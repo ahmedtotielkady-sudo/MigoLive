@@ -27,7 +27,9 @@ async function executeTransaction({
           existing.amount === amount &&
           existing.type === type &&
           existing.direction === direction &&
-          (existing.metadata?.game || null) === (metadata?.game || null);
+          existing.status === "posted" &&
+          (existing.metadata?.game || null) === (metadata?.game || null) &&
+          (existing.metadata?.action || null) === (metadata?.action || null);
 
         if (!sameRequest) throw new Error("Idempotency key was already used for another transaction");
         result = { success: true, duplicate: true, amount, direction, reference };
@@ -102,14 +104,22 @@ async function executeGiftTransfer({ senderId, recipientUsername, amount, refere
           debitExisting.amount === amount &&
           creditExisting.amount === amount &&
           debitExisting.type === "gift_debit" &&
-          creditExisting.type === "gift_credit";
+          creditExisting.type === "gift_credit" &&
+          debitExisting.direction === "debit" &&
+          creditExisting.direction === "credit" &&
+          debitExisting.status === "posted" &&
+          creditExisting.status === "posted" &&
+          String(debitExisting.metadata?.recipientId) === String(recipient._id) &&
+          String(creditExisting.metadata?.senderId) === String(senderId);
         if (!valid) throw new Error("Idempotency key was already used for another gift");
         duplicate = true;
         return;
       }
 
-      const sender = await User.findById(senderId).select("username").session(session);
+      const sender = await User.findOne({ _id: senderId, status: "active" }).select("username").session(session);
+      const activeRecipient = await User.findOne({ _id: recipient._id, status: "active" }).select("_id username").session(session);
       if (!sender) throw new Error("Sender not found");
+      if (!activeRecipient) throw new Error("Recipient not found");
 
       await Wallet.updateOne({ userId: senderId }, { $setOnInsert: { balance: 0 } }, { upsert: true, session });
       await Wallet.updateOne({ userId: recipient._id }, { $setOnInsert: { balance: 0 } }, { upsert: true, session });
@@ -132,7 +142,7 @@ async function executeGiftTransfer({ senderId, recipientUsername, amount, refere
         {
           userId: senderId, type: "gift_debit", amount, direction: "debit",
           reference: debitRef, status: "posted",
-          metadata: { recipientId: recipient._id, recipientUsername: recipient.username }
+          metadata: { recipientId: activeRecipient._id, recipientUsername: activeRecipient.username }
         },
         {
           userId: recipient._id, type: "gift_credit", amount, direction: "credit",
@@ -153,7 +163,11 @@ async function executeGiftTransfer({ senderId, recipientUsername, amount, refere
         debit && credit &&
         String(debit.userId) === String(senderId) &&
         String(credit.userId) === String(recipient._id) &&
-        debit.amount === amount && credit.amount === amount
+        debit.amount === amount && credit.amount === amount &&
+        debit.direction === "debit" && credit.direction === "credit" &&
+        debit.status === "posted" && credit.status === "posted" &&
+        String(debit.metadata?.recipientId) === String(recipient._id) &&
+        String(credit.metadata?.senderId) === String(senderId)
       ) {
         return { success: true, duplicate: true, amount, recipient: recipient.username, reference };
       }
