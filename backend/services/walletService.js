@@ -60,7 +60,9 @@ async function executeTransaction({
           existing.amount === amount &&
           existing.type === type &&
           existing.direction === direction &&
-          (existing.metadata?.game || null) === (metadata?.game || null);
+          existing.status === "posted" &&
+          (existing.metadata?.game || null) === (metadata?.game || null) &&
+          (existing.metadata?.action || null) === (metadata?.action || null);
         if (!sameRequest) throw new Error("Idempotency key was already used for another transaction");
         return { success: true, duplicate: true, amount, direction, reference };
       }
