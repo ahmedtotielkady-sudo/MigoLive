@@ -29,7 +29,9 @@ async function executeTransaction({
           existing.direction === direction &&
           existing.status === "posted" &&
           (existing.metadata?.game || null) === (metadata?.game || null) &&
-          (existing.metadata?.action || null) === (metadata?.action || null);
+          (existing.metadata?.action || null) === (metadata?.action || null) &&
+          (existing.metadata?.actorId || null) === (metadata?.actorId || null) &&
+          (existing.metadata?.reason || null) === (metadata?.reason || null);
 
         if (!sameRequest) throw new Error("Idempotency key was already used for another transaction");
         result = { success: true, duplicate: true, amount, direction, reference };
@@ -62,7 +64,9 @@ async function executeTransaction({
           existing.direction === direction &&
           existing.status === "posted" &&
           (existing.metadata?.game || null) === (metadata?.game || null) &&
-          (existing.metadata?.action || null) === (metadata?.action || null);
+          (existing.metadata?.action || null) === (metadata?.action || null) &&
+          (existing.metadata?.actorId || null) === (metadata?.actorId || null) &&
+          (existing.metadata?.reason || null) === (metadata?.reason || null);
         if (!sameRequest) throw new Error("Idempotency key was already used for another transaction");
         return { success: true, duplicate: true, amount, direction, reference };
       }
