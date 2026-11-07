@@ -10,7 +10,7 @@ async function executeTransaction({
   reference,
   metadata = {}
 }) {
-  if (!userId || !reference) {
+  if (!userId || !reference || !type) {
     throw new Error("Missing transaction data");
   }
 
@@ -27,13 +27,45 @@ async function executeTransaction({
 
   try {
     await session.withTransaction(async () => {
-      const existing = await Ledger.findOne({
-        reference
-      }).session(session);
+      const existing = await Ledger.findOne({ reference }).session(session);
 
       if (existing) {
-        result = { duplicate: true };
+        const sameRequest =
+          String(existing.userId) === String(userId) &&
+          existing.amount === amount &&
+          existing.type === type &&
+          existing.direction === direction;
+
+        if (!sameRequest) {
+          throw new Error("Idempotency key was already used for another transaction");
+        }
+
+        result = {
+          success: true,
+          duplicate: true,
+          amount: existing.amount,
+          direction: existing.direction,
+          reference: existing.reference
+        };
         return;
+      }
+
+      await Wallet.updateOne(
+        { userId },
+        { $setOnInsert: { balance: 0 } },
+        { upsert: true, session }
+      );
+
+      const walletUpdate = await Wallet.updateOne(
+        direction === "debit"
+          ? { userId, balance: { $gte: amount } }
+          : { userId },
+        { $inc: { balance: direction === "credit" ? amount : -amount } },
+        { session }
+      );
+
+      if (!walletUpdate.modifiedCount) {
+        throw new Error("Insufficient balance");
       }
 
       await Ledger.create([{
@@ -46,35 +78,7 @@ async function executeTransaction({
         metadata
       }], { session });
 
-      await Wallet.updateOne(
-        { userId },
-        { $setOnInsert: { balance: 0 } },
-        { upsert: true, session }
-      );
-
-      const update = await Wallet.updateOne(
-        direction === "debit"
-          ? { userId, balance: { $gte: amount } }
-          : { userId },
-        {
-          $inc: {
-            balance: direction === "credit"
-              ? amount
-              : -amount
-          }
-        },
-        { session }
-      );
-
-      if (!update.modifiedCount) {
-        throw new Error("Insufficient balance");
-      }
-
-      result = {
-        success: true,
-        amount,
-        direction
-      };
+      result = { success: true, duplicate: false, amount, direction, reference };
     });
 
     return result;
