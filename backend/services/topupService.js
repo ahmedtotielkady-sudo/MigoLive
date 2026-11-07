@@ -22,17 +22,18 @@ async function requestTopup({ userId, amount, paymentReference, receiptData, ide
   const matches = (entry) =>
     entry &&
     String(entry.userId) === String(userId) &&
-    entry.type === "topup_pending" &&
+    ["topup_pending", "topup"].includes(entry.type) &&
     entry.amount === amount &&
     entry.direction === "credit" &&
-    entry.status === "pending" &&
+    ["pending", "posted", "reversed"].includes(entry.status) &&
     String(entry.metadata?.paymentReference || "") === cleanPaymentReference &&
     String(entry.metadata?.receiptData || "") === cleanReceiptData;
+  const replayStatus = (entry) => entry.status === "posted" ? "posted" : entry.status === "reversed" ? "rejected" : "pending";
 
   const existing = await Ledger.findOne({ reference }).lean();
   if (existing) {
     if (!matches(existing)) throw new Error("Idempotency key was already used for another top-up");
-    return { success: true, duplicate: true, status: "pending", reference, amount };
+    return { success: true, duplicate: true, status: replayStatus(existing), reference, amount };
   }
 
   const session = await mongoose.startSession();
@@ -61,7 +62,7 @@ async function requestTopup({ userId, amount, paymentReference, receiptData, ide
   } catch (error) {
     if (error.code === 11000) {
       const raced = await Ledger.findOne({ reference }).lean();
-      if (matches(raced)) return { success: true, duplicate: true, status: "pending", reference, amount };
+      if (matches(raced)) return { success: true, duplicate: true, status: replayStatus(raced), reference, amount };
       if (raced) throw new Error("Idempotency key was already used for another top-up");
     }
     throw error;
