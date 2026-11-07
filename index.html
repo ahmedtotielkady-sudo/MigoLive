@@ -1399,9 +1399,24 @@ function rOwner(m){
   m.querySelectorAll('[data-tno]').forEach(b=>b.onclick=()=>{const t=DB.topups[b.dataset.tno];if(!t)return;t.status='no';notifyUserResult(t.user,`تم رفض طلب الشحن بقيمة ${fmt(t.amount)} عملة`);save();render()});
   m.querySelectorAll('[data-gi]').forEach(i=>i.onchange=()=>rImg(i.files[0],128,u=>{DB.gIcons=DB.gIcons||{};DB.gIcons[i.dataset.gi]=u;save();toast('تم رفع الأيقونة');render()}));
   if($('#ssw'))$('#ssw').onclick=()=>{DB.settings.wallet=$('#sw').value.trim().slice(0,40);save();toast('تم الحفظ')};
-  const go=$('#go');if(go)go.onclick=()=>{const k=findUser($('#tu').value)||$('#tu').value.trim().toLowerCase(),a=+(($('#am')||{}).value),e=$('#er');
-    if(ot==='coins'){const r=transfer(null,k,a);if(r&&!(a<0&&DB.users[k]))return e.textContent=r;if(a<0){DB.users[k].coins=Math.max(0,DB.users[k].coins+a);logIt('مالك',`خصم ${-a} من ${DB.users[k].name}`)}}
-    else if(ot==='ag'){if(U().role!=='owner')return e.textContent='إنشاء الوكالات متاح للمالك فقط';const t=DB.users[k],n=$('#an').value.trim();if(!n)return e.textContent='اكتب اسم الوكالة';if(!t)return e.textContent='المستخدم غير موجود';DB.agencies.push({id:Date.now(),name:n,head:k});if(t.role==='user')t.role='agent';logIt('مالك',`إنشاء وكالة ${n}`)}
+  const go=$('#go');if(go)go.onclick=async()=>{const rawTarget=$('#tu').value.trim(),k=findUser(rawTarget)||rawTarget.toLowerCase(),a=Number((($('#am')||{}).value)||0),e=$('#er');
+    if(ot==='coins'){
+      if(U().role!=='owner')return e.textContent='تعديل أرصدة المستخدمين متاح للمالك الأساسي فقط';
+      if(!Number.isSafeInteger(a)||a===0||Math.abs(a)>1000000)return e.textContent='أدخل مبلغاً صحيحاً من 1 إلى 1,000,000؛ استخدم السالب للخصم';
+      const local=DB.users[k],lookup=local?String(local.uid):rawTarget;
+      try{
+        const found=await apiRequest('/admin/users?q='+encodeURIComponent(lookup)+'&page=1&limit=100');
+        const target=(found.users||[]).find(user=>(local&&String(user.legacyUid)===String(local.uid))||String(user.legacyUid||'')===rawTarget||String(user.username||'').toLowerCase()===rawTarget.toLowerCase());
+        if(!target)return e.textContent='الحساب غير موجود في قاعدة بيانات الخادم أو لم يكتمل ترحيله بعد';
+        const key=crypto.randomUUID?crypto.randomUUID():('owner-adjust-'+Date.now()+'-'+Math.random().toString(36).slice(2));
+        await apiRequest('/admin/wallet/adjust',{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({userId:target._id,amount:Math.abs(a),direction:a<0?'debit':'credit',reason:a<0?'خصم من لوحة المالك':'منحة من لوحة المالك'})});
+        e.textContent='';toast(a<0?'تم الخصم من محفظة الخادم':'تمت إضافة العملات إلى محفظة الخادم');
+        if(local&&k===me)await refreshServerWallet();
+        render();
+      }catch(error){e.textContent='لم يتم تعديل الرصيد: '+error.message}
+      return;
+    }
+    if(ot==='ag'){if(U().role!=='owner')return e.textContent='إنشاء الوكالات متاح للمالك فقط';const t=DB.users[k],n=$('#an').value.trim();if(!n)return e.textContent='اكتب اسم الوكالة';if(!t)return e.textContent='المستخدم غير موجود';DB.agencies.push({id:Date.now(),name:n,head:k});if(t.role==='user')t.role='agent';logIt('مالك',`إنشاء وكالة ${n}`)}
     else{const t=DB.users[k];if(!t)return e.textContent='المستخدم غير موجود';t.role='agent';t.locked=false;if(a>0)t.coins+=a;logIt('مالك',`تعيين ${t.name} وكيلاً (+${a||0})`)}
     save();render()};
 }
