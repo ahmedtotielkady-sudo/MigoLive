@@ -22,6 +22,25 @@ const ownerClaimLimit = rateLimit({
   legacyHeaders: false
 });
 
+function issueToken(user) {
+  const token = jwt.sign(
+    { sub: user._id.toString() },
+    process.env.JWT_SECRET,
+    { expiresIn: "2h", issuer: "migolive-api", audience: "migolive-app", algorithm: "HS256" }
+  );
+  return {
+    token,
+    expiresIn: 7200,
+    user: {
+      id: user._id,
+      username: user.username,
+      displayName: user.displayName || user.username,
+      legacyUid: user.legacyUid || null,
+      role: user.role
+    }
+  };
+}
+
 router.post("/register", async (req, res, next) => {
   const username = String(req.body.username || "").trim();
   const password = String(req.body.password || "");
@@ -45,12 +64,77 @@ router.post("/register", async (req, res, next) => {
 
     return res.status(201).json({ id: user._id, username: user.username });
   } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({ error: "Username already exists" });
-    }
+    if (error.code === 11000) return res.status(409).json({ error: "Username already exists" });
     return next(error);
   } finally {
     await session.endSession();
+  }
+});
+
+// One-time migration path for accounts held by the previous localStorage app.
+// Only the password is used to authenticate; client-supplied coin balances and
+// roles are deliberately ignored. The server creates the canonical wallet.
+router.post("/legacy-login", loginLimit, async (req, res, next) => {
+  const legacyUid = String(req.body.legacyUid || "");
+  const password = String(req.body.password || "");
+  const displayName = String(req.body.displayName || "").trim().slice(0, 48);
+  const phone = String(req.body.phone || "").replace(/[\s()-]/g, "");
+
+  if (!/^\d{5,10}$/.test(legacyUid) || password.length < 6 || password.length > 128) {
+    return res.status(400).json({ error: "Invalid legacy account credentials" });
+  }
+  if (phone && !/^\+?\d{7,15}$/.test(phone)) {
+    return res.status(400).json({ error: "Invalid phone number" });
+  }
+
+  try {
+    let user = await User.findOne({ legacyUid }).select("+passwordHash username displayName legacyUid phone role status");
+    if (!user && phone) {
+      const byPhone = await User.findOne({ phone }).select("+passwordHash username displayName legacyUid phone role status");
+      if (byPhone && byPhone.legacyUid !== legacyUid) {
+        return res.status(409).json({ error: "Phone number is linked to another account" });
+      }
+      user = byPhone;
+    }
+
+    if (user) {
+      if (user.status !== "active" || !(await bcrypt.compare(password, user.passwordHash))) {
+        return res.status(401).json({ error: "Invalid ID or password" });
+      }
+      if (phone && !user.phone) {
+        user.phone = phone;
+        await user.save();
+      }
+      return res.json(issueToken(user));
+    }
+
+    const session = await mongoose.startSession();
+    try {
+      const passwordHash = await bcrypt.hash(password, 12);
+      await session.withTransaction(async () => {
+        const created = await User.create([{
+          username: "mg_" + legacyUid,
+          legacyUid,
+          phone: phone || undefined,
+          displayName: displayName || ("عضو " + legacyUid),
+          passwordHash,
+          role: "user",
+          status: "active"
+        }], { session });
+        user = created[0];
+        // The old app granted 100 coins to every newly-created account.
+        // Existing local balances are not trusted or imported from the client.
+        await Wallet.create([{ userId: user._id, balance: 100 }], { session });
+      });
+    } finally {
+      await session.endSession();
+    }
+    return res.status(201).json(issueToken(user));
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ error: "Account migration conflict; retry login" });
+    }
+    return next(error);
   }
 });
 
@@ -58,34 +142,14 @@ router.post("/login", loginLimit, async (req, res, next) => {
   try {
     const username = String(req.body.username || "").trim();
     const password = String(req.body.password || "");
-
     if (!username || password.length > 128) {
       return res.status(401).json({ error: "Invalid username or password" });
     }
-
-    const user = await User.findOne({ username })
-      .select("+passwordHash username role status");
-
+    const user = await User.findOne({ username }).select("+passwordHash username displayName role status");
     if (!user || user.status !== "active" || !(await bcrypt.compare(password, user.passwordHash))) {
       return res.status(401).json({ error: "Invalid username or password" });
     }
-
-    const token = jwt.sign(
-      { sub: user._id.toString() },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "2h",
-        issuer: "migolive-api",
-        audience: "migolive-app",
-        algorithm: "HS256"
-      }
-    );
-
-    return res.json({
-      token,
-      expiresIn: 7200,
-      user: { id: user._id, username: user.username, role: user.role }
-    });
+    return res.json(issueToken(user));
   } catch (error) {
     return next(error);
   }
@@ -96,7 +160,6 @@ router.post("/login", loginLimit, async (req, res, next) => {
 router.post("/claim-owner", auth, ownerClaimLimit, async (req, res, next) => {
   const configuredCode = process.env.OWNER_BOOTSTRAP_CODE;
   const suppliedCode = String(req.body.code || "");
-
   if (!configuredCode || configuredCode.length < 32) {
     return res.status(503).json({ error: "Owner bootstrap is not configured" });
   }
@@ -115,8 +178,9 @@ router.post("/claim-owner", auth, ownerClaimLimit, async (req, res, next) => {
     await session.withTransaction(async () => {
       const claimed = await OwnerClaim.findById("primary").session(session);
       if (claimed) {
-        const alreadyOwner = String(claimed.userId) === String(req.user._id);
-        if (!alreadyOwner) throw Object.assign(new Error("Primary owner already claimed"), { status: 409 });
+        if (String(claimed.userId) !== String(req.user._id)) {
+          throw Object.assign(new Error("Primary owner already claimed"), { status: 409 });
+        }
         return;
       }
 
@@ -134,12 +198,10 @@ router.post("/claim-owner", auth, ownerClaimLimit, async (req, res, next) => {
       if (!changed.modifiedCount) throw new Error("Unable to assign owner role");
     });
 
-    const updatedUser = await User.findById(req.user._id).select("_id username role status");
+    const updatedUser = await User.findById(req.user._id).select("_id username displayName role status");
     return res.json({ success: true, user: updatedUser });
   } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({ error: "Primary owner already claimed" });
-    }
+    if (error.code === 11000) return res.status(409).json({ error: "Primary owner already claimed" });
     if (error.status) return res.status(error.status).json({ error: error.message });
     return next(error);
   } finally {
@@ -151,6 +213,8 @@ router.get("/me", auth, (req, res) => {
   return res.json({
     id: req.user._id,
     username: req.user.username,
+    displayName: req.user.displayName || req.user.username,
+    legacyUid: req.user.legacyUid || null,
     role: req.user.role
   });
 });
