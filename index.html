@@ -1089,6 +1089,8 @@ function renderRoom(m){
     const cats=[['all','الكل'],['popular','رائج'],['lucky','محظوظ'],['special','خاص']];
     const recipients=memberIds.map(k=>`<label class="row" style="gap:8px;padding:5px 2px"><input type="checkbox" class="gift-rec" value="${k}" ${k===me?'checked':''}><span class="av" style="width:30px;height:30px" ${avS(DB.users[k])}>${avL(DB.users[k])}</span><span class="grow">${esc(DB.users[k].name)}${k===me?' — أنا':''}${r.seats.includes(k)?' — على المايك':''}</span></label>`).join('');
     const d=dlg('🎁 إرسال هدية',`<div class="mu">حدد المستلمين</div><label class="row" style="padding:7px 0;border-bottom:1px solid var(--line)"><input type="checkbox" id="giftAll"><b>تحديد الكل</b></label><div id="giftRecipients" style="max-height:105px;overflow:auto">${recipients}</div><div class="mu" style="margin-top:10px">أقسام الهدايا</div><div class="sec" id="giftCats">${cats.map(([k,l],i)=>`<button type="button" class="btn ${i===0?'g':'o'} s grow" data-cat="${k}">${l}</button>`).join('')}</div><div id="giftGrid" class="bgs" style="grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;max-height:145px;overflow:auto;margin-top:8px"></div><div id="giftChosen" class="card" style="margin:8px 0;text-align:center">اختر هدية</div><div class="mu">كمية الإرسال</div><div class="sec" id="giftQty">${[1,9,49,99,499].map((n,i)=>`<button type="button" class="btn ${i===0?'g':'o'} s grow" data-qty="${n}">${n}</button>`).join('')}</div><div class="mu" id="gpr"></div><div class="mu">رصيدك 🪙 ${fmt(u.coins)}</div>`,d=>{
+      d.querySelector('#dle').textContent='إرسال الهدايا داخل الغرف متوقف مؤقتاً حتى ربط خصم العملات وسجل أرباح المستلمين بالخادم.';
+      return false;
       const targets=[...d.querySelectorAll('.gift-rec:checked')].map(x=>x.value),g=DB.giftCat.find(x=>x.id==d.dataset.gift),qty=+(d.dataset.qty||1);
       if(!targets.length){d.querySelector('#dle').textContent='حدد مستلماً واحداً على الأقل';return false}if(!g){d.querySelector('#dle').textContent='اختر الهدية أولاً';return false}
       const total=pay(g)*qty*targets.length;if(u.coins<total){d.querySelector('#dle').textContent='رصيدك غير كافٍ لإرسال هذه الكمية';return false}
@@ -1471,6 +1473,12 @@ async function rWallet(m){
     $('#srv-topup-send').onclick=async()=>{const error=$('#srv-topup-error'),amount=Math.floor(+$('#srv-topup-amount').value),paymentReference=$('#srv-topup-ref').value.trim();if(!(amount>0)){error.textContent='أدخل كمية صحيحة';return}try{await apiRequest('/wallet/topups',{method:'POST',body:JSON.stringify({amount,paymentReference})});toast('تم إرسال طلب الشحن للمراجعة');rWallet(m)}catch(e){error.textContent=e.message}};
     $('#srv-gift-send').onclick=async()=>{const error=$('#srv-gift-error'),recipientLegacyUid=$('#srv-gift-id').value.trim(),amount=Math.floor(+$('#srv-gift-amount').value);if(!/^\d{5,10}$/.test(recipientLegacyUid)||!(amount>0)){error.textContent='أدخل ID صحيحاً وكمية موجبة';return}try{await apiRequest('/wallet/gift',{method:'POST',headers:{'Idempotency-Key':'gift-'+crypto.randomUUID()},body:JSON.stringify({recipientLegacyUid,amount})});toast('تم التحويل بنجاح');rWallet(m)}catch(e){error.textContent=e.message}};
   }catch(error){m.innerHTML=`<div class="card"><b>تعذر تحميل المحفظة المركزية</b><div class="mu">${esc(error.message)}</div><button class="btn o w" id="srv-wallet-retry">إعادة المحاولة</button></div>`;$('#srv-wallet-retry').onclick=()=>rWallet(m)}
+}
+
+
+function payInvite(_k){/* Referral rewards remain disabled until server-side eligibility and settlement exist. */}
+function rVip(m){
+  m.innerHTML='<div class="card"><b>👑 مستويات VIP</b><div class="mu">تم إيقاف استلام مكافآت VIP المحلية مؤقتاً. ستعود بعد ربط الشحن والمكافآت وسجل الاستحقاق بالخادم حتى لا تُنشأ عملات من الجهاز.</div></div>';
 }
 
 // Restore only after the server confirms the bearer token and current role.
