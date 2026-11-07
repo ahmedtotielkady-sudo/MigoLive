@@ -1,5 +1,4 @@
 const router = require("express").Router();
-const crypto = require("crypto");
 const auth = require("../middleware/auth");
 const { executeTransaction } = require("../services/walletService");
 
@@ -48,14 +47,11 @@ router.post("/:gameId/debit", auth, async (req, res) => {
   }
 
   const suppliedKey = req.get("Idempotency-Key");
-  if (
-    suppliedKey !== undefined &&
-    (typeof suppliedKey !== "string" || !/^[A-Za-z0-9._:-]{8,128}$/.test(suppliedKey))
-  ) {
-    return res.status(400).json({ error: "Invalid idempotency key" });
+  if (typeof suppliedKey !== "string" || !/^[A-Za-z0-9._:-]{8,128}$/.test(suppliedKey)) {
+    return res.status(400).json({ error: "A valid Idempotency-Key header is required" });
   }
 
-  const reference = suppliedKey || crypto.randomUUID();
+  const reference = suppliedKey;
 
   try {
     const transaction = await executeTransaction({
