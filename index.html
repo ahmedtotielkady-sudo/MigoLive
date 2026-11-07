@@ -1130,13 +1130,20 @@ function topupCard(){const w=DB.settings.wallet,mine=DB.topups.filter(t=>t.user=
   ${mine.length?'<b>طلباتي</b><div class="sp"></div>'+mine.map(t=>`<div class="card row"><div class="grow"><b>${t.amount} عملة</b><div class="mu">${t.t}</div></div><span class="badge">${{pending:'قيد المراجعة',ok:'تم الشحن',no:'مرفوض'}[t.status]}</span></div>`).join(''):''}`}
 function bindTopup(m){let img='';packsBind(m);
   if($('#cp'))$('#cp').onclick=()=>{try{navigator.clipboard.writeText(DB.settings.wallet);toast('تم النسخ')}catch(e){toast('انسخ الرقم يدوياً')}};
-  $('#tpf').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,800/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);img=c.toDataURL('image/jpeg',.6);$('#tv').innerHTML=`<img class="thumb" src="${img}" alt="المرفق">`};im.onerror=()=>toast('الملف ليس صورة');im.src=rd.result};rd.readAsDataURL(f)};
-  $('#ts').onclick=()=>{const a=+$('#ta').value,f=$('#tf').value.trim(),e=$('#te');
+  $('#tpf').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,320/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);img=c.toDataURL('image/jpeg',.32);$('#tv').innerHTML=`<img class="thumb" src="${img}" alt="المرفق">`};im.onerror=()=>toast('الملف ليس صورة');im.src=rd.result};rd.readAsDataURL(f)};
+  $('#ts').onclick=async()=>{const a=Math.floor(+$('#ta').value),f=$('#tf').value.trim(),e=$('#te'),button=$('#ts');
     if(!DB.settings.wallet)return e.textContent='لا يمكن الشحن قبل تحديد رقم المحفظة';
     if(!(a>0))return e.textContent='اكتب عدد العملات';if(f.length<6)return e.textContent='اكتب الرقم الذي حوّلت منه';if(!img)return e.textContent='ارفع صورة الإيصال';
-    DB.topups.unshift({id:Date.now(),user:me,amount:a,from:f,img,status:'pending',t:now(),pack:selPack?{coins:selPack.coins,bonus:selPack.bonus||0,price:selPack.price}:null});selPack=null;
-    if(!save()){DB.topups.shift();return e.textContent='مساحة التخزين ممتلئة، جرّب صورة أصغر'}
-    notifyOwner(`طلب شحن جديد من ${U().name} (ID ${U().uid}) بقيمة ${fmt(a)} عملة`,'request');notifyUserResult(me,`تم استلام طلب شحن ${fmt(a)} عملة وهو قيد المراجعة`);toast('تم إرسال الطلب للمراجعة');render()}}
+    if(img.length>24000)return e.textContent='حجم الإيصال كبير؛ اختر صورة أوضح بحجم أصغر';
+    if(!API_TOKEN)return e.textContent='سجّل الدخول إلى الخادم أولاً';
+    button.disabled=true;e.textContent='جارٍ إرسال طلب الشحن إلى الخادم...';
+    try{
+      const key=crypto.randomUUID?crypto.randomUUID():('topup-'+Date.now()+'-'+Math.random().toString(36).slice(2));
+      const result=await apiRequest('/wallet/topups',{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({amount:a,paymentReference:f,receiptData:img})});
+      selPack=null;e.textContent='';toast(result.duplicate?'طلب الشحن مسجل بالفعل':'تم إرسال طلب الشحن للمراجعة');await refreshServerWallet();render();
+    }catch(err){e.textContent='تعذر إرسال طلب الشحن: '+err.message}
+    finally{button.disabled=false}
+  }
 function rWallet(m){rWallet0(m);bindTopup(m)}
 function rWallet0(m){
   m.innerHTML=`<div class="card" style="text-align:center"><div class="mu">رصيدك</div><div style="font-size:36px;font-weight:900;color:var(--gd)">🪙 ${SERVER_WALLET_READY?SERVER_WALLET_BALANCE:'—'}</div></div>
@@ -1294,6 +1301,33 @@ function agencyOwnerBind(m){
 }
 const logTable=a=>a.length?`<div class="tbw"><table><tr><th>الوقت</th><th>التفاصيل</th></tr>${a.map(l=>`<tr><td>${l.t}</td><td>${esc(l.txt)}</td></tr>`).join('')}</table></div>`:'<p class="mu">لا يوجد سجل</p>';
 let ot='tp';
+async function loadServerTopups(container){
+  const box=container.querySelector('#server-topups-list');if(!box)return;
+  try{
+    const data=await apiRequest('/admin/topups/pending');
+    const items=data.items||[];
+    box.innerHTML=items.length?items.map(function(item){
+      const user=item.userId||{},name=user.username||user.legacyUid||String(user._id||'حساب');
+      const proof=item.metadata&&item.metadata.receiptData;
+      const paymentRef=item.metadata&&item.metadata.paymentReference||'—';
+      let proofHtml='<div class="mu">لا توجد صورة إيصال مرفقة</div>';
+      if(typeof proof==='string'&&/^data:image\/(?:jpeg|png|webp);base64,/.test(proof)){
+        proofHtml='<img class="thumb" src="'+esc(proof)+'" alt="إيصال الدفع">';
+      }
+      return '<div class="card"><b>'+esc(name)+' — '+fmt(item.amount)+' عملة</b><div class="mu">مرجع الدفع: <span dir="ltr">'+esc(paymentRef)+'</span></div><div class="mu">رقم الطلب: <span dir="ltr">'+esc(item.reference)+'</span> · '+new Date(item.createdAt).toLocaleString('ar-EG')+'</div>'+proofHtml+'<div class="row" style="margin-top:8px"><button class="btn s grow" data-server-topup-approve="'+esc(item.reference)+'">موافقة وشحن</button><button class="btn r s grow" data-server-topup-reject="'+esc(item.reference)+'">رفض</button></div></div>';
+    }).join(''):'<p class="mu">لا توجد طلبات شحن معلقة على الخادم.</p>';
+    box.querySelectorAll('[data-server-topup-approve]').forEach(function(button){button.onclick=async function(){
+      const ref=button.dataset.serverTopupApprove;button.disabled=true;
+      try{await apiRequest('/admin/topups/'+encodeURIComponent(ref)+'/approve',{method:'POST',body:JSON.stringify({note:'تمت المراجعة من لوحة الإدارة'})});toast('تم اعتماد الشحن من الخادم');await loadServerTopups(container)}
+      catch(err){toast('تعذر اعتماد الطلب: '+err.message);button.disabled=false}
+    }});
+    box.querySelectorAll('[data-server-topup-reject]').forEach(function(button){button.onclick=async function(){
+      const ref=button.dataset.serverTopupReject;button.disabled=true;
+      try{await apiRequest('/admin/topups/'+encodeURIComponent(ref)+'/reject',{method:'POST',body:JSON.stringify({note:'تم رفض الطلب بعد المراجعة'})});toast('تم رفض طلب الشحن');await loadServerTopups(container)}
+      catch(err){toast('تعذر رفض الطلب: '+err.message);button.disabled=false}
+    }});
+  }catch(error){box.innerHTML='<p class="err">تعذر تحميل طلبات الخادم: '+esc(error.message)+'</p>'}
+}
 function rOwner(m){
   if(!isStaff(U())){tab='me';return render()}
   const users=Object.entries(DB.users),agents=users.filter(([,x])=>x.role==='agent');
@@ -1304,7 +1338,7 @@ function rOwner(m){
   if(ot==='ledger')body=shippingLedgerHTML();
   if(ot==='broadcast')body=broadcastOwnerHTML();
   if(ot==='events')body=eventsOwnerHTML();
-  if(ot==='tp')body=DB.topups.length?DB.topups.map((t,i)=>`<div class="card"><div class="row"><div class="grow"><b>${esc(DB.users[t.user]?DB.users[t.user].name:t.user)}</b> — ${t.amount} عملة<div class="mu">من: <span dir="ltr">${esc(t.from)}</span> · ${t.t}${t.pack?` · باقة ${fmt(t.pack.price)} ${esc(DB.settings.cur)}`:''}</div></div><span class="badge">${{pending:'جديد',ok:'مقبول',no:'مرفوض'}[t.status]}</span></div><img class="thumb" src="${esc(t.img)}" alt="إيصال">${t.status==='pending'?`<div class="row" style="margin-top:8px"><button class="btn s grow" data-tok="${i}">قبول وشحن</button><button class="btn r s grow" data-tno="${i}">رفض</button></div>`:''}</div>`).join(''):'<p class="mu">لا توجد طلبات شحن</p>';
+  if(ot==='tp')body='<div id="server-topups-list"><p class="mu">جارٍ تحميل طلبات الشحن من الخادم...</p></div>';
   if(ot==='set')body=`<div class="card"><b>رقم محفظة الشحن</b><div class="sp"></div><input class="in" id="sw" dir="ltr" inputmode="tel" value="${esc(DB.settings.wallet||'')}" placeholder="رقم المحفظة"><button class="btn g w" id="ssw">حفظ</button></div>
   <div class="card"><b>أيقونات الألعاب</b>${Object.entries(GM).map(([k,g])=>`<div class="row" style="margin-top:8px"><div class="gi">${gicon(k)}</div><b class="grow">${g.n}</b><label class="btn o s" for="gi-${k}">رفع</label><input type="file" accept="image/*" class="hide" id="gi-${k}" data-gi="${k}"></div>`).join('')}</div>`;
   if(ot==='coins')body=`<div class="card"><b>منح عملات</b><div class="sp"></div><input class="in" id="tu" placeholder="اسم المستخدم"><input class="in" id="am" type="number" placeholder="العدد (سالب للخصم)"><div class="err" id="er"></div><button class="btn g w" id="go">تنفيذ</button></div>
@@ -1325,6 +1359,7 @@ function rOwner(m){
   if(ot==='localsec')body=localSecurityHTML();
   m.innerHTML=`<button class="btn o s" id="bk">← رجوع</button><h3 style="margin:10px 0">👑 لوحة المالك</h3><div style="overflow-x:auto;white-space:nowrap;margin-bottom:12px">${tabsO.map(([k,l])=>`<button class="pill ${ot===k?'on':''}" data-o="${k}">${l}</button>`).join('')}</div>${body}`;
   $('#bk').onclick=()=>goBack('me');
+  if(ot==='tp')loadServerTopups(m);
   m.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{ot=b.dataset.o;banFor=null;render()});
   if(ot==='dash')ownerDashboardBind(m);
   if(ot==='ship')shippingOwnerBind(m);
