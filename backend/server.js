@@ -26,10 +26,10 @@ app.use("/api", rateLimit({
 // Routes
 const authRoutes = require("./routes/auth");
 const walletRoutes = require("./routes/wallet");
-
+const gamesRoutes = require("./routes/games");
 app.use("/api/auth", authRoutes);
 app.use("/api/wallet", walletRoutes);
-
+app.use("/api/games", gamesRoutes);
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({
