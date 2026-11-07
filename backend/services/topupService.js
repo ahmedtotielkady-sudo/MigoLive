@@ -3,14 +3,41 @@ const crypto = require("crypto");
 const Wallet = require("../models/Wallet");
 const Ledger = require("../models/Ledger");
 
-async function requestTopup({ userId, amount, paymentReference }) {
+async function requestTopup({ userId, amount, paymentReference, idempotencyKey }) {
+  if (!userId || !idempotencyKey || !/^[A-Za-z0-9._:-]{8,100}$/.test(idempotencyKey)) {
+    throw new Error("Missing or invalid top-up idempotency key");
+  }
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000) {
     throw new Error("Invalid top-up amount");
   }
-  const reference = "topup_req_" + crypto.randomUUID();
+
+  // Scope the client key and bind it to the complete request. Reusing a key
+  // for a different account, amount, or payment reference is a conflict.
+  const reference = "topup_req_" + idempotencyKey;
+  const cleanPaymentReference = String(paymentReference || "").trim().slice(0, 100);
+  const matches = (entry) =>
+    entry &&
+    String(entry.userId) === String(userId) &&
+    entry.type === "topup_pending" &&
+    entry.amount === amount &&
+    entry.direction === "credit" &&
+    entry.status === "pending" &&
+    String(entry.metadata?.paymentReference || "") === cleanPaymentReference;
+
+  const existing = await Ledger.findOne({ reference }).lean();
+  if (existing) {
+    if (!matches(existing)) throw new Error("Idempotency key was already used for another top-up");
+    return { success: true, duplicate: true, status: "pending", reference, amount };
+  }
+
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
+      const concurrent = await Ledger.findOne({ reference }).session(session);
+      if (concurrent) {
+        if (!matches(concurrent)) throw new Error("Idempotency key was already used for another top-up");
+        return;
+      }
       await Ledger.create([{
         userId,
         type: "topup_pending",
@@ -19,12 +46,19 @@ async function requestTopup({ userId, amount, paymentReference }) {
         reference,
         status: "pending",
         metadata: {
-          paymentReference: String(paymentReference || "").trim().slice(0, 100),
+          paymentReference: cleanPaymentReference,
           requestedAt: new Date()
         }
       }], { session });
     });
-    return { success: true, status: "pending", reference, amount };
+    return { success: true, duplicate: false, status: "pending", reference, amount };
+  } catch (error) {
+    if (error.code === 11000) {
+      const raced = await Ledger.findOne({ reference }).lean();
+      if (matches(raced)) return { success: true, duplicate: true, status: "pending", reference, amount };
+      if (raced) throw new Error("Idempotency key was already used for another top-up");
+    }
+    throw error;
   } finally {
     await session.endSession();
   }
