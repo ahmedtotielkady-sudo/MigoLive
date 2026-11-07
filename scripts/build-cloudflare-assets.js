@@ -43,4 +43,4 @@ if (!fs.existsSync(path.join(output, "index.html"))) {
   throw new Error("index.html was not copied to the Cloudflare public directory");
 }
 
-console.log("Cloudflare assets prepared in ./public");
+console.log("Cloudflare assets prepared in ./public for Cloudflare Workers deployment");
