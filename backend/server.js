@@ -49,6 +49,11 @@ app.use(cors({
   origin(origin, callback) {
     // Native clients and server-to-server requests commonly omit Origin.
     if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    // The app and API are served from the same workers.dev host. Bearer-token
+    // authentication is used; no cross-site cookies are enabled.
+    if (/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)?\.workers\.dev$/i.test(origin)) {
+      return callback(null, true);
+    }
     return callback(new Error("Origin not allowed"));
   },
   methods: ["GET", "POST", "OPTIONS"],
