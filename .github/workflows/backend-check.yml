@@ -30,3 +30,5 @@ jobs:
           node scripts/check-html-syntax.js
       - name: Build Cloudflare static assets
         run: npm run build:cloudflare
+      - name: Validate Cloudflare Worker bundle
+        run: npx wrangler deploy --dry-run
