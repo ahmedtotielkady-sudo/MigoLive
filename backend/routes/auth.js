@@ -248,6 +248,22 @@ router.post("/claim-owner", auth, ownerClaimLimit, async (req, res, next) => {
   }
 });
 
+
+router.post("/profile", auth, async (req, res, next) => {
+  const displayName = String(req.body.displayName || "").trim();
+  if (displayName.length < 2 || displayName.length > 48) {
+    return res.status(400).json({ error: "Display name must be 2-48 characters" });
+  }
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: { displayName } },
+      { new: true, runValidators: true }
+    ).select("_id username displayName legacyUid role");
+    return res.json({ success: true, user });
+  } catch (error) { return next(error); }
+});
+
 router.get("/me", auth, (req, res) => {
   return res.json({
     id: req.user._id,
