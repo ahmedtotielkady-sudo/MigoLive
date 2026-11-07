@@ -32,6 +32,14 @@ Legacy IDs must be 5-10 digits. Legacy passwords must be 6-128 characters to pre
 - `POST /api/wallet/gift`: transfers virtual coins to another active username. Requires `recipientUsername`, positive integer `amount`, and an `Idempotency-Key` header. Sender debit, recipient credit and both ledger records commit in one MongoDB transaction.
 - The public API intentionally has no endpoint that lets a client credit its own coins.
 
+## Top-ups and owner adjustments
+
+
+- `POST /api/wallet/topups`: creates a pending request with a positive integer `amount` and optional payment reference. It does not credit the wallet.
+- `GET /api/admin/topups/pending`: lists pending requests for manual verification.
+- `POST /api/admin/topups/:reference/approve` or `/reject`: records the reviewer and review note. Approval credits the wallet and posts the ledger row in the same MongoDB transaction; rejection does not credit coins.
+- `POST /api/admin/wallet/adjust`: primary-owner-only manual credit/debit. Requires `userId`, positive integer `amount`, `direction`, a non-empty `reason`, and an `Idempotency-Key`. Every adjustment is written to the ledger.
+
 ## Games
 
 - `GET /api/games`: lists the configured game IDs.
