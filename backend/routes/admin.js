@@ -97,7 +97,7 @@ router.get("/users", async (req, res, next) => {
         const escaped = q.split("").map((ch) => "\\^$.*+?()[]{}|".includes(ch) ? "\\" + ch : ch).join("");
         filter.$or = [
           { username: { $regex: escaped, $options: "i" } },
-          ...( /^\\d{5,10}$/.test(q) ? [{ legacyUid: q }] : [])
+          ...( /^\d{5,10}$/.test(q) ? [{ legacyUid: q }] : [])
         ];
       }
     }
