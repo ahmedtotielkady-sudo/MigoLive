@@ -1144,6 +1144,7 @@ function bindTopup(m){let img='';packsBind(m);
     }catch(err){e.textContent='تعذر إرسال طلب الشحن: '+err.message}
     finally{button.disabled=false}
   }
+}
 function rWallet(m){rWallet0(m);bindTopup(m)}
 function rWallet0(m){
   m.innerHTML=`<div class="card" style="text-align:center"><div class="mu">رصيدك</div><div style="font-size:36px;font-weight:900;color:var(--gd)">🪙 ${SERVER_WALLET_READY?SERVER_WALLET_BALANCE:'—'}</div></div>
