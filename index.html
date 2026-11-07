@@ -693,7 +693,7 @@ const fmtD=t=>new Date(t).toLocaleDateString('ar-EG',{day:'numeric',month:'long'
 const banTxt=x=>x.banUntil?'محظور حتى '+fmtD(x.banUntil):'محظور نهائياً';
 let banFor=null;
 function goBack(fb){if(history.length>1)history.back();else nav(fb)}
-function forceOut(msg){leaveRoom(true);me=null;try{localStorage.removeItem('mygo_session');localStorage.removeItem('mygo_remember_login')}catch(_){}document.body.classList.add('auth-screen');$('#app').classList.add('hide');$('#auth').classList.remove('hide');$('#p').value='';$('#aerr').textContent=msg||''}
+function forceOut(msg){leaveRoom(true);me=null;API_TOKEN='';SERVER_WALLET_READY=false;try{localStorage.removeItem('mygo_api_token');localStorage.removeItem('mygo_session');localStorage.removeItem('mygo_remember_login')}catch(_){}document.body.classList.add('auth-screen');$('#app').classList.add('hide');$('#auth').classList.remove('hide');$('#p').value='';$('#aerr').textContent=msg||''}
 function start(){if(U()){U().last=Date.now();act('تسجيل دخول');save()}document.body.classList.remove('auth-screen');$('#auth').classList.add('hide');$('#app').classList.remove('hide');tab='rooms';room=null;lastKey='';try{history.replaceState(null,'','#rooms')}catch(e){}route();refreshServerWallet().then(()=>render()).catch(err=>toast('تعذر تحديث المحفظة من الخادم: '+err.message))}
 function render(){
   const u=U();
@@ -1393,16 +1393,23 @@ function localVipPlansBind(m){$('#vip-plan-save').onclick=()=>{DB.vipPlans.forEa
 function localSecurityHTML(){const events=DB.securityEvents.slice(0,100);return `<div class="card"><b>🛡️ الأمان المحلي</b><div class="mu">البيانات محصورة في هذا التطبيق وعلى هذا الهاتف. لا يمكن اعتبار تخزين HTML المحلي حماية قوية ضد مالك الجهاز أو أدوات المطور.</div><div class="row"><div class="grow">الحسابات</div><b>${Object.keys(DB.users).length}</b></div><div class="row"><div class="grow">حسابات محظورة</div><b>${Object.values(DB.users).filter(isBanned).length}</b></div></div><div class="card"><b>سجل أحداث الحساب</b>${events.map(x=>`<div class="mu" style="padding:7px 0;border-bottom:1px solid var(--line)">${new Date(x.t).toLocaleString('ar-EG')} · ${esc(x.action)} · ${esc(x.user)}</div>`).join('')||'<span class="mu">لا توجد أحداث بعد.</span>'}</div><div class="card"><b>نسخة احتياطية محلية</b><div class="mu">نزّل نسخة من بيانات التطبيق واحفظها في مكان آمن. لا تشاركها لأنها تحتوي بيانات الحسابات المحلية.</div><button class="btn o w" id="local-export">تصدير نسخة احتياطية JSON</button><label class="btn o w" for="local-import">استيراد نسخة احتياطية JSON</label><input class="hide" id="local-import" type="file" accept="application/json"></div>`}
 function localSecurityBind(m){$('#local-export').onclick=()=>{const blob=new Blob([JSON.stringify(DB)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mygo-local-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};$('#local-import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!d||typeof d.users!=='object'||!Array.isArray(d.rooms))throw Error('invalid');if(!confirm('سيتم استبدال البيانات المحلية الحالية بالنسخة الاحتياطية. هل تريد المتابعة؟'))return;DB=d;save();location.reload()}catch(_){toast('ملف النسخة الاحتياطية غير صالح')}}}
 
-// Restore the last signed-in account after closing/reopening the app.
-try{
-  const savedAccount=localStorage.getItem('mygo_remember_login')==='1'?localStorage.getItem('mygo_session'):null;
-  if(savedAccount && DB.users && DB.users[savedAccount] && !isBanned(DB.users[savedAccount])){
+// Restore only after the server confirms the bearer token and current role.
+(async()=>{
+  try{
+    const savedAccount=localStorage.getItem('mygo_remember_login')==='1'?localStorage.getItem('mygo_session'):null;
+    if(!savedAccount||!DB.users||!DB.users[savedAccount]||!API_TOKEN)throw new Error('No valid server session');
+    const identity=await apiRequest('/auth/me');
     me=savedAccount;
+    DB.users[me].role=identity.role||'user';
+    DB.users[me].serverUserId=String(identity.id);
+    await refreshServerWallet();
     start();
-  }else if(savedAccount){
-    localStorage.removeItem('mygo_session');
+  }catch(e){
+    API_TOKEN='';SERVER_WALLET_READY=false;
+    try{localStorage.removeItem('mygo_api_token');localStorage.removeItem('mygo_session');localStorage.removeItem('mygo_remember_login')}catch(_){}
+    console.warn('server session restore failed',e);
   }
-}catch(e){console.warn('session restore failed',e)}
+})();
 
 </script>
 
