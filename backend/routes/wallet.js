@@ -2,12 +2,72 @@ const router = require("express").Router();
 const auth = require("../middleware/auth");
 const Wallet = require("../models/Wallet");
 const Ledger = require("../models/Ledger");
-router.get("/", auth, async (req, res, next) => {
+const { executeGiftTransfer } = require("../services/walletService");
+
+router.use(auth);
+
+router.get("/", async (req, res, next) => {
   try {
-    const wallet = await Wallet.findOne({ userId: req.user._id }).lean();
-    const entries = await Ledger.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(50).lean();
-    res.json({ balance: wallet ? wallet.balance : 0, transactions: entries });
-  } catch (e) { next(e); }
+    const [wallet, entries] = await Promise.all([
+      Wallet.findOne({ userId: req.user._id }).select("balance updatedAt").lean(),
+      Ledger.find({ userId: req.user._id, status: "posted" })
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(50)
+        .select("type amount direction reference metadata createdAt")
+        .lean()
+    ]);
+
+    return res.json({
+      balance: wallet ? wallet.balance : 0,
+      updatedAt: wallet?.updatedAt || null,
+      transactions: entries
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
-// No client endpoint can directly credit coins. Verified payment webhooks/admin workflows must do that server-side.
+
+// Transfer virtual coins to another active account. The client cannot credit
+// either wallet directly; both balance changes and ledger rows commit together.
+router.post("/gift", async (req, res) => {
+  const recipientUsername = String(req.body.recipientUsername || "").trim();
+  const amount = req.body.amount;
+  const reference = req.get("Idempotency-Key");
+
+  if (!/^[A-Za-z0-9_]{3,24}$/.test(recipientUsername)) {
+    return res.status(400).json({ error: "Invalid recipient username" });
+  }
+  if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000) {
+    return res.status(400).json({ error: "Gift amount must be a positive integer up to 1,000,000" });
+  }
+  if (typeof reference !== "string" || !/^[A-Za-z0-9._:-]{8,100}$/.test(reference)) {
+    return res.status(400).json({ error: "A valid Idempotency-Key header is required" });
+  }
+
+  try {
+    const result = await executeGiftTransfer({
+      senderId: req.user._id,
+      recipientUsername,
+      amount,
+      reference
+    });
+    return res.json(result);
+  } catch (error) {
+    if (error.message === "Insufficient balance") {
+      return res.status(409).json({ error: "Insufficient balance" });
+    }
+    if (error.message === "Recipient not found") {
+      return res.status(404).json({ error: "Recipient not found" });
+    }
+    if (error.message === "Cannot gift yourself") {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error.message.includes("Idempotency key")) {
+      return res.status(409).json({ error: "Idempotency key conflict" });
+    }
+    console.error("Gift transfer failed:", error);
+    return res.status(500).json({ error: "Unable to process gift transfer" });
+  }
+});
+
 module.exports = router;
