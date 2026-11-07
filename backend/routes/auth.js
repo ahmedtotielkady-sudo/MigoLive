@@ -6,6 +6,7 @@ const rateLimit = require("express-rate-limit");
 const crypto = require("crypto");
 const User = require("../models/User");
 const Wallet = require("../models/Wallet");
+const Ledger = require("../models/Ledger");
 const OwnerClaim = require("../models/OwnerClaim");
 const auth = require("../middleware/auth");
 
@@ -125,6 +126,15 @@ router.post("/legacy-login", loginLimit, async (req, res, next) => {
         // The old app granted 100 coins to every newly-created account.
         // Existing local balances are not trusted or imported from the client.
         await Wallet.create([{ userId: user._id, balance: 100 }], { session });
+        await Ledger.create([{
+          userId: user._id,
+          type: "welcome_bonus",
+          amount: 100,
+          direction: "credit",
+          reference: "legacy-welcome:" + legacyUid,
+          status: "posted",
+          metadata: { action: "legacy_account_migration" }
+        }], { session });
       });
     } finally {
       await session.endSession();
