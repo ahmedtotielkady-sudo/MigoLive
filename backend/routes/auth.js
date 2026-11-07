@@ -46,14 +46,14 @@ router.post("/register", loginLimit, async (req, res, next) => {
   const username = String(req.body.username || "").trim();
   const password = String(req.body.password || "");
   const displayName = String(req.body.displayName || username).trim().slice(0, 48);
-  const phone = String(req.body.phone || "").replace(/[\\s()-]/g, "");
+  const phone = String(req.body.phone || "").replace(/[\s()-]/g, "");
 
   if (!/^[a-zA-Z0-9_]{3,24}$/.test(username) || password.length < 10 || password.length > 128) {
     return res.status(400).json({
       error: "Username must be 3-24 letters, numbers or underscores; password must be 10-128 characters"
     });
   }
-  if (phone && !/^\\+?\\d{7,15}$/.test(phone)) {
+  if (phone && !/^\+?\d{7,15}$/.test(phone)) {
     return res.status(400).json({ error: "Invalid phone number" });
   }
 
