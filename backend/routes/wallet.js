@@ -62,7 +62,7 @@ router.post("/gift", async (req, res) => {
   const amount = req.body.amount;
   const reference = req.get("Idempotency-Key");
 
-  if (recipientLegacyUid ? !/^\\d{5,10}$/.test(recipientLegacyUid) : !/^[A-Za-z0-9_]{3,24}$/.test(recipientUsername)) {
+  if (recipientLegacyUid ? !/^\d{5,10}$/.test(recipientLegacyUid) : !/^[A-Za-z0-9_]{3,24}$/.test(recipientUsername)) {
     return res.status(400).json({ error: "Invalid recipient username or ID" });
   }
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000) {
