@@ -95,7 +95,10 @@ router.get("/users", async (req, res, next) => {
       if (q.length > 24) return res.status(400).json({ error: "Search query is too long" });
       if (q) {
         const escaped = q.split("").map((ch) => "\\^$.*+?()[]{}|".includes(ch) ? "\\" + ch : ch).join("");
-        filter.username = { $regex: escaped, $options: "i" };
+        filter.$or = [
+          { username: { $regex: escaped, $options: "i" } },
+          ...( /^\\d{5,10}$/.test(q) ? [{ legacyUid: q }] : [])
+        ];
       }
     }
     if (req.query.status && ["active", "suspended"].includes(req.query.status)) {
@@ -109,7 +112,7 @@ router.get("/users", async (req, res, next) => {
         .sort({ createdAt: -1, _id: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
-        .select("_id username role status createdAt lastSeen")
+        .select("_id username legacyUid role status createdAt lastSeen")
         .lean(),
       User.countDocuments(filter)
     ]);
