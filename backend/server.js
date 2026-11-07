@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const mongoose = require("mongoose");
+const path = require("path");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
@@ -59,7 +60,7 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-app.get("/", (_req, res) => res.send("MigoLive API is running"));
+app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
 
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 
@@ -68,7 +69,8 @@ app.use((error, _req, res, _next) => {
     return res.status(403).json({ error: "Origin not allowed" });
   }
   console.error("Request failed:", error.message);
-  return res.status(500).json({ error: "Internal server error" });
+  const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 500 ? error.status : 500;
+  return res.status(status).json({ error: status === 500 ? "Internal server error" : error.message });
 });
 
 const PORT = Number(process.env.PORT || 3000);
