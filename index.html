@@ -510,7 +510,7 @@ function bindServerWallet(account,balance){
       try{delete account.coins}catch(_){}
       Object.defineProperty(account,'coins',{configurable:true,enumerable:true,
         get(){return SERVER_WALLET_BALANCE},
-        set(_value){toast('لم تُنفذ العملية: تعديل العملات المحلي غير مسموح. استخدم العملية المتصلة بالخادم.')}
+        set(_value){toast('لم يتم تغيير الرصيد: هذه العملية لم تُربط بالخادم بعد.');const error=new Error('SERVER_WALLET_OPERATION_REQUIRED');error.code='SERVER_WALLET_OPERATION_REQUIRED';throw error}
       });
     }
   }
