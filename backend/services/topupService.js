@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const Wallet = require("../models/Wallet");
 const Ledger = require("../models/Ledger");
 
-async function requestTopup({ userId, amount, paymentReference, idempotencyKey }) {
+async function requestTopup({ userId, amount, paymentReference, receiptData, idempotencyKey }) {
   if (!userId || !idempotencyKey || !/^[A-Za-z0-9._:-]{8,100}$/.test(idempotencyKey)) {
     throw new Error("Missing or invalid top-up idempotency key");
   }
@@ -15,6 +15,10 @@ async function requestTopup({ userId, amount, paymentReference, idempotencyKey }
   // for a different account, amount, or payment reference is a conflict.
   const reference = "topup_req_" + idempotencyKey;
   const cleanPaymentReference = String(paymentReference || "").trim().slice(0, 100);
+  const cleanReceiptData = typeof receiptData === "string" &&
+    /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(receiptData) &&
+    receiptData.length <= 24000 ? receiptData : "";
+  if (receiptData && !cleanReceiptData) throw new Error("Invalid or oversized receipt image");
   const matches = (entry) =>
     entry &&
     String(entry.userId) === String(userId) &&
@@ -22,7 +26,8 @@ async function requestTopup({ userId, amount, paymentReference, idempotencyKey }
     entry.amount === amount &&
     entry.direction === "credit" &&
     entry.status === "pending" &&
-    String(entry.metadata?.paymentReference || "") === cleanPaymentReference;
+    String(entry.metadata?.paymentReference || "") === cleanPaymentReference &&
+    String(entry.metadata?.receiptData || "") === cleanReceiptData;
 
   const existing = await Ledger.findOne({ reference }).lean();
   if (existing) {
@@ -47,6 +52,7 @@ async function requestTopup({ userId, amount, paymentReference, idempotencyKey }
         status: "pending",
         metadata: {
           paymentReference: cleanPaymentReference,
+          receiptData: cleanReceiptData || undefined,
           requestedAt: new Date()
         }
       }], { session });
