@@ -91,7 +91,7 @@ router.get("/users", async (req, res, next) => {
       const q = String(req.query.q).trim();
       if (q.length > 24) return res.status(400).json({ error: "Search query is too long" });
       if (q) {
-        const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\// Paginated transaction audit with optional date, game and type filters.");
+        const escaped = q.split("").map((ch) => "\\^$.*+?()[]{}|".includes(ch) ? "\\" + ch : ch).join("");
         filter.username = { $regex: escaped, $options: "i" };
       }
     }
