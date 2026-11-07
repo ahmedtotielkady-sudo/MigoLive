@@ -1,12 +1,12 @@
 {
-  "name": "migolive-backend",
+  "name": "migolive",
   "version": "1.0.0",
   "private": true,
-  "description": "MigoLive backend foundation",
+  "description": "MigoLive application and backend",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js"
   },
   "engines": {
     "node": ">=20"
