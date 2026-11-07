@@ -1331,8 +1331,55 @@ async function loadServerTopups(container){
     }});
   }catch(error){box.innerHTML='<p class="err">تعذر تحميل طلبات الخادم: '+esc(error.message)+'</p>'}
 }
+function loadServerAdminPanel(container){
+  const area=container.querySelector('#server-admin-data');
+  if(!area)return;
+  area.innerHTML='<p class="mu">جارٍ تحميل بيانات الخادم...</p>';
+  Promise.all([
+    apiRequest('/admin/overview'),
+    apiRequest('/admin/users?page=1&limit=30'),
+    apiRequest('/admin/transactions?page=1&limit=30')
+  ]).then(([overview,users,transactions])=>{
+    const games=(overview.games||[]).map(g=>'<div class="row"><span class="grow">'+esc(g._id||'لعبة')+'</span><b>رهانات '+fmt(g.debited||0)+' · أرباح '+fmt(g.credited||0)+'</b></div>').join('')||'<p class="mu">لا توجد عمليات ألعاب مسجلة على الخادم.</p>';
+    const tx=(transactions.items||[]).map(x=>{
+      const u=x.userId||{};
+      return '<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)"><div class="grow"><b>'+esc(u.username||'حساب')+'</b><div class="mu">'+esc(x.type)+' · '+esc(x.direction)+'</div></div><b>'+fmt(x.amount)+'</b><small class="mu">'+new Date(x.createdAt).toLocaleString('ar-EG')+'</small></div>';
+    }).join('')||'<p class="mu">لا توجد معاملات بعد.</p>';
+    const userRows=(users.users||[]).map(u=>'<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)"><div class="grow"><b>'+esc(u.username)+'</b><div class="mu">ID: '+esc(u.legacyUid||u._id)+' · '+esc(u.role)+' · '+esc(u.status)+'</div></div><b>🪙 '+fmt(u.balance||0)+'</b></div>').join('')||'<p class="mu">لا يوجد مستخدمون.</p>';
+    const adjust=U().role==='owner'?'<div class="card"><b>تعديل رصيد عضو (المالك الأساسي فقط)</b><div class="sp"></div><input class="in" id="srv-adjust-user" placeholder="رقم ID أو معرف الحساب"><input class="in" id="srv-adjust-amount" type="number" min="1" max="1000000" placeholder="عدد العملات"><select class="in" id="srv-adjust-direction"><option value="credit">إضافة رصيد</option><option value="debit">خصم رصيد</option></select><input class="in" id="srv-adjust-reason" maxlength="300" placeholder="سبب العملية — مطلوب"><div class="err" id="srv-adjust-error"></div><button class="btn g w" id="srv-adjust-submit">تنفيذ وتسجيل العملية</button></div>':'';
+    area.innerHTML='<div class="card"><b>📊 بيانات حقيقية من الخادم</b><div class="sp"></div><div class="row"><div class="grow"><div class="mu">الحسابات</div><b>'+fmt(overview.users||0)+'</b></div><div class="grow"><div class="mu">إجمالي أرصدة المحافظ</div><b>🪙 '+fmt(overview.totalWalletCoins||0)+'</b></div><div class="grow"><div class="mu">آخر المعاملات</div><b>'+fmt(transactions.total||0)+'</b></div></div></div><div class="card"><b>🎮 نشاط الألعاب المسجل بالخادم</b><div class="sp"></div>'+games+'</div>'+adjust+'<div class="card"><b>👥 المستخدمون (أول 30)</b><div class="sp"></div>'+userRows+'</div><div class="card"><b>📒 آخر المعاملات</b><div class="sp"></div>'+tx+'</div>';
+    const submit=area.querySelector('#srv-adjust-submit');
+    if(submit)submit.onclick=async()=>{
+      const err=area.querySelector('#srv-adjust-error');
+      const userId=area.querySelector('#srv-adjust-user').value.trim();
+      const amount=Math.floor(Number(area.querySelector('#srv-adjust-amount').value));
+      const direction=area.querySelector('#srv-adjust-direction').value;
+      const reason=area.querySelector('#srv-adjust-reason').value.trim();
+      if(!userId||!(amount>0)||!reason){err.textContent='أكمل رقم الحساب والمبلغ والسبب.';return}
+      submit.disabled=true;err.textContent='جارٍ تنفيذ العملية على الخادم...';
+      try{
+        const key=crypto.randomUUID?crypto.randomUUID():('owner-adjust-'+Date.now()+'-'+Math.random().toString(36).slice(2));
+        await apiRequest('/admin/wallet/adjust',{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({userId,amount,direction,reason})});
+        toast('تم تحديث الرصيد وتسجيل العملية');loadServerAdminPanel(container);
+      }catch(error){err.textContent='فشلت العملية: '+error.message;submit.disabled=false}
+    };
+  }).catch(error=>{
+    area.innerHTML='<p class="err">تعذر تحميل لوحة الخادم: '+esc(error.message)+'</p><button class="btn o w" id="server-admin-retry">إعادة المحاولة</button>';
+    const retry=area.querySelector('#server-admin-retry');if(retry)retry.onclick=()=>loadServerAdminPanel(container);
+  });
+}
 function rOwner(m){
   if(!isStaff(U())){tab='me';return render()}
+  const serverTabs=[['dash','📊 لوحة الخادم'],['tp','طلبات الشحن']];
+  m.innerHTML='<h3 style="margin:10px 0">👑 الإدارة الآمنة</h3><div style="overflow-x:auto;white-space:nowrap;margin-bottom:12px">'+serverTabs.map(([k,l])=>'<button class="pill '+(ot===k?'on':'')+'" data-server-admin-tab="'+k+'">'+l+'</button>').join('')+'</div><div id="server-admin-data"></div>';
+  m.querySelectorAll('[data-server-admin-tab]').forEach(b=>b.onclick=()=>{ot=b.dataset.serverAdminTab;render()});
+  if(ot==='tp'){
+    m.querySelector('#server-admin-data').innerHTML='<div id="server-topups-list"><p class="mu">جارٍ تحميل طلبات الشحن...</p></div>';
+    loadServerTopups(m);
+  }else{
+    loadServerAdminPanel(m);
+  }
+  return;
   const users=Object.entries(DB.users),agents=users.filter(([,x])=>x.role==='agent');
   const tabsO=staffTabs([['dash','📊 الرئيسية'],['tp','طلبات الشحن'],['set','الإعدادات'],['coins','العملات'],['agents','الوكلاء'],['users','الأعضاء'],['hosts','سجل المضيفين'],['alog','سجل الوكلاء'],['ag','وكالات المضيفين'],['ship','وكالات الشحن'],['ledger','دفاتر الحسابات'],['vip','VIP'],['gifts','الهدايا'],['broadcast','رسائل النظام'],['events','الفعاليات'],['staff','الصلاحيات'],['countries','طلبات تغيير البلد'],['support','الدعم']]);
   let body='';
