@@ -91,10 +91,8 @@ async function executeGiftTransfer({ senderId, recipientUsername, amount, refere
   try {
     let duplicate = false;
     await session.withTransaction(async () => {
-      const [debitExisting, creditExisting] = await Promise.all([
-        Ledger.findOne({ reference: debitRef }).session(session),
-        Ledger.findOne({ reference: creditRef }).session(session)
-      ]);
+      const debitExisting = await Ledger.findOne({ reference: debitRef }).session(session);
+      const creditExisting = await Ledger.findOne({ reference: creditRef }).session(session);
 
       if (debitExisting || creditExisting) {
         const valid =
@@ -109,6 +107,9 @@ async function executeGiftTransfer({ senderId, recipientUsername, amount, refere
         duplicate = true;
         return;
       }
+
+      const sender = await User.findById(senderId).select("username").session(session);
+      if (!sender) throw new Error("Sender not found");
 
       await Wallet.updateOne({ userId: senderId }, { $setOnInsert: { balance: 0 } }, { upsert: true, session });
       await Wallet.updateOne({ userId: recipient._id }, { $setOnInsert: { balance: 0 } }, { upsert: true, session });
@@ -136,7 +137,7 @@ async function executeGiftTransfer({ senderId, recipientUsername, amount, refere
         {
           userId: recipient._id, type: "gift_credit", amount, direction: "credit",
           reference: creditRef, status: "posted",
-          metadata: { senderId, senderUsername: null }
+          metadata: { senderId, senderUsername: sender.username }
         }
       ], { session });
     });
