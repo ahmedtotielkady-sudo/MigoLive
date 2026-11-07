@@ -53,6 +53,9 @@ router.post("/topups", async (req, res) => {
     const result = await requestTopup({ userId: req.user._id, amount, paymentReference, idempotencyKey });
     return res.status(result.duplicate ? 200 : 201).json(result);
   } catch (error) {
+    if (error.message.includes("Idempotency key")) {
+      return res.status(409).json({ error: "Idempotency key conflict" });
+    }
     console.error("Top-up request failed:", error);
     return res.status(500).json({ error: "Unable to create top-up request" });
   }
