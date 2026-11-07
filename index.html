@@ -492,7 +492,7 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 // API authority: no secrets or owner bootstrap code are shipped in this client.
 const API_BASE=String(window.MIGOLIVE_API_BASE||'/api').replace(/\/$/,'');
 let API_TOKEN=localStorage.getItem('mygo_api_token')||'';
-let SERVER_WALLET_BALANCE=0,SERVER_WALLET_READY=false;
+let SERVER_WALLET_BALANCE=0,SERVER_WALLET_READY=false,SERVER_PAYMENT_WALLET='',SERVER_PENDING_TOPUPS=[];
 async function apiRequest(path,options={}){
   const headers={'Content-Type':'application/json',...(options.headers||{})};
   if(API_TOKEN)headers.Authorization='Bearer '+API_TOKEN;
@@ -520,6 +520,8 @@ async function refreshServerWallet(){
   if(!API_TOKEN)return null;
   const data=await apiRequest('/wallet');
   bindServerWallet(me?DB.users[me]:null,data.balance);
+  SERVER_PENDING_TOPUPS=Array.isArray(data.pendingTopups)?data.pendingTopups:[];
+  try{const cfg=await apiRequest('/config');SERVER_PAYMENT_WALLET=String(cfg.paymentWallet||'')}catch(_){SERVER_PAYMENT_WALLET=''}
   return data;
 }
 async function establishServerSession(account,password,isNewAccount=false){
@@ -806,8 +808,8 @@ function rVip(m){const u=U(),cur=vipLv(u),ch=u.charged||0,nx=cur<VN?vipCfg(cur+1
   <div class="card"><b>🆓 عادي</b><div class="mu">${VPERKS[0]}</div></div>
   ${Array.from({length:VN},(_,i)=>i+1).map(l=>{const c=vipCfg(l),ok=cur>=l;return `<div class="card" style="${cur===l?'border-color:var(--gd)':''}"><div class="row"><div class="grow"><b>${VBADGE[l]} ${esc(c.name)} ${ok?'✅':''}</b><div class="mu">${VPERKS[l]}</div><div class="mu">يتطلب شحن إجمالي: 🪙 ${fmt(c.need)}</div><div class="mu">مكافأة الوصول: 🪙 ${fmt(c.reward)} · مكافأة يومية: 🪙 ${fmt(c.daily)}</div></div>${ok?(cl.includes(l)?'<span class="badge">تم الاستلام</span>':`<button class="btn g s" data-vr="${l}">استلم</button>`):'<span class="badge">مقفل</span>'}</div></div>`}).join('')}`;
   $('#bk').onclick=()=>goBack('me');
-  if($('#vclaim'))$('#vclaim').onclick=()=>{const d=vipCfg(cur).daily;u.coins+=d;u.vipClaim=Date.now();logIt('VIP',`${u.name} استلم مكافأة يومية (${d})`);save();toast('تم إضافة '+fmt(d)+' عملة');render()};
-  m.querySelectorAll('[data-vr]').forEach(b=>b.onclick=()=>{const l=+b.dataset.vr;if(vipLv(u)<l||(u.vipClaimed||[]).includes(l))return;const r=vipCfg(l).reward;u.coins+=r;(u.vipClaimed=u.vipClaimed||[]).push(l);logIt('VIP',`${u.name} استلم مكافأة ${vipCfg(l).name} (${r})`);save();toast('تم إضافة '+fmt(r)+' عملة');render()})}
+  if($('#vclaim'))$('#vclaim').onclick=()=>{const d=vipCfg(cur).daily;toast('مكافأة VIP اليومية غير متاحة حتى ربط اعتمادها بالخادم')};
+  m.querySelectorAll('[data-vr]').forEach(b=>b.onclick=()=>{const l=+b.dataset.vr;if(vipLv(u)<l||(u.vipClaimed||[]).includes(l))return;toast('مكافأة الوصول لمستوى VIP لم تُعتمد من الخادم بعد')})}
 function vipOwnerHTML(){return `<div class="card"><b>إعدادات مستويات VIP</b><div class="mu">المستوى يُحسب تلقائياً من إجمالي ما يشحنه المستخدم (طلبات الشحن المقبولة + تحويلات الوكلاء + منح المالك). عدّل الاسم والشحن المطلوب والمكافآت لكل مستوى.</div></div>`+Array.from({length:VN},(_,i)=>i+1).map(l=>{const c=vipCfg(l);return `<div class="card"><b>${VBADGE[l]} المستوى ${l}</b><div class="sp"></div><input class="in" id="vn${l}" value="${esc(c.name)}" maxlength="20" aria-label="الاسم"><div class="mu">الشحن المطلوب (عملة)</div><input class="in" id="vp${l}" type="number" min="0" inputmode="numeric" value="${c.need}" aria-label="الشحن المطلوب"><div class="mu">مكافأة الوصول · مكافأة يومية</div><div class="row" style="gap:8px"><input class="in grow" id="vr${l}" type="number" min="0" inputmode="numeric" value="${c.reward}" aria-label="مكافأة الوصول" style="margin:0"><input class="in grow" id="vd${l}" type="number" min="0" inputmode="numeric" value="${c.daily}" aria-label="مكافأة يومية" style="margin:0"></div></div>`}).join('')+`<div class="sec"><button class="btn g grow" id="vsave">حفظ الإعدادات</button><button class="btn o grow" id="vreset">القيم الافتراضية</button></div><div class="sp"></div><div class="card"><b>منح / سحب مستوى مؤقت</b><div class="sp"></div><input class="in" id="vgu" placeholder="اسم المستخدم أو ID"><div class="row" style="gap:8px"><select class="in grow" id="vgl" style="margin:0"><option value="0">سحب المنحة</option>${Array.from({length:VN},(_,i)=>i+1).map(l=>`<option value="${l}">${esc(vipCfg(l).name)}</option>`).join('')}</select><input class="in grow" id="vgd" type="number" min="1" inputmode="numeric" value="30" style="margin:0" aria-label="الأيام"></div><div class="err" id="vge" role="alert"></div><button class="btn w" id="vgo">تنفيذ</button></div>`}
 function vipOwnerBind(m){
   $('#vsave').onclick=()=>{DB.settings.vip=[];for(let l=1;l<=VN;l++)DB.settings.vip[l]={name:$('#vn'+l).value.trim().slice(0,20)||'VIP '+l,need:Math.max(0,Math.floor(+$('#vp'+l).value)||0),reward:Math.max(0,Math.floor(+$('#vr'+l).value)||0),daily:Math.max(0,Math.floor(+$('#vd'+l).value)||0)};logIt('مالك','تحديث إعدادات VIP');save();toast('تم الحفظ')};
@@ -1097,6 +1099,7 @@ function renderRoom(m){
       return false;
       const targets=[...d.querySelectorAll('.gift-rec:checked')].map(x=>x.value),g=DB.giftCat.find(x=>x.id==d.dataset.gift),qty=+(d.dataset.qty||1);
       if(!targets.length){d.querySelector('#dle').textContent='حدد مستلماً واحداً على الأقل';return false}if(!g){d.querySelector('#dle').textContent='اختر الهدية أولاً';return false}
+      d.querySelector('#dle').textContent='إرسال الهدايا متوقف مؤقتاً حتى اعتماد كتالوج الهدايا وخصمها من الخادم؛ لم يتم خصم أي عملات.';return false;
       const total=pay(g)*qty*targets.length;if(u.coins<total){d.querySelector('#dle').textContent='رصيدك غير كافٍ لإرسال هذه الكمية';return false}
       u.coins-=total;targets.forEach(rk=>{const rc=DB.users[rk];if(!rc)return;const amt=g.price*qty,A=rc.agency?ag(rc.agency):null,fee=A?Math.floor(amt*agRate(A)/100):0,net=amt-fee;rc.gifts=(rc.gifts||0)+net;if(A)A.earn=(A.earn||0)+fee;DB.gifts.unshift({t:Date.now(),from:me,to:rk,amt,qty,net,fee,ag:A?A.id:0,room:r.id,gid:g.id});notify(rk,`${u.name} أرسل لك ${qty} من ${g.name}`,'gift');act(`أرسل ${qty} من ${g.name} إلى ${rc.name}`);act(`استلم ${qty} من ${g.name} من ${u.name}`,rk);r.chat.push({n:'🎁',u:me,m:`${u.name} أرسل ${qty} من ${g.name} إلى ${rc.name}`})});DB.gifts=DB.gifts.slice(0,3000);r.chat=r.chat.slice(-60);save();render();giftFx(g.fx,gIconTxt(g),`${u.name}: ${g.name} ×${qty}`);playGiftMedia(g)
     },'إرسال');
@@ -1126,7 +1129,7 @@ function rMsgs(m){
   ${mine.length?mine.slice().reverse().map(x=>`<div class="card"><b>${x.from===me?'إلى: '+esc(DB.users[x.to].name):esc(DB.users[x.from].name)}</b> <span class="mu">${x.t}</span><div>${esc(x.m)}</div></div>`).join(''):'<p class="mu" style="text-align:center;padding:30px">لا توجد رسائل</p>'}`;
   $('#sm').onclick=()=>{const t=$('#to').value.trim().toLowerCase(),v=$('#tx').value.trim();if(!DB.users[t]||t===me)return toast('مستخدم غير موجود');if((DB.users[t].blocked||[]).includes(me))return toast('لا يمكن إرسال رسالة لهذا المستخدم');if(!v)return;DB.msgs.push({from:me,to:t,m:v,t:now()});notify(t,`رسالة جديدة من ${U().name}`,'msg');sfx('msg');save();render()};
 }
-function topupCard(){const w=DB.settings.wallet,mine=DB.topups.filter(t=>t.user===me);
+function topupCard(){const w=SERVER_PAYMENT_WALLET,mine=SERVER_PENDING_TOPUPS;
   return `${packsHTML()}<div class="card"><b>شحن العملات بالتحويل</b><p class="mu" style="margin:6px 0">حوّل إلى رقم المحفظة التالي، ثم ارفع صورة الإيصال واكتب الرقم الذي حوّلت منه.</p>
   <div class="card row" style="margin:0 0 10px"><div class="grow"><div class="mu">رقم المحفظة</div><b dir="ltr">${w?esc(w):'لم يحدد المالك الرقم بعد'}</b></div>${w?'<button class="btn o s" id="cp">نسخ</button>':''}</div>
   ${selPack?`<div class="card mu" style="margin:0 0 10px">المطلوب تحويله: <b>${fmt(selPack.price)} ${esc(DB.settings.cur)}</b></div>`:''}<input class="in" id="ta" type="number" min="1" inputmode="numeric" placeholder="عدد العملات المطلوبة"${selPack?` value="${selPack.coins+(selPack.bonus||0)}" readonly`:''}>
@@ -1135,10 +1138,10 @@ function topupCard(){const w=DB.settings.wallet,mine=DB.topups.filter(t=>t.user=
   <div id="tv"></div><div class="err" id="te" role="alert"></div><button class="btn g w" id="ts">إرسال طلب الشحن</button></div>
   ${mine.length?'<b>طلباتي</b><div class="sp"></div>'+mine.map(t=>`<div class="card row"><div class="grow"><b>${t.amount} عملة</b><div class="mu">${t.t}</div></div><span class="badge">${{pending:'قيد المراجعة',ok:'تم الشحن',no:'مرفوض'}[t.status]}</span></div>`).join(''):''}`}
 function bindTopup(m){let img='';packsBind(m);
-  if($('#cp'))$('#cp').onclick=()=>{try{navigator.clipboard.writeText(DB.settings.wallet);toast('تم النسخ')}catch(e){toast('انسخ الرقم يدوياً')}};
+  if($('#cp'))$('#cp').onclick=()=>{try{navigator.clipboard.writeText(SERVER_PAYMENT_WALLET);toast('تم النسخ')}catch(e){toast('انسخ الرقم يدوياً')}};
   $('#tpf').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,320/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);img=c.toDataURL('image/jpeg',.32);$('#tv').innerHTML=`<img class="thumb" src="${img}" alt="المرفق">`};im.onerror=()=>toast('الملف ليس صورة');im.src=rd.result};rd.readAsDataURL(f)};
   $('#ts').onclick=async()=>{const a=Math.floor(+$('#ta').value),f=$('#tf').value.trim(),e=$('#te'),button=$('#ts');
-    if(!DB.settings.wallet)return e.textContent='لا يمكن الشحن قبل تحديد رقم المحفظة';
+    if(!SERVER_PAYMENT_WALLET)return e.textContent='لم يحدد الخادم رقم محفظة الشحن بعد';
     if(!(a>0))return e.textContent='اكتب عدد العملات';if(f.length<6)return e.textContent='اكتب الرقم الذي حوّلت منه';if(!img)return e.textContent='ارفع صورة الإيصال';
     if(img.length>24000)return e.textContent='حجم الإيصال كبير؛ اختر صورة أوضح بحجم أصغر';
     if(!API_TOKEN)return e.textContent='سجّل الدخول إلى الخادم أولاً';
@@ -1213,6 +1216,7 @@ function agentStats(k){const mine=DB.tx.filter(x=>x.k==='tr'&&x.from===k),td=new
   return{ops:mine.length,total:mine.reduce((p,x)=>p+x.amt,0),fee:mine.reduce((p,x)=>p+(x.fee||0),0),day:mine.filter(x=>new Date(x.t).toDateString()===td).reduce((p,x)=>p+x.amt,0)}}
 function findUser(q){q=String(q||'').trim().toLowerCase();if(/^\d{5,9}$/.test(q)){const e=Object.entries(DB.users).find(([,x])=>String(x.uid)===q);return e?e[0]:null}return DB.users[q]?q:null}
 function transfer(from,to,amt){
+  return 'تحويل العملات عبر النظام المحلي متوقف؛ يجب تنفيذ التحويل من خلال الخادم.';
   const t=DB.users[to];if(!t)return'المستخدم غير موجود';amt=Math.floor(+amt);if(!(amt>0))return'مبلغ غير صحيح';let fee=0;
   if(from){const f=DB.users[from];if(from===to)return'لا يمكن التحويل لنفسك';if(f.coins<amt)return'رصيدك غير كافٍ';
     if(f.limit>0){const used=agentStats(from).day;if(used+amt>f.limit)return`تجاوزت الحد اليومي (${f.limit}) · المتبقي ${Math.max(0,f.limit-used)}`}
