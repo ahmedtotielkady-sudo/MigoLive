@@ -11,7 +11,25 @@ const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
 
-app.use(helmet());
+app.use(helmet({
+  // The legacy single-file UI uses inline scripts/styles and trusted CDNs.
+  // Keep the other Helmet protections while allowing its current asset model.
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+      connectSrc: ["'self'", "https:", "wss:"],
+      mediaSrc: ["'self'", "data:", "blob:", "https:"],
+      frameSrc: ["'self'", "blob:"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"]
+    }
+  }
+}));
 
 const configuredOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
@@ -61,6 +79,10 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
+app.get("/api-config.js", (_req, res) => {
+  res.type("application/javascript");
+  return res.sendFile(path.join(__dirname, "..", "api-config.js"));
+});
 
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 
