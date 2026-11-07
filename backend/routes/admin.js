@@ -144,7 +144,7 @@ router.get("/transactions", async (req, res, next) => {
 
     const filter = { status: "posted", ...dateFilter(req.query) };
     if (req.query.type) {
-      const allowed = ["topup", "topup_pending", "game_debit", "game_credit", "gift_debit", "gift_credit", "admin_adjustment"];
+      const allowed = ["topup", "topup_pending", "game_debit", "game_credit", "gift_debit", "gift_credit", "admin_adjustment", "welcome_bonus"];
       if (!allowed.includes(req.query.type)) return res.status(400).json({ error: "Invalid transaction type" });
       filter.type = req.query.type;
     }
