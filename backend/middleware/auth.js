@@ -17,16 +17,14 @@ module.exports = async function auth(req, res, next) {
       algorithms: ["HS256"]
     });
 
-    if (
-      typeof decoded.sub !== "string" ||
-      !mongoose.isValidObjectId(decoded.sub)
-    ) {
+    if (typeof decoded.sub !== "string" || !mongoose.isValidObjectId(decoded.sub)) {
       return res.status(401).json({ error: "Invalid or expired token" });
     }
 
-    // Always load authorization data from the database. Never trust a role
-    // supplied by a client or an old token, and reject suspended/deleted users.
-    const user = await User.findById(decoded.sub).select("_id username role status");
+    // Always reload current account and role from MongoDB. Never trust a role
+    // supplied by a client or an old token.
+    const user = await User.findById(decoded.sub)
+      .select("_id username displayName legacyUid phone role status");
 
     if (!user || user.status !== "active") {
       return res.status(401).json({ error: "Account is unavailable" });
