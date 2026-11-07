@@ -39,6 +39,7 @@ Configured IDs: `ocean_storm`, `slot777`, `animal_wheel`.
 All routes below require a currently active database account with role `admin` or `owner`. Roles are loaded from MongoDB for every authenticated request.
 
 - `GET /api/admin/overview`: user count, total wallet coins, posted transaction totals, per-game debit/credit totals and recent transactions.
+- `GET /api/admin/users?page=1&limit=50`: paginated user directory with current role, status and wallet balance. Optional filters: `q` (username) and `status` (`active` or `suspended`).
 - `GET /api/admin/transactions?page=1&limit=50`: paginated posted ledger records. Optional filters: `from`, `to` (ISO dates), `type`, `game`.
 - `GET /api/admin/users/:userId/activity`: public user identity, wallet balance and latest 100 ledger entries.
 
