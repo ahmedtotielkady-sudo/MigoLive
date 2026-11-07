@@ -39,15 +39,19 @@ router.get("/", async (req, res, next) => {
 router.post("/topups", async (req, res) => {
   const amount = req.body.amount;
   const paymentReference = String(req.body.paymentReference || "").trim();
+  const idempotencyKey = req.get("Idempotency-Key");
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000) {
     return res.status(400).json({ error: "Invalid top-up amount" });
   }
   if (paymentReference.length > 100) {
     return res.status(400).json({ error: "Payment reference is too long" });
   }
+  if (typeof idempotencyKey !== "string" || !/^[A-Za-z0-9._:-]{8,100}$/.test(idempotencyKey)) {
+    return res.status(400).json({ error: "A valid Idempotency-Key header is required" });
+  }
   try {
-    const result = await requestTopup({ userId: req.user._id, amount, paymentReference });
-    return res.status(201).json(result);
+    const result = await requestTopup({ userId: req.user._id, amount, paymentReference, idempotencyKey });
+    return res.status(result.duplicate ? 200 : 201).json(result);
   } catch (error) {
     console.error("Top-up request failed:", error);
     return res.status(500).json({ error: "Unable to create top-up request" });
