@@ -5,6 +5,9 @@ const requireAdmin = require("../middleware/requireAdmin");
 const User = require("../models/User");
 const Wallet = require("../models/Wallet");
 const Ledger = require("../models/Ledger");
+const requireOwner = require("../middleware/requireOwner");
+const { reviewTopup } = require("../services/topupService");
+const { executeTransaction } = require("../services/walletService");
 
 router.use(auth, requireAdmin);
 
@@ -187,6 +190,87 @@ router.get("/users/:userId/activity", async (req, res, next) => {
 
     return res.json({ user, balance: wallet?.balance || 0, transactions });
   } catch (error) { return next(error); }
+});
+
+
+// Pending top-ups are only credited after a human verifies the payment.
+router.get("/topups/pending", async (_req, res, next) => {
+  try {
+    const items = await Ledger.find({ type: "topup_pending", status: "pending" })
+      .sort({ createdAt: 1 })
+      .limit(100)
+      .select("userId amount reference metadata createdAt")
+      .populate("userId", "username legacyUid")
+      .lean();
+    return res.json({ items });
+  } catch (error) { return next(error); }
+});
+
+router.post("/topups/:reference/approve", async (req, res) => {
+  try {
+    const result = await reviewTopup({
+      reference: req.params.reference,
+      reviewerId: req.user._id,
+      approve: true,
+      note: req.body.note
+    });
+    return res.json(result);
+  } catch (error) {
+    if (error.message === "Pending top-up not found") return res.status(404).json({ error: error.message });
+    console.error("Top-up approval failed:", error);
+    return res.status(500).json({ error: "Unable to approve top-up" });
+  }
+});
+
+router.post("/topups/:reference/reject", async (req, res) => {
+  try {
+    const result = await reviewTopup({
+      reference: req.params.reference,
+      reviewerId: req.user._id,
+      approve: false,
+      note: req.body.note
+    });
+    return res.json(result);
+  } catch (error) {
+    if (error.message === "Pending top-up not found") return res.status(404).json({ error: error.message });
+    console.error("Top-up rejection failed:", error);
+    return res.status(500).json({ error: "Unable to reject top-up" });
+  }
+});
+
+// Only the primary owner may make manual balance adjustments. Every change is
+// posted to the immutable transaction ledger and requires an idempotency key.
+router.post("/wallet/adjust", requireOwner, async (req, res) => {
+  const { userId, amount, direction, reason } = req.body;
+  if (!mongoose.isValidObjectId(userId)) return res.status(400).json({ error: "Invalid user id" });
+  if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000) {
+    return res.status(400).json({ error: "Invalid adjustment amount" });
+  }
+  if (!["credit", "debit"].includes(direction)) return res.status(400).json({ error: "Invalid direction" });
+  const cleanReason = String(reason || "").trim().slice(0, 300);
+  if (!cleanReason) return res.status(400).json({ error: "A reason is required" });
+  const reference = req.get("Idempotency-Key");
+  if (typeof reference !== "string" || !/^[A-Za-z0-9._:-]{8,100}$/.test(reference)) {
+    return res.status(400).json({ error: "A valid Idempotency-Key header is required" });
+  }
+  try {
+    const target = await User.findOne({ _id: userId, status: "active" }).select("_id");
+    if (!target) return res.status(404).json({ error: "User not found" });
+    const result = await executeTransaction({
+      userId: target._id,
+      amount,
+      type: "admin_adjustment",
+      direction,
+      reference,
+      metadata: { actorId: String(req.user._id), reason: cleanReason, action: "owner_adjustment" }
+    });
+    return res.json(result);
+  } catch (error) {
+    if (error.message === "Insufficient balance") return res.status(409).json({ error: "Insufficient balance" });
+    if (error.message.includes("Idempotency key")) return res.status(409).json({ error: "Idempotency key conflict" });
+    console.error("Owner wallet adjustment failed:", error);
+    return res.status(500).json({ error: "Unable to adjust wallet" });
+  }
 });
 
 module.exports = router;
