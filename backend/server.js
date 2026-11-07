@@ -70,6 +70,13 @@ app.use("/api/wallet", require("./routes/wallet"));
 app.use("/api/games", require("./routes/games"));
 app.use("/api/admin", require("./routes/admin"));
 
+app.get("/api/config", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  return res.json({
+    paymentWallet: String(process.env.PAYMENT_WALLET_NUMBER || "").slice(0, 64)
+  });
+});
+
 app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
