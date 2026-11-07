@@ -83,6 +83,33 @@ async function executeTransaction({
     });
 
     return result;
+  } catch (error) {
+    // Two identical requests can race before either ledger row is visible.
+    // Resolve the unique-reference winner as an idempotent replay.
+    if (error.code === 11000) {
+      const existing = await Ledger.findOne({ reference }).lean();
+      if (existing) {
+        const sameRequest =
+          String(existing.userId) === String(userId) &&
+          existing.amount === amount &&
+          existing.type === type &&
+          existing.direction === direction &&
+          (existing.metadata?.game || null) === (metadata?.game || null);
+
+        if (!sameRequest) {
+          throw new Error("Idempotency key was already used for another transaction");
+        }
+
+        return {
+          success: true,
+          duplicate: true,
+          amount: existing.amount,
+          direction: existing.direction,
+          reference: existing.reference
+        };
+      }
+    }
+    throw error;
   } finally {
     await session.endSession();
   }
