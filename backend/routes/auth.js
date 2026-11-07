@@ -42,30 +42,59 @@ function issueToken(user) {
   };
 }
 
-router.post("/register", async (req, res, next) => {
+router.post("/register", loginLimit, async (req, res, next) => {
   const username = String(req.body.username || "").trim();
   const password = String(req.body.password || "");
+  const displayName = String(req.body.displayName || username).trim().slice(0, 48);
+  const phone = String(req.body.phone || "").replace(/[\\s()-]/g, "");
 
   if (!/^[a-zA-Z0-9_]{3,24}$/.test(username) || password.length < 10 || password.length > 128) {
     return res.status(400).json({
       error: "Username must be 3-24 letters, numbers or underscores; password must be 10-128 characters"
     });
   }
+  if (phone && !/^\\+?\\d{7,15}$/.test(phone)) {
+    return res.status(400).json({ error: "Invalid phone number" });
+  }
 
   const session = await mongoose.startSession();
   try {
     const passwordHash = await bcrypt.hash(password, 12);
     let user;
-
     await session.withTransaction(async () => {
-      const created = await User.create([{ username, passwordHash }], { session });
+      let legacyUid;
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        const candidate = String(1000000 + crypto.randomInt(0, 9000000));
+        const exists = await User.findOne({ legacyUid: candidate }).session(session).select("_id");
+        if (!exists) { legacyUid = candidate; break; }
+      }
+      if (!legacyUid) throw new Error("Unable to allocate account ID; retry registration");
+
+      const created = await User.create([{
+        username,
+        legacyUid,
+        displayName,
+        phone: phone || undefined,
+        passwordHash,
+        role: "user",
+        status: "active"
+      }], { session });
       user = created[0];
-      await Wallet.create([{ userId: user._id, balance: 0 }], { session });
+      await Wallet.create([{ userId: user._id, balance: 100 }], { session });
+      await Ledger.create([{
+        userId: user._id,
+        type: "welcome_bonus",
+        amount: 100,
+        direction: "credit",
+        reference: "welcome:" + user._id.toString(),
+        status: "posted",
+        metadata: { action: "new_account_registration" }
+      }], { session });
     });
 
-    return res.status(201).json({ id: user._id, username: user.username });
+    return res.status(201).json(issueToken(user));
   } catch (error) {
-    if (error.code === 11000) return res.status(409).json({ error: "Username already exists" });
+    if (error.code === 11000) return res.status(409).json({ error: "Username or phone number already exists" });
     return next(error);
   } finally {
     await session.endSession();
