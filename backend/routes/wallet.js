@@ -9,19 +9,25 @@ router.use(auth);
 
 router.get("/", async (req, res, next) => {
   try {
-    const [wallet, entries] = await Promise.all([
+    const [wallet, entries, pendingTopups] = await Promise.all([
       Wallet.findOne({ userId: req.user._id }).select("balance updatedAt").lean(),
       Ledger.find({ userId: req.user._id, status: "posted" })
         .sort({ createdAt: -1, _id: -1 })
         .limit(50)
         .select("type amount direction reference metadata createdAt")
+        .lean(),
+      Ledger.find({ userId: req.user._id, type: "topup_pending", status: "pending" })
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .select("amount reference metadata createdAt")
         .lean()
     ]);
 
     return res.json({
       balance: wallet ? wallet.balance : 0,
       updatedAt: wallet?.updatedAt || null,
-      transactions: entries
+      transactions: entries,
+      pendingTopups
     });
   } catch (error) {
     return next(error);
