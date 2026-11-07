@@ -242,7 +242,10 @@ router.post("/topups/:reference/reject", async (req, res) => {
 // posted to the immutable transaction ledger and requires an idempotency key.
 router.post("/wallet/adjust", requireOwner, async (req, res) => {
   const { userId, amount, direction, reason } = req.body;
-  if (!mongoose.isValidObjectId(userId)) return res.status(400).json({ error: "Invalid user id" });
+  const targetFilter = mongoose.isValidObjectId(userId)
+    ? { _id: userId, status: "active" }
+    : (/^\\d{5,10}$/.test(String(userId || "")) ? { legacyUid: String(userId), status: "active" } : null);
+  if (!targetFilter) return res.status(400).json({ error: "Invalid user id" });
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000) {
     return res.status(400).json({ error: "Invalid adjustment amount" });
   }
@@ -254,7 +257,7 @@ router.post("/wallet/adjust", requireOwner, async (req, res) => {
     return res.status(400).json({ error: "A valid Idempotency-Key header is required" });
   }
   try {
-    const target = await User.findOne({ _id: userId, status: "active" }).select("_id");
+    const target = await User.findOne(targetFilter).select("_id");
     if (!target) return res.status(404).json({ error: "User not found" });
     const result = await executeTransaction({
       userId: target._id,
