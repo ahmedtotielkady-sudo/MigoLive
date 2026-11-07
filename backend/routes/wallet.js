@@ -58,11 +58,12 @@ router.post("/topups", async (req, res) => {
 // either wallet directly; both balance changes and ledger rows commit together.
 router.post("/gift", async (req, res) => {
   const recipientUsername = String(req.body.recipientUsername || "").trim();
+  const recipientLegacyUid = String(req.body.recipientLegacyUid || "").trim();
   const amount = req.body.amount;
   const reference = req.get("Idempotency-Key");
 
-  if (!/^[A-Za-z0-9_]{3,24}$/.test(recipientUsername)) {
-    return res.status(400).json({ error: "Invalid recipient username" });
+  if (recipientLegacyUid ? !/^\\d{5,10}$/.test(recipientLegacyUid) : !/^[A-Za-z0-9_]{3,24}$/.test(recipientUsername)) {
+    return res.status(400).json({ error: "Invalid recipient username or ID" });
   }
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000) {
     return res.status(400).json({ error: "Gift amount must be a positive integer up to 1,000,000" });
@@ -75,6 +76,7 @@ router.post("/gift", async (req, res) => {
     const result = await executeGiftTransfer({
       senderId: req.user._id,
       recipientUsername,
+      recipientLegacyUid,
       amount,
       reference
     });
