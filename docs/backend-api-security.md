@@ -29,7 +29,7 @@ Legacy IDs must be 5-10 digits. Legacy passwords must be 6-128 characters to pre
 ## Wallet
 
 - `GET /api/wallet`: returns the authenticated user's balance and latest 50 ledger entries.
-- `POST /api/wallet/gift`: transfers virtual coins to another active username. Requires `recipientUsername`, positive integer `amount`, and an `Idempotency-Key` header. Sender debit, recipient credit and both ledger records commit in one MongoDB transaction.
+- `POST /api/wallet/gift`: transfers virtual coins to another active account. Supply either `recipientUsername` or the legacy app's `recipientLegacyUid` (5-10 digits), positive integer `amount`, and an `Idempotency-Key` header. Sender debit, recipient credit and both ledger records commit in one MongoDB transaction.
 - The public API intentionally has no endpoint that lets a client credit its own coins.
 
 ## Top-ups and owner adjustments
@@ -67,3 +67,13 @@ These endpoints are read-only and do not expose password hashes or authenticatio
 3. Run registration, legacy migration, login, owner-claim race, wallet debit, insufficient-balance and repeated-idempotency tests against a staging database.
 4. Implement and test server-authoritative settlement from the actual game source before enabling winnings.
 5. Integrate the HTML client with these API routes and test Android/web end-to-end.
+
+## Client integration
+
+- The root `index.html` now authenticates legacy ID/password sessions with `POST /api/auth/legacy-login`, stores the returned bearer token, and verifies restored sessions with `GET /api/auth/me`.
+- The displayed wallet balance and wallet history are loaded from `GET /api/wallet`. Client-side balance writes are rejected; game iframes cannot overwrite the parent balance.
+- The wallet screen supports pending top-up requests and ID-based wallet transfers. Transfers use an idempotency key.
+- The owner screen reads overview, user, transaction and pending top-up data from the server. Manual wallet adjustment is owner-only and ledger-audited.
+- `api-config.js` is a public client configuration file. For a web deployment served by the API host, leave `window.MIGOLIVE_API_BASE` empty to use the same-origin `/api`. For Android/Capacitor, set it to the deployed HTTPS API base, ending in `/api`. Never put server secrets in this file.
+- The three games are temporarily blocked in the client until server-authoritative game round and payout settlement is implemented. This is intentional: the current browser RNG and payout code must not be allowed to credit coins.
+- In-room virtual gift items, VIP rewards, referral bonuses, agent commissions, shipping-agent operations, room/host permissions, and profile/social state are still local-only and are not yet authoritative server features. Do not use these local controls for real-value accounting.
