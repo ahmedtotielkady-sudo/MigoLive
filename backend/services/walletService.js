@@ -34,7 +34,8 @@ async function executeTransaction({
           String(existing.userId) === String(userId) &&
           existing.amount === amount &&
           existing.type === type &&
-          existing.direction === direction;
+          existing.direction === direction &&
+          (existing.metadata?.game || null) === (metadata?.game || null);
 
         if (!sameRequest) {
           throw new Error("Idempotency key was already used for another transaction");
