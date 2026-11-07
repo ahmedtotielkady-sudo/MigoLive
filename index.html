@@ -535,6 +535,7 @@ async function establishServerSession(account,password,isNewAccount=false){
   account.role=response.user.role||'user';
   account.serverUserId=String(response.user.id);
   account.username=response.user.username;
+  if(response.user.displayName)account.name=response.user.displayName;
   if(response.user.legacyUid)account.uid=Number(response.user.legacyUid);
   const wallet=await refreshServerWallet();
   return {user:response.user,wallet};
@@ -877,7 +878,7 @@ function notifyRoles(roles,txt,type='request',exclude=[]){Object.entries(DB.user
 function notifyOwner(txt,type='request'){notifyRoles(['owner'],txt,type)}
 function notifyUserResult(k,txt){notify(k,txt,'result')}
 const invCode=u=>'MG'+u.uid;
-function payInvite(k){const u=DB.users[k];if(!u||!u.invBy||u.invPaid)return;const a=DB.users[u.invBy];if(!a)return;const td=new Date().toDateString();
+function payInvite(k){return;const u=DB.users[k];if(!u||!u.invBy||u.invPaid)return;const a=DB.users[u.invBy];if(!a)return;const td=new Date().toDateString();
   if(Object.values(DB.users).filter(x=>x.invBy===u.invBy&&x.invPaid&&new Date(x.invAt).toDateString()===td).length>=20)return;
   const rw=DB.settings.invReward!=null?DB.settings.invReward:100;u.invPaid=true;u.invAt=Date.now();u.coins+=rw;a.coins+=rw;a.invEarn=(a.invEarn||0)+rw;
   notify(u.invBy,`مكافأة دعوة: انضم ${u.name} وحصلت على ${fmt(rw)} عملة`,'sys');notify(k,`حصلت على مكافأة دعوة ${fmt(rw)} عملة`,'sys');act(`مكافأة دعوة +${rw}`,k);act(`مكافأة دعوة (${u.name}) +${rw}`,u.invBy);logIt('دعوة',`${a.name} ← ${u.name}: ${rw} عملة لكل منهما`)}
@@ -1136,7 +1137,7 @@ function topupCard(){const w=SERVER_PAYMENT_WALLET,mine=SERVER_PENDING_TOPUPS;
   <input class="in" id="tf" inputmode="tel" dir="ltr" placeholder="الرقم الذي حوّلت منه">
   <label class="btn o w" style="display:flex;align-items:center;justify-content:center;margin-bottom:12px" for="tpf">📎 رفع المرفق (صورة الإيصال)</label><input id="tpf" type="file" accept="image/*" class="hide">
   <div id="tv"></div><div class="err" id="te" role="alert"></div><button class="btn g w" id="ts">إرسال طلب الشحن</button></div>
-  ${mine.length?'<b>طلباتي</b><div class="sp"></div>'+mine.map(t=>`<div class="card row"><div class="grow"><b>${t.amount} عملة</b><div class="mu">${t.t}</div></div><span class="badge">${{pending:'قيد المراجعة',ok:'تم الشحن',no:'مرفوض'}[t.status]}</span></div>`).join(''):''}`}
+  ${mine.length?'<b>طلباتي</b><div class="sp"></div>'+mine.map(t=>`<div class="card row"><div class="grow"><b>${fmt(t.amount)} عملة</b><div class="mu">${new Date(t.createdAt).toLocaleString('ar-EG')} · ${esc(t.reference)}</div></div><span class="badge">قيد المراجعة</span></div>`).join(''):''}`}
 function bindTopup(m){let img='';packsBind(m);
   if($('#cp'))$('#cp').onclick=()=>{try{navigator.clipboard.writeText(SERVER_PAYMENT_WALLET);toast('تم النسخ')}catch(e){toast('انسخ الرقم يدوياً')}};
   $('#tpf').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,320/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);img=c.toDataURL('image/jpeg',.32);$('#tv').innerHTML=`<img class="thumb" src="${img}" alt="المرفق">`};im.onerror=()=>toast('الملف ليس صورة');im.src=rd.result};rd.readAsDataURL(f)};
@@ -1186,10 +1187,11 @@ function rMe(m){
   let newAvatar=null,deleteAvatar=false;
   $('#profile-photo').onchange=e=>{const f=e.target.files[0];if(!f)return;rImg(f,256,d=>{newAvatar=d;deleteAvatar=false;$('#profile-photo-status').textContent='تم اختيار الصورة الجديدة، اضغط حفظ التعديلات.'});e.target.value=''};
   if($('#profile-photo-delete'))$('#profile-photo-delete').onclick=()=>{newAvatar=null;deleteAvatar=true;$('#profile-photo-status').textContent='سيتم حذف الصورة عند حفظ التعديلات.'};
-  $('#profile-edit-save').onclick=()=>{
+  $('#profile-edit-save').onclick=async()=>{
     const name=$('#profile-name').value.trim(),country=$('#profile-country').value,err=$('#profile-edit-error');
     if(!name||name.length<2)return err.textContent='اكتب اسماً صحيحاً من حرفين على الأقل.';
     if(name.length>24)return err.textContent='الاسم يجب ألا يتجاوز 24 حرفاً.';
+    try{await apiRequest('/auth/profile',{method:'POST',body:JSON.stringify({displayName:name})})}catch(error){err.textContent='تعذر حفظ الاسم على الخادم: '+error.message;return}
     const selected=$('#profile-country').value;
     if(selected&&selected!==u.country){
       if(!u.countrySetOnce){u.country=selected;u.countrySetOnce=true;logIt('الملف الشخصي',`تعيين بلد ${u.name}: ${selected}`)}
