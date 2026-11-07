@@ -77,17 +77,17 @@ async function executeTransaction({
   }
 }
 
-async function executeGiftTransfer({ senderId, recipientUsername, amount, reference }) {
-  if (!senderId || !recipientUsername || !reference) throw new Error("Missing gift data");
+async function executeGiftTransfer({ senderId, recipientUsername, recipientLegacyUid, amount, reference }) {
+  if (!senderId || (!recipientUsername && !recipientLegacyUid) || !reference) throw new Error("Missing gift data");
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000) {
     throw new Error("Invalid gift amount");
   }
   if (!/^[A-Za-z0-9._:-]{8,100}$/.test(reference)) throw new Error("Invalid idempotency key");
 
-  const recipient = await User.findOne({
-    username: String(recipientUsername).trim(),
-    status: "active"
-  }).select("_id username");
+  const recipientFilter = recipientLegacyUid
+    ? { legacyUid: String(recipientLegacyUid), status: "active" }
+    : { username: String(recipientUsername).trim(), status: "active" };
+  const recipient = await User.findOne(recipientFilter).select("_id username legacyUid");
 
   if (!recipient) throw new Error("Recipient not found");
   if (String(recipient._id) === String(senderId)) throw new Error("Cannot gift yourself");
