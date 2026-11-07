@@ -30,6 +30,7 @@ const gamesRoutes = require("./routes/games");
 app.use("/api/auth", authRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/games", gamesRoutes);
+app.use("/api/admin", require("./routes/admin"));
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({
