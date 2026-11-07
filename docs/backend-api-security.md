@@ -22,12 +22,13 @@ Passwords must be 10-128 characters. Usernames must be 3-24 letters, numbers or 
 ## Wallet
 
 - `GET /api/wallet`: returns the authenticated user's balance and latest 50 ledger entries.
+- `POST /api/wallet/gift`: transfers virtual coins to another active username. Requires `recipientUsername`, positive integer `amount`, and an `Idempotency-Key` header. Sender debit, recipient credit and both ledger records commit in one MongoDB transaction. Self-gifts and insufficient balances are rejected.
 - The public API intentionally has no endpoint that lets a client credit its own coins.
 
 ## Games
 
 - `GET /api/games`: lists the configured game IDs.
-- `POST /api/games/:gameId/debit`: debits a positive integer stake from the authenticated user's shared wallet. Send an `Idempotency-Key` header (8-128 safe characters) and reuse that same key only when retrying the same bet request.
+- `POST /api/games/:gameId/debit`: debits a positive integer stake from the authenticated user's shared wallet. An `Idempotency-Key` header (8-128 safe characters) is required; reuse that same key only when retrying the same bet request.
 
 Configured IDs: `ocean_storm`, `slot777`, `animal_wheel`.
 
@@ -41,7 +42,7 @@ All routes below require a currently active database account with role `admin` o
 - `GET /api/admin/transactions?page=1&limit=50`: paginated posted ledger records. Optional filters: `from`, `to` (ISO dates), `type`, `game`.
 - `GET /api/admin/users/:userId/activity`: public user identity, wallet balance and latest 100 ledger entries.
 
-These endpoints are read-only. They do not expose password hashes or authentication tokens and do not permit arbitrary balance changes.
+These endpoints are read-only. They do not expose password hashes or authentication tokens and do not permit arbitrary balance changes. The backend root (`/`) serves the repository `index.html` app.
 
 ## Deployment checks still required
 
