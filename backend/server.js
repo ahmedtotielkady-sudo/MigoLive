@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const express = require("express");
@@ -8,72 +7,92 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 
 const app = express();
-
-app.use(helmet());
-app.use(cors());
-app.use(express.json({ limit: "1mb" }));
-
+app.disable("x-powered-by");
 app.set("trust proxy", 1);
 
-// API protection
+app.use(helmet());
+
+const configuredOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = new Set([
+  "capacitor://localhost",
+  "http://localhost",
+  "https://localhost",
+  "http://localhost:3000",
+  "http://localhost:8100",
+  ...configuredOrigins
+]);
+
+app.use(cors({
+  origin(origin, callback) {
+    // Native clients and server-to-server requests commonly omit Origin.
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error("Origin not allowed"));
+  },
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],
+  maxAge: 600
+}));
+
+app.use(express.json({ limit: "32kb" }));
+
 app.use("/api", rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 300,
+  limit: 200,
   standardHeaders: true,
   legacyHeaders: false
 }));
 
-// Routes
-const authRoutes = require("./routes/auth");
-const walletRoutes = require("./routes/wallet");
-const gamesRoutes = require("./routes/games");
-app.use("/api/auth", authRoutes);
-app.use("/api/wallet", walletRoutes);
-app.use("/api/games", gamesRoutes);
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/wallet", require("./routes/wallet"));
+app.use("/api/games", require("./routes/games"));
 app.use("/api/admin", require("./routes/admin"));
-// Health check
-app.get("/api/health", (req, res) => {
+
+app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     service: "MigoLive API",
-    database: mongoose.connection.readyState === 1
-      ? "connected"
-      : "disconnected"
+    database: mongoose.connection.readyState === 1 ? "connected" : "disconnected"
   });
 });
 
-// Root
-app.get("/", (req, res) => {
-  res.send("MigoLive API is running");
+app.get("/", (_req, res) => res.send("MigoLive API is running"));
+
+app.use((req, res) => res.status(404).json({ error: "Route not found" }));
+
+app.use((error, _req, res, _next) => {
+  if (error.message === "Origin not allowed") {
+    return res.status(403).json({ error: "Origin not allowed" });
+  }
+  console.error("Request failed:", error.message);
+  return res.status(500).json({ error: "Internal server error" });
 });
 
-// Database connection
-const PORT = process.env.PORT || 3000;
-const MONGO_URI =
-  process.env.MONGODB_URI || process.env.MONGO_URI;
+const PORT = Number(process.env.PORT || 3000);
+const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
 
 async function startServer() {
-  try {
-    if (!MONGO_URI) {
-      throw new Error("MONGODB_URI is missing");
-    }
-
-    if (!process.env.JWT_SECRET) {
-      throw new Error("JWT_SECRET is missing");
-    }
-
-    await mongoose.connect(MONGO_URI);
-
-    console.log("MongoDB connected successfully");
-
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`MigoLive API running on port ${PORT}`);
-    });
-
-  } catch (error) {
-    console.error("Server startup failed:", error.message);
-    process.exit(1);
+  if (!MONGO_URI) throw new Error("MONGODB_URI is missing");
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+    throw new Error("JWT_SECRET must be at least 32 characters");
   }
+
+  await mongoose.connect(MONGO_URI);
+  console.log("MongoDB connected successfully");
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`MigoLive API running on port ${PORT}`);
+  });
 }
 
-startServer();
+if (require.main === module) {
+  startServer().catch((error) => {
+    console.error("Server startup failed:", error.message);
+    process.exit(1);
+  });
+}
+
+module.exports = app;
