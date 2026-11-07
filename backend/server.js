@@ -65,6 +65,16 @@ app.use("/api", rateLimit({
   legacyHeaders: false
 }));
 
+app.use("/api", async (_req, res, next) => {
+  try {
+    await ensureDatabaseConnected();
+    return next();
+  } catch (error) {
+    console.error("Database connection failed:", error.message);
+    return res.status(503).json({ error: "Database temporarily unavailable" });
+  }
+});
+
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/wallet", require("./routes/wallet"));
 app.use("/api/games", require("./routes/games"));
