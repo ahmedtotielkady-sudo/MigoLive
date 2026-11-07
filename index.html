@@ -527,7 +527,7 @@ async function refreshServerWallet(){
 async function establishServerSession(account,password,isNewAccount=false){
   const endpoint=isNewAccount?'/auth/register':'/auth/legacy-login';
   const payload=isNewAccount
-    ?{username:String(account.username||account.name||'').trim().replace(/\\s+/g,'_').slice(0,24),password,displayName:String(account.name||'').slice(0,48),phone:String(account.phone||'')}
+    ?{username:(/^[A-Za-z0-9_]{3,24}$/.test(String(account.username||'').trim())?String(account.username).trim():('mg_'+String(account.uid||''))),password,displayName:String(account.name||'').slice(0,48),phone:String(account.phone||'')}
     :{legacyUid:String(account.uid),password,displayName:String(account.name||'').slice(0,48),phone:String(account.phone||'')};
   const response=await apiRequest(endpoint,{method:'POST',body:JSON.stringify(payload)});
   API_TOKEN=response.token;
