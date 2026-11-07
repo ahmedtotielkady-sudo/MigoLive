@@ -244,7 +244,7 @@ router.post("/wallet/adjust", requireOwner, async (req, res) => {
   const { userId, amount, direction, reason } = req.body;
   const targetFilter = mongoose.isValidObjectId(userId)
     ? { _id: userId, status: "active" }
-    : (/^\\d{5,10}$/.test(String(userId || "")) ? { legacyUid: String(userId), status: "active" } : null);
+    : (/^\d{5,10}$/.test(String(userId || "")) ? { legacyUid: String(userId), status: "active" } : null);
   if (!targetFilter) return res.status(400).json({ error: "Invalid user id" });
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000) {
     return res.status(400).json({ error: "Invalid adjustment amount" });
