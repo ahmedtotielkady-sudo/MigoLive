@@ -101,4 +101,4 @@ async function playSlot777({ userId, multiplierIndex, reference }) {
     await session.endSession();
   }
 }
-module.exports = { playSlot777 };
+async function getSlot777State({ userId }) {\n  const state = await Slot777State.findOne({ userId }).select('freeSpins').lean();\n  return { freeSpins: state?.freeSpins || 0 };\n}\nmodule.exports = { playSlot777, getSlot777State };
