@@ -39,6 +39,9 @@ jobs:
           node --check backend/routes/agencies.js
           node --check backend/scripts/bootstrap-owner.js
 
+      - name: Apply MigoLive room interaction fixes
+        run: python3 scripts/apply-room-repairs.py
+
       - name: Prepare web assets
         run: |
           mkdir -p www
@@ -57,7 +60,7 @@ jobs:
               if tag not in html:
                   if '</body>' not in html:
                       raise SystemExit('index.html has no closing body tag; refusing unsafe injection')
-                  html = html.replace('</body>', tag + '\n</body>', 1)
+                  html = html.replace('</body>', tag + '\\n</body>', 1)
           p.write_text(html, encoding='utf-8')
           PY
           node --check www/migolive-api.js
