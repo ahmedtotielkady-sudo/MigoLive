@@ -63,8 +63,8 @@ router.post("/:gameId/debit", async (req, res, next) => {
       transaction: result
     });
   } catch (error) {
-    if (error.message === "Insufficient balance") {
-      return res.status(409).json({ success: false, error: "Insufficient balance" });
+    if (error.message === "Insufficient balance" || error.status === 409) {
+      return res.status(409).json({ success: false, error: error.message });
     }
     return next(error);
   }
