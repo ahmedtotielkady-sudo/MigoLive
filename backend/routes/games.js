@@ -32,6 +32,42 @@ router.get("/:gameId", auth, (req, res) => {
   });
 });
 
+// The wheel result and payout are generated and settled entirely on the server.
+// The client may submit stakes only; it cannot submit a winner or payout amount.
+router.post("/animal_wheel/play", auth, async (req, res) => {
+  const bets = req.body.bets;
+  const reference = req.get("Idempotency-Key");
+  if (!Array.isArray(bets) || bets.length !== 8 ||
+      !bets.every((value) => Number.isSafeInteger(value) && value >= 0)) {
+    return res.status(400).json({ error: "Eight non-negative integer bets are required" });
+  }
+  if (typeof reference !== "string" || !/^[A-Za-z0-9._:-]{8,100}$/.test(reference)) {
+    return res.status(400).json({ error: "A valid Idempotency-Key header is required" });
+  }
+
+  try {
+    const { executeAnimalWheelRound } = require("../services/animalWheelService");
+    const result = await executeAnimalWheelRound({
+      userId: req.user._id,
+      bets,
+      reference
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    if (error.message === "Insufficient balance") {
+      return res.status(409).json({ error: "Insufficient balance" });
+    }
+    if (error.message.includes("Idempotency key")) {
+      return res.status(409).json({ error: "Idempotency key conflict" });
+    }
+    if (error.message.includes("Invalid") || error.message.includes("between 1")) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error("Animal wheel round failed:", error);
+    return res.status(500).json({ error: "Unable to settle animal wheel round" });
+  }
+});
+
 // Debit is a server-side wallet operation. A client-supplied game result or
 // payout is deliberately not accepted here.
 router.post("/:gameId/debit", auth, async (req, res) => {
