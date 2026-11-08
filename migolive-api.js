@@ -87,6 +87,39 @@ function renderAgency(){
  $id('api-agency-refresh').onclick=refresh;refresh();
 }
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+const APP_VERSION='1.0.0';
+function versionParts(v){return String(v||'0.0.0').split('.').map(n=>parseInt(n,10)||0)}
+function versionLess(a,b){const x=versionParts(a),y=versionParts(b);for(let i=0;i<3;i++){if(x[i]!==y[i])return x[i]<y[i]}return false}
+function updateDialog(release,forced){
+ if(document.getElementById('migolive-update-lock'))return;
+ const overlay=document.createElement('div');overlay.id='migolive-update-lock';
+ overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#080414f5;display:flex;align-items:center;justify-content:center;padding:22px;direction:rtl;font-family:Cairo,Tahoma,sans-serif;color:#fff';
+ const card=document.createElement('div');card.style.cssText='width:100%;max-width:420px;background:#180d32;border:1px solid #a855f7;border-radius:22px;padding:22px;text-align:center;box-shadow:0 15px 55px #000b';
+ const title=document.createElement('h2');title.textContent=forced?'يجب تحديث التطبيق للمتابعة':'يتوفر تحديث جديد';
+ const info=document.createElement('p');info.style.cssText='color:#c4b5fd;margin:14px 0;white-space:pre-wrap';info.textContent='الإصدار '+release.version+' · build '+release.build+(release.notes?'\\n'+release.notes:'');
+ const button=document.createElement('button');button.textContent='تحديث الآن';button.style.cssText='width:100%;min-height:48px;border:0;border-radius:12px;background:linear-gradient(90deg,#7c3aed,#a855f7);color:white;font-weight:bold';
+ button.onclick=()=>GenUpdateOpen(release.downloadUrl);
+ card.append(title,info,button);
+ if(!forced){const later=document.createElement('button');later.textContent='لاحقاً';later.style.cssText='margin-top:10px;width:100%;min-height:42px;background:transparent;border:1px solid #8b5cf6;border-radius:12px;color:white';later.onclick=()=>overlay.remove();card.append(later)}
+ overlay.append(card);document.body.append(overlay);
+}
+function GenUpdateOpen(url){if(url)window.open(url,'_system')||window.open(url,'_blank')}
+async function checkAppUpdate(){
+ try{
+  if(!base())return;
+  const d=await api('/api/app-update');const r=d.release;if(!r||!r.active)return;
+  const current=window.MIGOLIVE_APP_VERSION||APP_VERSION;
+  const forced=!!r.force&&versionLess(current,r.minVersion);
+  if(forced||versionLess(current,r.version))updateDialog(r,forced);
+ }catch(e){console.warn('MigoLive update check:',e.message)}
+}
+window.MigoLiveAppUpdates={
+ adminGet:()=>api('/api/app-update/admin'),
+ adminSave:data=>api('/api/app-update',{method:'PUT',body:JSON.stringify(data)}),
+ check:checkAppUpdate
+};
+
 function install(){
  authHook();
  if(typeof window.rMsgs==='function')window.rMsgs=renderMessages;
