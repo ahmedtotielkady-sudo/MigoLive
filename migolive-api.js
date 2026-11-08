@@ -10,7 +10,7 @@ async function api(path,opts={}){
   if(token()) headers.Authorization='Bearer '+token();
   const res=await fetch(url+path,{...opts,headers});
   const data=await res.json().catch(()=>({}));
-  if(!res.ok) throw new Error(data.error||'تعذر الاتصال بالخادم ('+res.status+')');
+  if(!res.ok){const error=new Error(data.error||'تعذر الاتصال بالخادم ('+res.status+')');error.status=res.status;throw error;}
   return data;
 }
 function statusText(){return base()?'الخادم: '+base():'الخادم غير مربوط بعد';}
@@ -31,20 +31,10 @@ function authHook(){
    const raw=($id('u')?.value||'').trim(),password=$id('p')?.value||'';
    if(!raw||!password)return;
    try{
-     let username=raw.toLowerCase();
-     if(!window.reg){
-       const users=window.DB?.users||{};
-       const key=Object.keys(users).find(k=>String(users[k].uid)===raw)||Object.keys(users).find(k=>String(users[k].phone||'').replace(/[\s()-]/g,'')===raw.replace(/[\s()-]/g,''));
-       if(key)username=key;
-     }
-     let data;
-     try{data=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username,password})});}
-     catch(loginError){
-       if(!window.reg && !/Invalid username or password/i.test(loginError.message)) throw loginError;
-       if(password.length<10) throw new Error('لربط الحساب بالخادم، كلمة المرور يجب أن تكون 10 أحرف على الأقل. غيّرها أو أنشئ الحساب بكلمة مرور أقوى.');
-       await api('/api/auth/register',{method:'POST',body:JSON.stringify({username,password})});
-       data=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username,password})});
-     }
+     // Backend accounts are separate from legacy local accounts. Never auto-create
+     // a remote account after a failed login; that could create duplicates or confusion.
+     const username=raw.toLowerCase();
+     const data=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username,password})});
      localStorage.setItem(TOKEN,data.token);localStorage.setItem(REMOTE,JSON.stringify(data.user));
      document.dispatchEvent(new CustomEvent('migolive:api-authenticated',{detail:data.user}));
    }catch(e){console.warn('MigoLive API authentication:',e.message);setTimeout(()=>{if(typeof window.toast==='function')window.toast('تعذر ربط الحساب بالخادم: '+e.message)},300);}
