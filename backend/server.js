@@ -12,8 +12,6 @@ app.disable("x-powered-by");
 app.set("trust proxy", 1);
 
 app.use(helmet({
-  // The legacy single-file UI uses inline scripts/styles and trusted CDNs.
-  // Keep the other Helmet protections while allowing its current asset model.
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -47,10 +45,11 @@ const allowedOrigins = new Set([
 
 app.use(cors({
   origin(origin, callback) {
-    // Native clients and server-to-server requests commonly omit Origin.
     if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-    // The app and API are served from the same workers.dev host. Bearer-token
-    // authentication is used; no cross-site cookies are enabled.
+    // Back4app temporary app domains rotate; allow HTTPS app origins on back4.app.
+    if (/^https:\/\/[a-z0-9-]+\.back4\.app$/i.test(origin)) {
+      return callback(null, true);
+    }
     if (/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)?\.workers\.dev$/i.test(origin)) {
       return callback(null, true);
     }
