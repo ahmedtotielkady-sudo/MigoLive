@@ -1,0 +1,8 @@
+{
+  "appId": "com.migolive.app",
+  "appName": "MigoLive",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
