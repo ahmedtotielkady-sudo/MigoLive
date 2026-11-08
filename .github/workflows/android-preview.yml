@@ -34,6 +34,7 @@ jobs:
           node --check backend/models/Message.js
           node --check backend/routes/messages.js
           node --check backend/routes/agencies.js
+          node --check backend/scripts/bootstrap-owner.js
 
       - name: Prepare web assets
         run: |
