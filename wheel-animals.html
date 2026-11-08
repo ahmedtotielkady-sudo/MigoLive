@@ -59,7 +59,7 @@ function ui(){document.getElementById('bal').textContent=F(bal);document.getElem
 function snd(f,d,t='sine',g=.15){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),k=ac.createGain();o.type=t;o.frequency.value=f;k.gain.value=g;k.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(k);k.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
 function tick(f){snd(f,.08)}
 function msg(t,ms=2500){ov.textContent=t;ov.classList.add('s');clearTimeout(msg.t);msg.t=setTimeout(()=>ov.classList.remove('s'),ms)}
-function add(i){if(busy||roundPending)return;hits.forEach(([h])=>h.classList.remove('win'));if(total()+chip>bal){msg('الرصيد لا يكفي');return}bets[i]+=chip;betRound=Math.floor(Date.now()/CYC);snd(900,.1,'triangle');ui()}
+function add(i){if(busy||pendingRound)return;if(!ready||!token){msg('انتظر اتصال الحساب بالخادم');return}hits.forEach(([h])=>h.classList.remove('win'));if(total()+chip>bal){msg('الرصيد لا يكفي');return}bets[i]+=chip;betRound=Math.floor(Date.now()/CYC);snd(900,.1,'triangle');ui()}
 
 let H=[];
 function renderH(){const hs=document.getElementById('hs'),bg=BG;hs.innerHTML='';for(let k=0;k<8;k++){const e=document.createElement('i'),a=A[H[k]];if(a){e.style.backgroundImage=bg;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%'}hs.appendChild(e)}}
@@ -92,15 +92,15 @@ async function submitPendingRound(){
  if(!token){msg('اتصال الحساب بالخادم غير متاح — أعد تسجيل الدخول',4000);retryAt=Date.now()+5000;return;}
  requestInFlight=true;busy=true;const round=pendingRound;
  try{
-  const base=String(window.MIGOLIVE_API_BASE||location.origin+'/api').replace(/\\/$/,'');
+  const base=String(window.MIGOLIVE_API_BASE||location.origin+'/api').replace(/\/+$/,'');
   const response=await fetch(base+'/games/animal_wheel/play',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Idempotency-Key':round.key},body:JSON.stringify({bets:round.bets})});
   let data={};try{data=await response.json()}catch(_){}
-  if(!response.ok)throw new Error(data.error||('HTTP '+response.status));
+  if(!response.ok){if(response.status===409||response.status===400||response.status===422){pendingRound=null;bets=A.map(()=>0);betRound=-1;ui();try{parent.postMessage({t:'get'},'*')}catch(_){}throw Object.assign(new Error(data.error||('HTTP '+response.status)),{definitive:true})}if(response.status===401){try{parent.postMessage({t:'get'},'*')}catch(_){}}throw new Error(data.error||('HTTP '+response.status))}
   if(pendingRound!==round)return;
   applyServerResult(data);
  }catch(error){
-  retryAt=Date.now()+4000;
-  msg('تعذر تأكيد الجولة من الخادم. سنعيد المحاولة بنفس رقم الجولة دون تكرار الخصم.',5000);
+  retryAt=Date.now()+(error.definitive?15000:4000);
+  msg(error.definitive?('لم تُقبل الجولة: '+error.message):'تعذر تأكيد الجولة من الخادم. سنعيد المحاولة بنفس رقم الجولة دون تكرار الخصم.',5000);
  }finally{requestInFlight=false;busy=!!pendingRound;}
 }
 function tick(){
