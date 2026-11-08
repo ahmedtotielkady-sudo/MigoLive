@@ -34,10 +34,16 @@ router.post("/register", async (req, res, next) => {
       user = created;
     });
 
+    const token = jwt.sign(
+      { sub: user._id.toString() },
+      process.env.JWT_SECRET,
+      { expiresIn: "2h", issuer: "migolive-api", audience: "migolive-app" }
+    );
+
     return res.status(201).json({
-      id: user._id,
-      username: user.username,
-      role: user.role
+      token,
+      expiresIn: 7200,
+      user: { id: user._id, username: user.username, role: user.role }
     });
   } catch (e) {
     if (e.code === 11000) return res.status(409).json({ error: "Username already exists" });
