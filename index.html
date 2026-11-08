@@ -1236,7 +1236,7 @@ let ot='tp';
 function rOwner(m){
   if(!isStaff(U())){tab='me';return render()}
   const users=Object.entries(DB.users),agents=users.filter(([,x])=>x.role==='agent');
-  const tabsO=staffTabs([['dash','📊 الرئيسية'],['tp','طلبات الشحن'],['set','الإعدادات'],['coins','العملات'],['agents','الوكلاء'],['users','الأعضاء'],['hosts','سجل المضيفين'],['alog','سجل الوكلاء'],['ag','وكالات المضيفين'],['ship','وكالات الشحن'],['ledger','دفاتر الحسابات'],['vip','VIP'],['gifts','الهدايا'],['broadcast','رسائل النظام'],['events','الفعاليات'],['staff','الصلاحيات'],['countries','طلبات تغيير البلد'],['support','الدعم']]);
+  const tabsO=staffTabs([['dash','📊 الرئيسية'],['tp','طلبات الشحن'],['set','الإعدادات'],['coins','العملات'],['agents','الوكلاء'],['users','الأعضاء'],['hosts','سجل المضيفين'],['alog','سجل الوكلاء'],['ag','وكالات المضيفين'],['ship','وكالات الشحن'],['ledger','دفاتر الحسابات'],['vip','VIP'],['gifts','الهدايا'],['broadcast','رسائل النظام'],['events','الفعاليات'],['staff','الصلاحيات'],['appupdate','📲 تحديث التطبيق'],['countries','طلبات تغيير البلد'],['support','الدعم']]);
   let body='';
   if(ot==='dash')body=ownerDashboardHTML();
   if(ot==='ship')body=shippingOwnerHTML();
@@ -1258,6 +1258,7 @@ function rOwner(m){
   if(ot==='staff')body=staffOwnerHTML();
   if(ot==='countries')body=(U().role==='owner'?(DB.countryRequests||[]).filter(x=>x.status==='pending').map(x=>{const u=DB.users[x.user];return `<div class="card"><b>${esc(u?u.name:x.user)}</b><div class="mu">ID: ${u?u.uid:'-'} · البلد المطلوب: ${esc(x.country)} · الرسوم: 100,000 عملة</div><div class="row" style="margin-top:8px"><button class="btn g s grow" data-country-ok="${x.id}">موافقة وخصم الرسوم</button><button class="btn r s grow" data-country-no="${x.id}">رفض</button></div></div>`}).join('')||'<p class="mu">لا توجد طلبات تغيير بلد معلقة.</p>':'<p class="mu">طلبات تغيير البلد متاحة للمالك فقط.</p>');
   if(ot==='support')body=supportOwnerHTML();
+  if(ot==='appupdate')body=appUpdateOwnerHTML();
   if(ot==='hostapps')body=localHostAppsHTML();
   if(ot==='referrals')body=localReferralsHTML();
   if(ot==='vipplans')body=localVipPlansHTML();
@@ -1276,6 +1277,7 @@ function rOwner(m){
   if(ot==='gifts')giftsOwnerBind(m);
   if(ot==='staff')staffOwnerBind(m);
   if(ot==='support')supportOwnerBind(m);
+  if(ot==='appupdate')appUpdateOwnerBind(m);
   m.querySelectorAll('[data-country-ok]').forEach(b=>b.onclick=()=>{if(!U()||U().role!=='owner')return toast('الموافقة للمالك فقط');const q=(DB.countryRequests||[]).find(x=>x.id==b.dataset.countryOk&&x.status==='pending'),u=q&&DB.users[q.user];if(!q||!u)return toast('الطلب غير موجود');if((+u.coins||0)<100000)return toast('رصيد المستخدم لم يعد كافياً');u.coins-=100000;u.country=q.country;u.countrySetOnce=true;q.status='approved';q.reviewed=Date.now();q.reviewedBy=me;logIt('المالك',`وافق على تغيير بلد ${u.name} إلى ${q.country} وخصم 100,000 عملة`);notifyUserResult(q.user,`تمت الموافقة على تغيير بلدك إلى ${q.country} وخصم 100,000 عملة`);save();toast('تمت الموافقة وتغيير البلد');render()});
   m.querySelectorAll('[data-country-no]').forEach(b=>b.onclick=()=>{if(!U()||U().role!=='owner')return toast('الرفض للمالك فقط');const q=(DB.countryRequests||[]).find(x=>x.id==b.dataset.countryNo&&x.status==='pending');if(!q)return;q.status='rejected';q.reviewed=Date.now();q.reviewedBy=me;logIt('المالك',`رفض طلب تغيير بلد الحساب ${q.user}`);notifyUserResult(q.user,`تم رفض طلب تغيير البلد إلى ${q.country}`);save();toast('تم رفض الطلب');render()});
   if(ot==='hostapps')localHostAppsBind(m);
@@ -1305,6 +1307,34 @@ function rOwner(m){
     else if(ot==='ag'){if(U().role!=='owner')return e.textContent='إنشاء الوكالات متاح للمالك فقط';const t=DB.users[k],n=$('#an').value.trim();if(!n)return e.textContent='اكتب اسم الوكالة';if(!t)return e.textContent='المستخدم غير موجود';DB.agencies.push({id:Date.now(),name:n,head:k});if(t.role==='user')t.role='agent';logIt('مالك',`إنشاء وكالة ${n}`)}
     else{const t=DB.users[k];if(!t)return e.textContent='المستخدم غير موجود';t.role='agent';t.locked=false;if(a>0)t.coins+=a;logIt('مالك',`تعيين ${t.name} وكيلاً (+${a||0})`)}
     save();render()};
+}
+
+
+/* ===== Server-controlled application updates ===== */
+function appUpdateOwnerHTML(){
+ const remote=(()=>{try{return JSON.parse(localStorage.getItem('migolive_remote_user')||'null')}catch(_){return null}})();
+ return `<div class="card"><b>📲 إدارة تحديث التطبيق</b><div class="mu">الإعدادات تُحفظ على الخادم وتصل لكل المستخدمين. يلزم تسجيل الدخول بحساب المالك على الخادم.</div><div id="app-update-status" class="mu" style="margin-top:8px">${remote?'جاري تحميل إعدادات الإصدار...':'حساب الخادم غير مربوط'}</div></div>
+ <div class="card"><label>أحدث إصدار</label><input class="in" id="au-version" dir="ltr" placeholder="مثال: 1.2.0"><label>رقم البناء</label><input class="in" id="au-build" type="number" min="1" placeholder="مثال: 12"><label>رابط تحميل APK</label><input class="in" id="au-url" dir="ltr" placeholder="https://.../MigoLive.apk"><label>أقل إصدار مسموح به</label><input class="in" id="au-min" dir="ltr" placeholder="مثال: 1.1.0"><label>ملاحظات التحديث</label><textarea class="in" id="au-notes" maxlength="2000" placeholder="ما الجديد في هذا الإصدار؟"></textarea><label class="row"><input type="checkbox" id="au-force"> فرض التحديث ومنع استخدام الإصدارات الأقدم</label><label class="row"><input type="checkbox" id="au-active" checked> نشر هذا الإصدار للمستخدمين</label><button class="btn g w" id="au-save">حفظ ونشر إعدادات التحديث</button><button class="btn o w" id="au-load" style="margin-top:8px">إعادة تحميل الإعدادات</button></div>
+ <div class="card"><b>تنبيه مهم</b><div class="mu">فرض التحديث يحتاج رابط APK مباشر صالح، ورقم إصدار التطبيق المثبت داخل كل نسخة. لا تفعّل الفرض قبل رفع النسخة الجديدة والتأكد من الرابط.</div></div>`;
+}
+function appUpdateOwnerBind(m){
+ const status=m.querySelector('#app-update-status'),get=()=>window.MigoLiveAppUpdates;
+ async function load(){
+  try{if(!get())throw Error('ملف اتصال الخادم غير جاهز');const d=await get().adminGet();const x=d.release||{};
+   $('#au-version').value=x.version||'';$('#au-build').value=x.build||'';$('#au-url').value=x.downloadUrl||'';$('#au-min').value=x.minVersion||'';$('#au-notes').value=x.notes||'';$('#au-force').checked=!!x.force;$('#au-active').checked=x.active!==false;status.textContent='تم تحميل إعدادات الخادم · آخر تحديث: '+(x.updatedAt?new Date(x.updatedAt).toLocaleString('ar-EG'):'لم يُنشر بعد');
+  }catch(e){status.textContent=e.message;}
+ }
+ $('#au-load').onclick=load;
+ $('#au-save').onclick=async()=>{
+  const version=$('#au-version').value.trim(),build=Math.floor(($('#au-build').value||0)),downloadUrl=$('#au-url').value.trim(),minVersion=$('#au-min').value.trim(),notes=$('#au-notes').value.trim(),force=$('#au-force').checked,active=$('#au-active').checked;
+  if(!/^\d+\.\d+\.\d+$/.test(version)||!/^\d+\.\d+\.\d+$/.test(minVersion))return status.textContent='اكتب الإصدار وأقل إصدار بصيغة 1.2.3';
+  if(!(build>0))return status.textContent='رقم البناء يجب أن يكون أكبر من صفر';
+  if(active&&(!/^https:\/\//i.test(downloadUrl)))return status.textContent='أدخل رابط APK يبدأ بـ https://';
+  if(force&&!active)return status.textContent='لا يمكن فرض تحديث غير منشور';
+  try{const d=await get().adminSave({version,build,downloadUrl,minVersion,notes,force,active});status.textContent=d.message||'تم حفظ إعدادات التحديث على الخادم';}
+  catch(e){status.textContent=e.message;}
+ };
+ load();
 }
 
 /* ===== مركز الإدارة الموسع: شحن، رسائل، فعاليات، دفاتر ===== */
