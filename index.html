@@ -605,8 +605,7 @@ const dec=b=>new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0)
 const gicon=k=>DB.gIcons&&DB.gIcons[k]?`<img src="${esc(DB.gIcons[k])}" alt="">`:GM[k].i;
 const gamesGrid=()=>`<b>🎮 ألعاب العملات</b><p class="mu">تلعب بنفس رصيد حسابك، ولا يوجد رصيد تلقائي.</p><div class="gg">${Object.entries(GM).map(([k,g])=>`<button class="gt" data-g="${k}"><span class="gi">${gicon(k)}</span><b>${g.n}</b><small class="mu">${g.d}</small></button>`).join('')}</div><div class="sp"></div>`;
 function openGame(k){
-toast('اللعب متوقف مؤقتاً حتى اكتمال اعتماد النتائج والرصيد من الخادم');
-return;
+if(k!=='wheel'){toast('هذه اللعبة متوقفة حتى اكتمال ربط نتائجها بالخادم');return;}
 gameScrollY=window.scrollY||window.pageYOffset||0;
 document.documentElement.style.overflow='hidden';
 document.body.style.position='fixed';
@@ -617,7 +616,7 @@ $('#app').style.overflow='hidden';
 gameOn=k;
 document.body.classList.add('game-active');
 try{window.MyGoNative.enterFullscreen()}catch(e){}
-$('#gf').srcdoc=dec(GB[k]);
+if(k==='wheel'){$('#gf').src='./games/wheel-animals.html'}else{$('#gf').srcdoc=dec(GB[k])}
 $('#gm').classList.remove('hide');
 try{history.pushState({mygoGame:true},'','#game-'+k)}catch(e){}
 }
@@ -626,7 +625,7 @@ gameOn=null;
 document.body.classList.remove('game-active');
 try{window.MyGoNative.exitFullscreen()}catch(e){}
 $('#gm').classList.add('hide');
-$('#gf').srcdoc='';
+$('#gf').src='about:blank';$('#gf').srcdoc='';
 document.documentElement.style.overflow='';
 document.body.style.position='';
 document.body.style.top='';
@@ -640,7 +639,7 @@ render();
 $('#gx').onclick=()=>{if(history.state&&history.state.mygoGame)history.back();else closeGame()};
 addEventListener('popstate',()=>{document.querySelectorAll('.dlg').forEach(x=>x.remove());if(gameOn){closeGame();return}if(rs){rsPop();return}route()});
 addEventListener('message',e=>{const d=e.data;if(!d||!me||e.source!==$('#gf').contentWindow)return;
-  if(d.t==='get'){refreshServerWallet().then(()=>{e.source.postMessage({t:'bal',v:SERVER_WALLET_BALANCE},'*')}).catch(()=>{e.source.postMessage({t:'bal',v:0},'*')});e.source.postMessage({t:'me',name:U().name,avatar:okAv(U())?U().avatar:''},'*')}
+  if(d.t==='get'){refreshServerWallet().then(()=>{e.source.postMessage({t:'bal',v:SERVER_WALLET_BALANCE,token:API_TOKEN},'*')}).catch(()=>{e.source.postMessage({t:'bal',v:0},'*')});e.source.postMessage({t:'me',name:U().name,avatar:okAv(U())?U().avatar:''},'*')}
   else if(d.t==='set'){console.warn('Rejected client-side wallet mutation from game iframe')}
   else if(d.t==='wallet'){closeGame();tab='wallet';try{history.replaceState(null,'','#wallet')}catch(e){}render()}});
 function rImg(f,mx,cb){if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,mx/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.8))};im.onerror=()=>toast('الملف ليس صورة');im.src=rd.result};rd.readAsDataURL(f)}
