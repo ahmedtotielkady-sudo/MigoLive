@@ -29,6 +29,10 @@
         return;
       }
 
+      if (typeof window.__migoOwnerSectionBack === 'function' && window.__migoOwnerSectionBack()) {
+        return;
+      }
+
       const hash = window.location.hash || '';
       const atHome = hash === '#rooms' ||
         (document.body.classList.contains('auth-screen') && (!hash || hash === '#rooms'));
