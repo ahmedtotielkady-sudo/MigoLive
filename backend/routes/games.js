@@ -58,7 +58,7 @@ router.post("/:gameId/debit", async (req, res, next) => {
       success: true,
       duplicate: !!result.duplicate,
       game: gameId,
-      amount,
+      amount: result.amount || amount,
       reference,
       transaction: result
     });
