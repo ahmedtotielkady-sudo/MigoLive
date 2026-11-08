@@ -32,6 +32,8 @@ jobs:
         run: |
           node --check backend/server.js
           node --check backend/models/Message.js
+          node --check backend/models/AppRelease.js
+          node --check backend/routes/appUpdates.js
           node --check backend/routes/messages.js
           node --check backend/routes/agencies.js
           node --check backend/scripts/bootstrap-owner.js
