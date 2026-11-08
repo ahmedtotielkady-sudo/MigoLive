@@ -68,6 +68,16 @@ router.post("/animal_wheel/play", auth, async (req, res) => {
   }
 });
 
+router.get("/slot777/state", auth, async (req, res) => {
+  try {
+    const { getSlot777State } = require("../services/slot777Service");
+    return res.json(await getSlot777State({ userId: req.user._id }));
+  } catch (error) {
+    console.error("Slot 777 state failed:", error);
+    return res.status(500).json({ error: "Unable to load Slot 777 state" });
+  }
+});
+
 // Slot 777 outcomes, free spins, and wallet settlement are generated on the server.
 router.post("/slot777/spin", auth, async (req, res) => {
   const multiplierIndex = req.body.multiplierIndex;
