@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - android-preview
+      - feature/agency-owner-approval
   workflow_dispatch:
 
 permissions:
