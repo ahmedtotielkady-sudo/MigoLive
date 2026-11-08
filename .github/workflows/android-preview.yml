@@ -1,0 +1,71 @@
+name: Build MigoLive Android preview
+
+on:
+  push:
+    branches:
+      - android-preview
+      - feature/agency-owner-approval
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Check backend JavaScript syntax
+        run: |
+          node --check backend/server.js
+          node --check backend/models/Message.js
+          node --check backend/routes/messages.js
+          node --check backend/routes/agencies.js
+          node --check backend/scripts/bootstrap-owner.js
+          node --check migolive-api.js
+
+      - name: Prepare web assets
+        run: |
+          mkdir -p www
+          cp index.html www/index.html
+          cp migolive-api.js www/migolive-api.js
+          sed -i "/const OWNER_CODE='CHANGE-ME-2026'/d" www/index.html
+          sed -i 's#</body>#<script src="migolive-api.js"></script></body>#' www/index.html
+          cp slot-777.html slot-ocean-storm.html wheel-animals.html www/
+          if [ -d games ]; then cp -R games www/games; fi
+
+      - name: Install Capacitor
+        run: npm install @capacitor/core@^8 @capacitor/cli@^8 @capacitor/android@^8
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Sync Android project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MigoLive-Android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
