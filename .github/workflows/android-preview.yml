@@ -40,6 +40,19 @@ jobs:
         run: |
           mkdir -p www
           cp index.html www/index.html
+          cp migolive-api.js www/migolive-api.js
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('www/index.html')
+          html = p.read_text(encoding='utf-8')
+          tag = '<script src="migolive-api.js"></script>'
+          if tag not in html:
+              if '</body>' not in html:
+                  raise SystemExit('index.html has no closing body tag; refusing unsafe injection')
+              html = html.replace('</body>', tag + '\\n</body>', 1)
+              p.write_text(html, encoding='utf-8')
+          PY
+          node --check www/migolive-api.js
           cp slot-777.html slot-ocean-storm.html wheel-animals.html www/
           if [ -d games ]; then cp -R games www/games; fi
 
