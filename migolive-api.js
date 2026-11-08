@@ -10,7 +10,7 @@ async function api(path,opts={}){
   if(token()) headers.Authorization='Bearer '+token();
   const res=await fetch(url+path,{...opts,headers});
   const data=await res.json().catch(()=>({}));
-  if(!res.ok) throw new Error(data.error||'تعذر الاتصال بالخادم ('+res.status+')');
+  if(!res.ok){const error=new Error(data.error||'تعذر الاتصال بالخادم ('+res.status+')');error.status=res.status;throw error;}
   return data;
 }
 function statusText(){return base()?'الخادم: '+base():'الخادم غير مربوط بعد';}
@@ -31,50 +31,14 @@ function authHook(){
    const raw=($id('u')?.value||'').trim(),password=$id('p')?.value||'';
    if(!raw||!password)return;
    try{
-     let username=raw.toLowerCase();
-     if(!(typeof reg!=='undefined'&&reg)){
-       const users=window.DB?.users||{};
-       const key=Object.keys(users).find(k=>String(users[k].uid)===raw)||Object.keys(users).find(k=>String(users[k].phone||'').replace(/[\s()-]/g,'')===raw.replace(/[\s()-]/g,''));
-       if(key)username=key;
-     }
-     let data;
-     try{data=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username,password})});}
-     catch(loginError){
-       if(!(typeof reg!=='undefined'&&reg) && !/Invalid username or password/i.test(loginError.message)) throw loginError;
-       if(password.length<10) throw new Error('لربط الحساب بالخادم، كلمة المرور يجب أن تكون 10 أحرف على الأقل. غيّرها أو أنشئ الحساب بكلمة مرور أقوى.');
-       await api('/api/auth/register',{method:'POST',body:JSON.stringify({username,password})});
-       data=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username,password})});
-     }
+     // Backend accounts are separate from legacy local accounts. Never auto-create
+     // a remote account after a failed login; that could create duplicates or confusion.
+     const username=raw.toLowerCase();
+     const data=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username,password})});
      localStorage.setItem(TOKEN,data.token);localStorage.setItem(REMOTE,JSON.stringify(data.user));
      document.dispatchEvent(new CustomEvent('migolive:api-authenticated',{detail:data.user}));
    }catch(e){console.warn('MigoLive API authentication:',e.message);setTimeout(()=>{if(typeof window.toast==='function')window.toast('تعذر ربط الحساب بالخادم: '+e.message)},300);}
  },true);
-}
-async function renderAgency(m){
- const remote=(()=>{try{return JSON.parse(localStorage.getItem(REMOTE)||'null')}catch(_){return null}})();
- const connected=!!base()&&!!token();
- m.innerHTML='<h3>🏢 الوكالات</h3><div class="card"><div class="mu">'+(connected?'متصل بحساب الخادم':'يلزم ربط الخادم وتسجيل الدخول')+'</div></div><div id="api-agency-main" class="card">جاري تحميل بيانات الوكالة...</div><div id="api-agency-owner"></div>';
- setupButton();const main=$id('api-agency-main'),owner=$id('api-agency-owner');
- if(!connected){main.textContent='اضبط رابط الخادم ثم سجّل الدخول مجدداً.';return;}
- async function load(){
-  try{
-   const [mine,joins]=await Promise.all([api('/api/agencies/mine'),api('/api/agencies/join-requests').catch(()=>({requests:[]}))]);
-   if(mine.agency){
-    main.innerHTML='<b>وكالتك: '+escapeHtml(mine.agency.name)+'</b><div class="mu">المعرف: '+escapeHtml(mine.agency.agencyId)+' · الأعضاء: '+mine.agency.memberCount+' · الصفة: '+(mine.role==='agent'?'وكيل':'عضو')+'</div>';
-    if(mine.role==='agent')main.innerHTML+='<div class="sp"></div><b>طلبات الانضمام</b>'+(joins.requests.length?joins.requests.map(r=>'<div class="row" style="margin:8px 0"><span class="grow">'+escapeHtml(r.username)+'</span><button class="btn g s" data-join="'+r._id+'" data-decision="approve">قبول</button><button class="btn r s" data-join="'+r._id+'" data-decision="reject">رفض</button></div>').join(''):'<div class="mu">لا توجد طلبات معلقة</div>');
-    main.querySelectorAll('[data-join]').forEach(b=>b.onclick=async()=>{try{await api('/api/agencies/join-requests/'+b.dataset.join,{method:'PATCH',body:JSON.stringify({decision:b.dataset.decision})});await load()}catch(e){alert(e.message)}});
-   }else{
-    main.innerHTML='<b>إنشاء وكالة</b><div class="mu">يرسل الطلب إلى مالك المنصة للموافقة.</div><input class="in" id="api-agency-name" maxlength="60" placeholder="اسم الوكالة"><textarea class="in" id="api-agency-desc" maxlength="500" placeholder="وصف الوكالة (اختياري)"></textarea><button class="btn g w" id="api-agency-create">إرسال طلب إنشاء</button><div class="divider"></div><b>الانضمام إلى وكالة</b><input class="in" id="api-agency-id" dir="ltr" placeholder="معرف الوكالة"><button class="btn o w" id="api-agency-lookup">بحث عن وكالة</button><div id="api-agency-found" class="mu"></div>';
-    $id('api-agency-create').onclick=async()=>{const name=$id('api-agency-name').value.trim(),description=$id('api-agency-desc').value.trim();try{await api('/api/agencies/create-requests',{method:'POST',body:JSON.stringify({name,description})});alert('تم إرسال طلب إنشاء الوكالة للمالك');await load()}catch(e){alert(e.message)}};
-    $id('api-agency-lookup').onclick=async()=>{const id=$id('api-agency-id').value.trim();try{const d=await api('/api/agencies/lookup/'+encodeURIComponent(id));$id('api-agency-found').innerHTML='<b>'+escapeHtml(d.agency.name)+'</b> · الوكيل '+escapeHtml(d.agency.ownerUsername)+' · '+d.agency.memberCount+' أعضاء <button class="btn s" id="api-agency-join">طلب انضمام</button>';$id('api-agency-join').onclick=async()=>{try{await api('/api/agencies/join-requests',{method:'POST',body:JSON.stringify({agencyId:d.agency.agencyId})});alert('تم إرسال طلب الانضمام للوكيل')}catch(e){alert(e.message)}};}catch(e){$id('api-agency-found').textContent=e.message}};
-   }
-   if(remote&&remote.role==='owner'){
-    owner.innerHTML='<div class="card"><b>طلبات إنشاء الوكالات (المالك)</b><div id="api-owner-requests">جاري التحميل...</div></div>';
-    try{const d=await api('/api/agencies/owner/create-requests');const box=$id('api-owner-requests');box.innerHTML=d.requests.length?d.requests.map(a=>'<div class="card"><b>'+escapeHtml(a.name)+'</b><div class="mu">المتقدم: '+escapeHtml(a.applicant||'')+' · ID '+escapeHtml(a.agencyId)+'</div><div>'+escapeHtml(a.description||'')+'</div><div class="row"><button class="btn g grow" data-agency="'+escapeHtml(a.agencyId)+'" data-decision="approve">موافقة</button><button class="btn r grow" data-agency="'+escapeHtml(a.agencyId)+'" data-decision="reject">رفض</button></div></div>').join(''):'لا توجد طلبات معلقة';box.querySelectorAll('[data-agency]').forEach(b=>b.onclick=async()=>{try{await api('/api/agencies/owner/create-requests/'+encodeURIComponent(b.dataset.agency),{method:'PATCH',body:JSON.stringify({decision:b.dataset.decision})});await load()}catch(e){alert(e.message)}})}catch(e){$id('api-owner-requests').textContent=e.message}
-   }
-  }catch(e){main.textContent=e.message}
- }
- await load();
 }
 function renderMessages(m){
  const remote=(()=>{try{return JSON.parse(localStorage.getItem(REMOTE)||'null')}catch(_){return null}})();
@@ -99,10 +63,67 @@ function renderMessages(m){
  $id('api-msg-find').onclick=async()=>{const id=$id('api-msg-user').value.trim();if(!id)return state.textContent='اكتب ID الحساب';try{const d=await api('/api/messages/users/'+encodeURIComponent(id));await openChat(d.user.id);}catch(e){state.textContent=e.message;}};
  if(connected)loadConversations();else state.textContent='اضبط رابط الخادم من الزر أعلى الصفحة، ثم سجّل الدخول مجدداً.';
 }
+function renderAgency(){
+ const host=$id('main'); if(!host)return;
+ const connected=!!base()&&!!token();
+ host.innerHTML='<div class="card"><b>🏢 الوكالات عبر الخادم</b><div class="mu" id="api-agency-status">'+(connected?'الحساب متصل بالخادم':'سجّل الدخول بحساب الخادم أولاً')+'</div></div>'+
+ '<div class="card"><b>طلب إنشاء وكالة</b><input class="in w" id="api-agency-name" maxlength="60" placeholder="اسم الوكالة"><textarea class="in w" id="api-agency-desc" maxlength="500" placeholder="وصف الوكالة"></textarea><button class="btn w" id="api-agency-create">إرسال طلب للمالك</button></div>'+
+ '<div class="card"><b>الانضمام إلى وكالة</b><input class="in w" id="api-agency-code" maxlength="20" placeholder="كود الوكالة"><button class="btn o w" id="api-agency-lookup">بحث عن الوكالة</button><div id="api-agency-found" class="mu"></div></div>'+
+ '<div class="card"><b>وكالتي</b><div id="api-agency-mine" class="mu">جاري التحميل...</div><button class="btn o w" id="api-agency-refresh">تحديث</button></div>'+
+ '<div class="card"><b>طلبات الانضمام (للوكيل)</b><div id="api-agency-joins" class="mu">—</div></div>'+
+ '<div class="card"><b>طلبات إنشاء الوكالات (للمالك)</b><div id="api-agency-owner" class="mu">—</div></div>';
+ const status=$id('api-agency-status'),found=$id('api-agency-found'),mine=$id('api-agency-mine'),joins=$id('api-agency-joins'),owner=$id('api-agency-owner');
+ if(!connected){status.textContent='اضبط رابط الخادم وسجّل الدخول بحساب مسجل على الخادم.';return;}
+ async function refresh(){
+  try{const d=await api('/api/agencies/mine');mine.textContent=d.agency?d.agency.name+' · كود '+d.agency.agencyId+' · '+(d.role==='agent'?'وكيل':'عضو'):'لا تنتمي إلى وكالة حالياً';}
+  catch(e){mine.textContent=e.message;}
+  try{const d=await api('/api/agencies/join-requests');joins.innerHTML=d.requests.length?d.requests.map(x=>'<div class="row" style="justify-content:space-between;margin:6px 0"><span>'+escapeHtml(x.username)+'</span><span><button class="btn s" data-join="'+x._id+'" data-decision="approve">قبول</button> <button class="btn o s" data-join="'+x._id+'" data-decision="reject">رفض</button></span></div>').join(''):'لا توجد طلبات معلقة';joins.querySelectorAll('[data-join]').forEach(b=>b.onclick=async()=>{try{await api('/api/agencies/join-requests/'+encodeURIComponent(b.dataset.join),{method:'PATCH',body:JSON.stringify({decision:b.dataset.decision})});refresh();}catch(e){status.textContent=e.message;}});}
+  catch(e){joins.textContent=e.status===403?'هذه القائمة تظهر لوكيل وكالة نشطة فقط':e.message;}
+  try{const d=await api('/api/agencies/owner/create-requests');owner.innerHTML=d.requests.length?d.requests.map(x=>'<div style="margin:8px 0"><b>'+escapeHtml(x.name)+'</b> · '+escapeHtml(x.applicant||'')+'<div><button class="btn s" data-owner="'+escapeHtml(x.agencyId)+'" data-decision="approve">موافقة</button> <button class="btn o s" data-owner="'+escapeHtml(x.agencyId)+'" data-decision="reject">رفض</button></div></div>').join(''):'لا توجد طلبات إنشاء معلقة';owner.querySelectorAll('[data-owner]').forEach(b=>b.onclick=async()=>{try{await api('/api/agencies/owner/create-requests/'+encodeURIComponent(b.dataset.owner),{method:'PATCH',body:JSON.stringify({decision:b.dataset.decision})});refresh();}catch(e){status.textContent=e.message;}});}
+  catch(e){owner.textContent=e.status===403?'هذه القائمة للمالك فقط':e.message;}
+ }
+ $id('api-agency-create').onclick=async()=>{try{const name=$id('api-agency-name').value.trim(),description=$id('api-agency-desc').value.trim();await api('/api/agencies/create-requests',{method:'POST',body:JSON.stringify({name,description})});status.textContent='تم إرسال طلب إنشاء الوكالة للمالك.';refresh();}catch(e){status.textContent=e.message;}};
+ $id('api-agency-lookup').onclick=async()=>{try{const code=$id('api-agency-code').value.trim();const d=await api('/api/agencies/lookup/'+encodeURIComponent(code));found.innerHTML='<b>'+escapeHtml(d.agency.name)+'</b> · '+escapeHtml(d.agency.ownerUsername||'')+' · '+d.agency.memberCount+' عضو <button class="btn s" id="api-agency-join">طلب انضمام</button>';$id('api-agency-join').onclick=async()=>{try{await api('/api/agencies/join-requests',{method:'POST',body:JSON.stringify({agencyId:d.agency.agencyId})});found.textContent='تم إرسال طلب الانضمام للوكيل.';}catch(e){found.textContent=e.message;}};}catch(e){found.textContent=e.message;}};
+ $id('api-agency-refresh').onclick=refresh;refresh();
+}
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+const APP_VERSION='1.0.0';
+function versionParts(v){return String(v||'0.0.0').split('.').map(n=>parseInt(n,10)||0)}
+function versionLess(a,b){const x=versionParts(a),y=versionParts(b);for(let i=0;i<3;i++){if(x[i]!==y[i])return x[i]<y[i]}return false}
+function updateDialog(release,forced){
+ if(document.getElementById('migolive-update-lock'))return;
+ const overlay=document.createElement('div');overlay.id='migolive-update-lock';
+ overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#080414f5;display:flex;align-items:center;justify-content:center;padding:22px;direction:rtl;font-family:Cairo,Tahoma,sans-serif;color:#fff';
+ const card=document.createElement('div');card.style.cssText='width:100%;max-width:420px;background:#180d32;border:1px solid #a855f7;border-radius:22px;padding:22px;text-align:center;box-shadow:0 15px 55px #000b';
+ const title=document.createElement('h2');title.textContent=forced?'يجب تحديث التطبيق للمتابعة':'يتوفر تحديث جديد';
+ const info=document.createElement('p');info.style.cssText='color:#c4b5fd;margin:14px 0;white-space:pre-wrap';info.textContent='الإصدار '+release.version+' · build '+release.build+(release.notes?'\\n'+release.notes:'');
+ const button=document.createElement('button');button.textContent='تحديث الآن';button.style.cssText='width:100%;min-height:48px;border:0;border-radius:12px;background:linear-gradient(90deg,#7c3aed,#a855f7);color:white;font-weight:bold';
+ button.onclick=()=>GenUpdateOpen(release.downloadUrl);
+ card.append(title,info,button);
+ if(!forced){const later=document.createElement('button');later.textContent='لاحقاً';later.style.cssText='margin-top:10px;width:100%;min-height:42px;background:transparent;border:1px solid #8b5cf6;border-radius:12px;color:white';later.onclick=()=>overlay.remove();card.append(later)}
+ overlay.append(card);document.body.append(overlay);
+}
+function GenUpdateOpen(url){if(url)window.open(url,'_system')||window.open(url,'_blank')}
+async function checkAppUpdate(){
+ try{
+  if(!base())return;
+  const d=await api('/api/app-update');const r=d.release;if(!r||!r.active)return;
+  const current=window.MIGOLIVE_APP_VERSION||APP_VERSION;
+  const forced=!!r.force&&versionLess(current,r.minVersion);
+  if(forced||versionLess(current,r.version))updateDialog(r,forced);
+ }catch(e){console.warn('MigoLive update check:',e.message)}
+}
+window.MigoLiveAppUpdates={
+ adminGet:()=>api('/api/app-update/admin'),
+ adminSave:data=>api('/api/app-update',{method:'PUT',body:JSON.stringify(data)}),
+ check:checkAppUpdate
+};
+
 function install(){
  authHook();
- if(typeof window.rMsgs==='function')window.rMsgs=renderMessages;\n if(typeof window.rAgency==='function')window.rAgency=renderAgency;
+ if(typeof window.rMsgs==='function')window.rMsgs=renderMessages;
+ if(typeof window.rAgency==='function')window.rAgency=renderAgency;
  if(typeof window.render==='function'&&!window.render.__apiWrapped){const old=window.render;const wrapped=function(){const out=old.apply(this,arguments);setupButton();return out};wrapped.__apiWrapped=true;window.render=wrapped;}
  setupButton();
 }
