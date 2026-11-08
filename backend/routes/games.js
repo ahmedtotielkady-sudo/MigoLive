@@ -68,6 +68,28 @@ router.post("/animal_wheel/play", auth, async (req, res) => {
   }
 });
 
+// Slot 777 outcomes, free spins, and wallet settlement are generated on the server.
+router.post("/slot777/spin", auth, async (req, res) => {
+  const multiplierIndex = req.body.multiplierIndex;
+  const reference = req.get("Idempotency-Key");
+  if (!Number.isInteger(multiplierIndex) || multiplierIndex < 0 || multiplierIndex > 3) {
+    return res.status(400).json({ error: "Invalid slot wager" });
+  }
+  if (typeof reference !== "string" || !/^[A-Za-z0-9._:-]{8,128}$/.test(reference)) {
+    return res.status(400).json({ error: "A valid Idempotency-Key header is required" });
+  }
+  try {
+    const { playSlot777 } = require("../services/slot777Service");
+    return res.json(await playSlot777({ userId: req.user._id, multiplierIndex, reference }));
+  } catch (error) {
+    if (error.message === "Insufficient balance") return res.status(409).json({ error: "Insufficient balance" });
+    if (error.message.includes("Idempotency key")) return res.status(409).json({ error: "Idempotency key conflict" });
+    if (error.message.includes("Invalid")) return res.status(400).json({ error: error.message });
+    console.error("Slot 777 round failed:", error);
+    return res.status(500).json({ error: "Unable to settle Slot 777 round" });
+  }
+});
+
 // Debit is a server-side wallet operation. A client-supplied game result or
 // payout is deliberately not accepted here.
 router.post("/:gameId/debit", auth, async (req, res) => {
