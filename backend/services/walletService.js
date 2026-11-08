@@ -21,6 +21,16 @@ async function executeTransaction({
     await session.withTransaction(async () => {
       const existing = await Ledger.findOne({ reference }).session(session);
       if (existing) {
+        const sameRequest =
+          String(existing.userId) === String(userId) &&
+          existing.amount === amount &&
+          existing.type === type &&
+          existing.direction === direction;
+        if (!sameRequest) {
+          const conflict = new Error("Idempotency key was already used for a different transaction");
+          conflict.status = 409;
+          throw conflict;
+        }
         result = { duplicate: true, transactionId: existing._id, amount: existing.amount, direction: existing.direction };
         return;
       }
@@ -57,7 +67,19 @@ async function executeTransaction({
     // Two simultaneous retries can race on the unique reference index.
     if (error && error.code === 11000) {
       const existing = await Ledger.findOne({ reference }).lean();
-      if (existing) return { duplicate: true, transactionId: existing._id, amount: existing.amount, direction: existing.direction };
+      if (existing) {
+        const sameRequest =
+          String(existing.userId) === String(userId) &&
+          existing.amount === amount &&
+          existing.type === type &&
+          existing.direction === direction;
+        if (!sameRequest) {
+          const conflict = new Error("Idempotency key was already used for a different transaction");
+          conflict.status = 409;
+          throw conflict;
+        }
+        return { duplicate: true, transactionId: existing._id, amount: existing.amount, direction: existing.direction };
+      }
     }
     throw error;
   } finally {
