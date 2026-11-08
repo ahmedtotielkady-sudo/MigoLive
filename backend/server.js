@@ -29,11 +29,13 @@ const walletRoutes = require("./routes/wallet");
 const gamesRoutes = require("./routes/games");
 const agencyRoutes = require("./routes/agencies");
 const messageRoutes = require("./routes/messages");
+const appUpdateRoutes = require("./routes/appUpdates");
 app.use("/api/auth", authRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/games", gamesRoutes);
 app.use("/api/agencies", agencyRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/app-update", appUpdateRoutes);
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({
