@@ -55,7 +55,7 @@ const hits=A.map((a,i)=>{const h=document.createElement('button');h.className='h
 const b=document.createElement('div');b.className='bet';b.style.left=a[3]+'%';b.style.top=(a[4]-8.5)+'%';st.appendChild(b);return [h,b]});
 [500,1000,10000,100000].forEach(v=>{const c=document.createElement('button');c.className='chip'+(v==500?' on':'');c.innerHTML='<u></u><s>'+v+'</s>';c.onclick=()=>{chip=v;document.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');tick(600)};document.getElementById('chips').appendChild(c)});
 const total=()=>bets.reduce((a,b)=>a+b,0);
-function ui(){document.getElementById('bal').textContent=F(bal);document.getElementById('tot').textContent=F(total());hits.forEach(([h,b],i)=>{b.style.display=bets[i]?'block':'none';b.textContent=F(bets[i])}}
+function ui(){document.getElementById('bal').textContent=F(bal);document.getElementById('tot').textContent=F(total());hits.forEach(([h,b],i)=>{b.style.display=bets[i]?'block':'none';b.textContent=F(bets[i])})}
 function snd(f,d,t='sine',g=.15){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),k=ac.createGain();o.type=t;o.frequency.value=f;k.gain.value=g;k.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(k);k.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
 function tick(f){snd(f,.08)}
 function msg(t,ms=2500){ov.textContent=t;ov.classList.add('s');clearTimeout(msg.t);msg.t=setTimeout(()=>ov.classList.remove('s'),ms)}
