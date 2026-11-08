@@ -78,14 +78,17 @@ function applyServerResult(result){
  hits[i][0].classList.add('win');showWin(i,serverRound.p);
  const target=A[i][1]+(Math.random()*10-5);cur+=1800+((target-cur)%360+360)%360;nd.style.transform='rotate('+cur+'deg)';
  if(serverRound.p){snd(660,.3,'triangle');setTimeout(()=>snd(880,.4,'triangle'),150);setTimeout(()=>snd(1320,.5,'triangle'),300);msg('🎉 '+A[i][0]+' ×'+A[i][2]+' — ربحت '+F(serverRound.p),4000)}else msg('وقف على '+A[i][0]+' ×'+A[i][2]+' — حظ أوفر',3500);
- pendingRound=null;bets=A.map(()=>0);betRound=-1;ui();try{parent.postMessage({t:'get'},'*')}catch(e){}
+ pendingRound=null;persistPendingRound();bets=A.map(()=>0);betRound=-1;ui();try{parent.postMessage({t:'get'},'*')}catch(e){}
 }
+function pendingStorageKey(){return 'migolive_animal_wheel_pending_'+(token.split('.')[1]||'account').slice(0,32)}
+function persistPendingRound(){try{if(pendingRound)localStorage.setItem(pendingStorageKey(),JSON.stringify(pendingRound));else localStorage.removeItem(pendingStorageKey())}catch(_){}}
+function restorePendingRound(){try{const raw=localStorage.getItem(pendingStorageKey());if(!raw)return;const p=JSON.parse(raw);if(p&&typeof p.key==='string'&&Array.isArray(p.bets)&&p.bets.length===8&&p.bets.every(x=>Number.isSafeInteger(x)&&x>=0)&&p.bets.reduce((a,b)=>a+b,0)>0&&p.bets.reduce((a,b)=>a+b,0)<=1000000){pendingRound={n:Number(p.n)||0,key:p.key,bets:p.bets.slice()};bets=A.map(()=>0);busy=true;msg('تم استرجاع جولة معلّقة للتحقق من الخادم',4000)}}catch(_){}}
 function createPendingRound(n){
  if(pendingRound||!total())return;
  const snapshot=bets.slice(),sum=snapshot.reduce((x,y)=>x+y,0);
  if(!Number.isSafeInteger(sum)||sum<=0||sum>1000000){msg('إجمالي الرهان خارج الحد المسموح');bets=A.map(()=>0);ui();return;}
  const key='animal-wheel-'+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
- pendingRound={n,key,bets:snapshot};retryAt=0;
+ pendingRound={n,key,bets:snapshot};persistPendingRound();retryAt=0;
 }
 async function submitPendingRound(){
  if(!pendingRound||requestInFlight||Date.now()<retryAt)return;
@@ -95,7 +98,7 @@ async function submitPendingRound(){
   const base=String(window.MIGOLIVE_API_BASE||location.origin+'/api').replace(/\/+$/,'');
   const response=await fetch(base+'/games/animal_wheel/play',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Idempotency-Key':round.key},body:JSON.stringify({bets:round.bets})});
   let data={};try{data=await response.json()}catch(_){}
-  if(!response.ok){if(response.status===409||response.status===400||response.status===422){pendingRound=null;bets=A.map(()=>0);betRound=-1;ui();try{parent.postMessage({t:'get'},'*')}catch(_){}throw Object.assign(new Error(data.error||('HTTP '+response.status)),{definitive:true})}if(response.status===401){try{parent.postMessage({t:'get'},'*')}catch(_){}}throw new Error(data.error||('HTTP '+response.status))}
+  if(!response.ok){if(response.status===409||response.status===400||response.status===422){pendingRound=null;persistPendingRound();bets=A.map(()=>0);betRound=-1;ui();try{parent.postMessage({t:'get'},'*')}catch(_){}throw Object.assign(new Error(data.error||('HTTP '+response.status)),{definitive:true})}if(response.status===401){try{parent.postMessage({t:'get'},'*')}catch(_){}}throw new Error(data.error||('HTTP '+response.status))}
   if(pendingRound!==round)return;
   applyServerResult(data);
  }catch(error){
@@ -118,5 +121,5 @@ function tick(){
  doneN=fin;
  spunN=n-1;cur=0;nd.style.transition='none';nd.style.transform='rotate('+cur+'deg)';void nd.offsetWidth;nd.style.transition='';
  setH(fin);ui();tick();setInterval(tick,200)})();
-addEventListener('message',e=>{if(e.source!==parent)return;const d=e.data;if(d&&d.t==='bal'){bal=Math.max(0,Math.floor(Number(d.v)||0));token=String(d.token||'');ready=!!token;ui();if(pendingRound)submitPendingRound()}});try{parent.postMessage({t:'get'},'*')}catch(e){}
+addEventListener('message',e=>{if(e.source!==parent)return;const d=e.data;if(d&&d.t==='bal'){bal=Math.max(0,Math.floor(Number(d.v)||0));const incoming=String(d.token||'');if(incoming&&incoming!==token){token=incoming;restorePendingRound()}ready=!!token;ui();if(pendingRound)submitPendingRound()}});try{parent.postMessage({t:'get'},'*')}catch(e){}
 </script></body></html>
