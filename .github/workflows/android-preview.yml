@@ -53,6 +53,40 @@ jobs:
               p.write_text(html, encoding='utf-8')
           PY
           node --check www/migolive-api.js
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.active = False
+                  self.kind = ''
+                  self.parts = []
+                  self.current = []
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower() == 'script':
+                      attrs = dict(attrs)
+                      self.active = 'src' not in attrs
+                      self.kind = attrs.get('type', '').lower()
+                      self.current = []
+              def handle_data(self, data):
+                  if self.active:
+                      self.current.append(data)
+              def handle_endtag(self, tag):
+                  if tag.lower() == 'script' and self.active:
+                      if self.kind in ('', 'text/javascript', 'application/javascript', 'module'):
+                          self.parts.append(''.join(self.current))
+                      self.active = False
+          parser = Scripts()
+          parser.feed(Path('www/index.html').read_text(encoding='utf-8'))
+          scripts = [x for x in parser.parts if x.strip()]
+          if not scripts:
+              raise SystemExit('No inline JavaScript found to validate')
+          for i, source in enumerate(scripts):
+              Path(f'/tmp/migolive-inline-{i}.js').write_text(source, encoding='utf-8')
+          print(f'Extracted {len(scripts)} inline JavaScript block(s)')
+          PY
+          for file in /tmp/migolive-inline-*.js; do node --check "$file"; done
           cp slot-777.html slot-ocean-storm.html wheel-animals.html www/
           if [ -d games ]; then cp -R games www/games; fi
 
