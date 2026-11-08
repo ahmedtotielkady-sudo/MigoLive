@@ -2,7 +2,7 @@ const router = require("express").Router();
 const AppRelease = require("../models/AppRelease");
 const auth = require("../middleware/auth");
 
-const validVersion = v => /^\\d+\\.\\d+\\.\\d+$/.test(String(v || ""));
+const validVersion = v => /^\d+\.\d+\.\d+$/.test(String(v || ""));
 const publicShape = x => x ? ({
   version: x.version, build: x.build, downloadUrl: x.downloadUrl,
   minVersion: x.minVersion, notes: x.notes, force: x.force,
