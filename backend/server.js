@@ -28,10 +28,12 @@ const authRoutes = require("./routes/auth");
 const walletRoutes = require("./routes/wallet");
 const gamesRoutes = require("./routes/games");
 const agencyRoutes = require("./routes/agencies");
+const messageRoutes = require("./routes/messages");
 app.use("/api/auth", authRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/games", gamesRoutes);
 app.use("/api/agencies", agencyRoutes);
+app.use("/api/messages", messageRoutes);
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({
