@@ -10,41 +10,20 @@ async function executeTransaction({
   reference,
   metadata = {}
 }) {
-  if (!userId || !reference) {
-    throw new Error("Missing transaction data");
-  }
-
-  if (!Number.isSafeInteger(amount) || amount <= 0) {
-    throw new Error("Invalid transaction amount");
-  }
-
-  if (!["credit", "debit"].includes(direction)) {
-    throw new Error("Invalid transaction direction");
-  }
+  if (!userId || !reference) throw new Error("Missing transaction data");
+  if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error("Invalid transaction amount");
+  if (!["credit", "debit"].includes(direction)) throw new Error("Invalid transaction direction");
 
   const session = await mongoose.startSession();
   let result;
 
   try {
     await session.withTransaction(async () => {
-      const existing = await Ledger.findOne({
-        reference
-      }).session(session);
-
+      const existing = await Ledger.findOne({ reference }).session(session);
       if (existing) {
-        result = { duplicate: true };
+        result = { duplicate: true, transactionId: existing._id };
         return;
       }
-
-      await Ledger.create([{
-        userId,
-        type,
-        amount,
-        direction,
-        reference,
-        status: "posted",
-        metadata
-      }], { session });
 
       await Wallet.updateOne(
         { userId },
@@ -53,31 +32,34 @@ async function executeTransaction({
       );
 
       const update = await Wallet.updateOne(
-        direction === "debit"
-          ? { userId, balance: { $gte: amount } }
-          : { userId },
-        {
-          $inc: {
-            balance: direction === "credit"
-              ? amount
-              : -amount
-          }
-        },
+        direction === "debit" ? { userId, balance: { $gte: amount } } : { userId },
+        { $inc: { balance: direction === "credit" ? amount : -amount } },
         { session }
       );
 
-      if (!update.modifiedCount) {
-        throw new Error("Insufficient balance");
-      }
+      if (update.modifiedCount !== 1) throw new Error("Insufficient balance");
+
+      const [entry] = await Ledger.create([{
+        userId, type, amount, direction, reference, status: "posted", metadata
+      }], { session });
 
       result = {
         success: true,
+        duplicate: false,
+        transactionId: entry._id,
         amount,
         direction
       };
     });
 
     return result;
+  } catch (error) {
+    // Two simultaneous retries can race on the unique reference index.
+    if (error && error.code === 11000) {
+      const existing = await Ledger.findOne({ reference }).lean();
+      if (existing) return { duplicate: true, transactionId: existing._id };
+    }
+    throw error;
   } finally {
     await session.endSession();
   }
