@@ -1238,7 +1238,7 @@ function rOwner(m){
   const users=Object.entries(DB.users),agents=users.filter(([,x])=>x.role==='agent');
   const tabsO=staffTabs([['dash','📊 الرئيسية'],['tp','طلبات الشحن'],['set','الإعدادات'],['coins','العملات'],['agents','الوكلاء'],['users','الأعضاء'],['hosts','سجل المضيفين'],['alog','سجل الوكلاء'],['ag','وكالات المضيفين'],['ship','وكالات الشحن'],['ledger','دفاتر الحسابات'],['vip','VIP'],['gifts','الهدايا'],['broadcast','رسائل النظام'],['events','الفعاليات'],['staff','الصلاحيات'],['appupdate','📲 تحديث التطبيق'],['countries','طلبات تغيير البلد'],['support','الدعم']]);
   let body='';
-  if(ot==='dash')body=ownerDashboardHTML();
+  if(ot==='dash')body=ownerDashboardHTML(tabsO);
   if(ot==='ship')body=shippingOwnerHTML();
   if(ot==='ledger')body=shippingLedgerHTML();
   if(ot==='broadcast')body=broadcastOwnerHTML();
@@ -1263,9 +1263,10 @@ function rOwner(m){
   if(ot==='referrals')body=localReferralsHTML();
   if(ot==='vipplans')body=localVipPlansHTML();
   if(ot==='localsec')body=localSecurityHTML();
-  m.innerHTML=`<button class="btn o s" id="bk">← رجوع</button><h3 style="margin:10px 0">👑 لوحة المالك</h3><div style="overflow-x:auto;white-space:nowrap;margin-bottom:12px">${tabsO.map(([k,l])=>`<button class="pill ${ot===k?'on':''}" data-o="${k}">${l}</button>`).join('')}</div>${body}`;
-  $('#bk').onclick=()=>goBack('me');
-  m.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{ot=b.dataset.o;banFor=null;render()});
+  const currentOwnerLabel=(tabsO.find(([k])=>k===ot)||['dash','📊 الرئيسية'])[1];
+  m.innerHTML=`<div class="owner-page-head"><button class="btn o s" id="bk">${ot==='dash'?'← رجوع للتطبيق':'→ رجوع للرئيسية'}</button><h3>${ot==='dash'?'👑 لوحة المالك':currentOwnerLabel}</h3></div>${body}`;
+  $('#bk').onclick=()=>{if(ot==='dash'){goBack('me')}else{ot='dash';banFor=null;render()}};
+
   if(ot==='dash')ownerDashboardBind(m);
   if(ot==='ship')shippingOwnerBind(m);
   if(ot==='ledger')shippingLedgerBind(m);
@@ -1339,8 +1340,17 @@ function appUpdateOwnerBind(m){
 
 /* ===== مركز الإدارة الموسع: شحن، رسائل، فعاليات، دفاتر ===== */
 function adminLog(type,detail){DB.audit.unshift({t:Date.now(),by:me||'local',type,detail});DB.audit=DB.audit.slice(0,5000);}
-function ownerDashboardHTML(){const us=Object.values(DB.users),pending=DB.topups.filter(x=>x.status==='pending').length;return `<div class="card"><b>📊 ملخص التطبيق</b><div class="sp"></div><div class="row"><div class="grow"><div class="mu">الحسابات</div><b>${us.length}</b></div><div class="grow"><div class="mu">إجمالي العملات</div><b>${fmt(us.reduce((a,x)=>a+(+x.coins||0),0))}</b></div><div class="grow"><div class="mu">طلبات الشحن</div><b>${pending}</b></div></div><div class="sp"></div><div class="row"><div class="grow">🎁 الهدايا: <b>${DB.giftCat.length}</b></div><div class="grow">🏠 الغرف: <b>${DB.rooms.length}</b></div></div><div class="sp"></div><div class="row"><div class="grow">🏢 وكالات المضيفين: <b>${DB.agencies.length}</b></div><div class="grow">💳 وكالات الشحن: <b>${DB.shippingAgencies.length}</b></div></div><div class="sp"></div><div class="row"><div class="grow">🎉 فعاليات نشطة: <b>${DB.events.filter(e=>e.active!==false&&(!e.until||e.until>Date.now())).length}</b></div><div class="grow">📣 رسائل نظام: <b>${DB.broadcasts.length}</b></div></div></div><div class="card"><b>وصول سريع لكل أدوات الإدارة</b><div class="sp"></div><div class="sec">${[['gifts','🎁 الهدايا'],['broadcast','📣 رسائل النظام'],['events','🎉 الفعاليات'],['ship','🏦 وكالات الشحن'],['ledger','📒 دفاتر الحسابات'],['ag','🎙️ وكالات المضيفين'],['users','👥 المستخدمون'],['staff','🔐 الصلاحيات'],['hostapps','🎙️ طلبات المضيفين'],['referrals','🎟️ الدعوات'],['vipplans','💎 اشتراكات VIP'],['localsec','🛡️ الأمان المحلي']].map(([k,l])=>`<button class="btn o s grow" data-jump="${k}">${l}</button>`).join('')}</div></div><div class="card"><b>آخر سجل إداري</b><div class="sp"></div>${(DB.audit||[]).slice(0,8).map(x=>`<div class="mu" style="padding:6px 0;border-bottom:1px solid var(--line)">${new Date(x.t).toLocaleString('ar-EG')} · ${esc(x.type)} · ${esc(x.detail)}</div>`).join('')||'<span class="mu">لا توجد عمليات بعد</span>'}</div>`}
-function ownerDashboardBind(m){m.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{ot=b.dataset.jump;render()})}
+function ownerDashboardHTML(tabsO=[]){
+ const us=Object.values(DB.users),pending=DB.topups.filter(x=>x.status==='pending').length;
+ const icons={tp:'🧾',set:'⚙️',coins:'🪙',agents:'🛡️',users:'👥',hosts:'🎙️',alog:'📋',ag:'🏢',ship:'🏦',ledger:'📒',vip:'💎',gifts:'🎁',broadcast:'📣',events:'🎉',staff:'🔐',appupdate:'📲',countries:'🌍',support:'🆘',hostapps:'🎤',referrals:'🎟️',vipplans:'💠',localsec:'🛡️'};
+ const cards=tabsO.filter(([k])=>k!=='dash').map(([k,label])=>`<button type="button" class="owner-menu-item" data-jump="${k}"><span class="owner-menu-icon">${icons[k]||'📂'}</span><span class="owner-menu-label">${label.replace(/^\S+\s/,'')}</span><span class="owner-menu-arrow">‹</span></button>`).join('');
+ return `<section class="owner-summary card"><b>📊 ملخص التطبيق</b><div class="owner-stats">
+ <div><span>الحسابات</span><b>${us.length}</b></div><div><span>إجمالي العملات</span><b>${fmt(us.reduce((a,x)=>a+(+x.coins||0),0))}</b></div><div><span>طلبات الشحن المعلقة</span><b>${pending}</b></div>
+ <div><span>الهدايا</span><b>${DB.giftCat.length}</b></div><div><span>الغرف</span><b>${DB.rooms.length}</b></div><div><span>وكالات المضيفين</span><b>${DB.agencies.length}</b></div><div><span>وكالات الشحن</span><b>${DB.shippingAgencies.length}</b></div><div><span>الفعاليات النشطة</span><b>${DB.events.filter(e=>e.active!==false&&(!e.until||e.until>Date.now())).length}</b></div>
+ </div></section><section class="owner-menu-section"><h4>أقسام الإدارة</h4><p class="mu">اختار القسم المطلوب؛ كل قسم هيفتح في صفحة مستقلة.</p><div class="owner-menu-grid">${cards}</div></section>
+ <section class="card"><b>آخر سجل إداري</b><div class="sp"></div>${(DB.audit||[]).slice(0,8).map(x=>`<div class="mu" style="padding:6px 0;border-bottom:1px solid var(--line)">${new Date(x.t).toLocaleString('ar-EG')} · ${esc(x.type)} · ${esc(x.detail)}</div>`).join('')||'<span class="mu">لا توجد عمليات بعد</span>'}</section>`;
+}
+function ownerDashboardBind(m){m.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{ot=b.dataset.jump;banFor=null;render()})}
 function shippingOwnerHTML(){return `<div class="card"><b>🏦 إنشاء وكالة شحن (الإدارة فقط)</b><div class="sp"></div><input class="in" id="shname" placeholder="اسم الوكالة"><input class="in" id="shuser" placeholder="اسم حساب المستخدم المسؤول أو ID"><input class="in" id="shstock" type="number" min="0" placeholder="مخزون العملات الافتتاحي"><button class="btn g w" id="shcreate">إنشاء وتعيين الوكيل</button><div class="err" id="sherr"></div></div>${DB.shippingAgencies.map(a=>{const u=DB.users[a.user],rows=DB.shippingLedger.filter(x=>x.agency===a.id),sales=rows.filter(x=>x.kind==='sale'),purch=rows.filter(x=>x.kind==='purchase');return `<div class="card" data-shcard="${a.id}"><b>${esc(a.name)}</b><div class="mu">المسؤول: ${esc(u?u.name:'حساب غير موجود')} · ID ${u?u.uid:'-'}</div><div class="row"><div class="grow">رصيد محفظة الوكيل <b>${fmt(shippingBalance(a))}</b></div><div class="grow">مبيعات <b>${fmt(sales.reduce((n,x)=>n+x.amount,0))}</b></div></div><div class="mu">المشتريات من الإدارة: ${fmt(purch.reduce((n,x)=>n+x.amount,0))} · عدد عمليات البيع: ${sales.length}</div><div class="sp"></div><div class="row"><input class="in grow" data-stockbuy type="number" min="1" placeholder="إضافة عملات لمحفظة الوكيل" style="margin:0"><button class="btn s" data-shbuy="${a.id}">إضافة رصيد</button><button class="btn r s" data-shstop="${a.id}">${a.active===false?'تفعيل':'إيقاف'}</button></div></div>`}).join('')||'<p class="mu">لم تُنشأ وكالات شحن بعد.</p>'}`}
 function shippingOwnerBind(m){$('#shcreate').onclick=()=>{const name=$('#shname').value.trim(),k=findUser($('#shuser').value),stock=Math.floor(+$('#shstock').value);if(!name||!k)return $('#sherr').textContent='أدخل اسم الوكالة وحساباً موجوداً';if(DB.shippingAgencies.some(a=>a.user===k))return $('#sherr').textContent='هذا الحساب مرتبط بوكالة شحن بالفعل';if(!(stock>=0))return $('#sherr').textContent='مخزون غير صحيح';const id=Date.now();DB.users[k].coins=(+DB.users[k].coins||0)+stock;DB.shippingAgencies.push({id,name,user:k,stock:0,active:true,created:Date.now()});DB.users[k].shippingAgency=id;DB.users[k].role='shipping';DB.shippingLedger.unshift({id:Date.now()+1,agency:id,kind:'purchase',amount:stock,t:Date.now(),by:me,detail:'إضافة رصيد افتتاحي إلى محفظة حساب الوكيل'});adminLog('وكالة شحن',`إنشاء ${name} وتعيين ${DB.users[k].name}`);save();render()};m.querySelectorAll('[data-shbuy]').forEach(b=>b.onclick=()=>{const a=DB.shippingAgencies.find(x=>x.id==b.dataset.shbuy),n=Math.floor(+b.closest('[data-shcard]').querySelector('[data-stockbuy]').value);if(!a||!(n>0))return toast('أدخل كمية صحيحة');const wallet=shippingWallet(a);if(!wallet)return toast('حساب الوكيل غير موجود');wallet.coins=(+wallet.coins||0)+n;DB.shippingLedger.unshift({id:Date.now(),agency:a.id,kind:'purchase',amount:n,t:Date.now(),by:me,detail:'إضافة رصيد إلى محفظة حساب الوكيل'});adminLog('توريد وكالة',`${a.name}: ${n} عملة`);save();render()});m.querySelectorAll('[data-shstop]').forEach(b=>b.onclick=()=>{const a=DB.shippingAgencies.find(x=>x.id==b.dataset.shstop);a.active=a.active===false?true:false;adminLog('حالة وكالة',`${a.name}: ${a.active?'مفعلة':'موقوفة'}`);save();render()})}
 function shippingLedgerHTML(){const cutoff=Date.now()-155*86400000,rows=DB.shippingLedger.filter(x=>x.t>=cutoff);return `<div class="card"><b>📒 أرشيف وكالات الشحن — آخر خمسة أشهر</b><div class="mu">السجل محفوظ محلياً على هذا الجهاز. المبيعات للمستخدمين فقط.</div></div>${rows.map(x=>{const a=DB.shippingAgencies.find(y=>y.id===x.agency),u=DB.users[x.to];return `<div class="card"><b>${esc(a?a.name:'وكالة محذوفة')} · ${x.kind==='sale'?'بيع لمستخدم':'شراء من الإدارة'}</b><div class="mu">${fmt(x.amount)} عملة · ${new Date(x.t).toLocaleString('ar-EG')}</div>${x.kind==='sale'?`<div>المستلم: ${esc(u?u.name:x.to)} · ID ${u?u.uid:'-'}</div>`:''}<div class="mu">${esc(x.detail||'')}</div></div>`}).join('')||'<p class="mu">لا توجد حركات مسجلة.</p>'}`}
@@ -1481,6 +1491,25 @@ body.auth-screen #auth .or{flex:0 0 auto!important;margin:12px 0!important}
   body.auth-screen #auth h1.t{font-size:34px!important}
   body.auth-screen #auth .sub{margin:2px 0 10px!important}
 }
+</style>
+
+<style id="migolive-owner-menu-v1">
+.owner-page-head{display:flex;align-items:center;gap:12px;margin:4px 0 14px}
+.owner-page-head h3{margin:0!important;min-width:0;flex:1;font-size:18px}
+.owner-summary{padding:14px}
+.owner-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.owner-stats>div{min-width:0;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(124,58,237,.08)}
+.owner-stats span{display:block;color:var(--mu);font-size:12px}
+.owner-stats b{display:block;margin-top:3px;font-size:19px;overflow-wrap:anywhere}
+.owner-menu-section{margin:16px 0}
+.owner-menu-section h4{font-size:17px;margin-bottom:4px}
+.owner-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.owner-menu-item{min-width:0;min-height:82px;display:flex;align-items:center;gap:9px;padding:12px 10px;border-radius:15px;border:1px solid var(--line);background:linear-gradient(145deg,var(--card),rgba(124,58,237,.13));color:var(--tx);text-align:right;cursor:pointer}
+.owner-menu-item:active{transform:scale(.98)}
+.owner-menu-icon{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:12px;background:rgba(124,58,237,.2);font-size:23px}
+.owner-menu-label{flex:1;min-width:0;font-size:13px;font-weight:800;line-height:1.45}
+.owner-menu-arrow{color:var(--gd);font-size:24px}
+@media(min-width:430px){.owner-menu-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
 </body>
 </html>
