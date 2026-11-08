@@ -21,7 +21,7 @@ async function executeTransaction({
     await session.withTransaction(async () => {
       const existing = await Ledger.findOne({ reference }).session(session);
       if (existing) {
-        result = { duplicate: true, transactionId: existing._id };
+        result = { duplicate: true, transactionId: existing._id, amount: existing.amount, direction: existing.direction };
         return;
       }
 
@@ -57,7 +57,7 @@ async function executeTransaction({
     // Two simultaneous retries can race on the unique reference index.
     if (error && error.code === 11000) {
       const existing = await Ledger.findOne({ reference }).lean();
-      if (existing) return { duplicate: true, transactionId: existing._id };
+      if (existing) return { duplicate: true, transactionId: existing._id, amount: existing.amount, direction: existing.direction };
     }
     throw error;
   } finally {
