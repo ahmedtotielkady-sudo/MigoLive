@@ -103,7 +103,7 @@ function ap(){const a=$('uav');if(!me)return;if(me.avatar){a.style.backgroundIma
 const toWallet=()=>{try{parent.postMessage({t:'wallet'},'*')}catch(e){}};
 addEventListener('message',e=>{const d=e.data;if(!d)return;if(d.t==='bal'&&Number.isFinite(d.v)){bal=d.v;ready=true;upd()}else if(d.t==='me'){me=d;ap()}});
 try{parent.postMessage({t:'get'},'*')}catch(e){}
-setTimeout(()=>{if(!ready&&bal===0){bal=5000;upd()}},1500);
+// لا تنشئ رصيدًا افتراضيًا عند فشل الاتصال بالخادم؛ الرصيد يأتي من المحفظة فقط.
 
 // RNG: single function, easy to tune via WT
 function rnd(nw){const w=WT.map((x,i)=>nw&&i===W?0:x);let r=Math.random()*w.reduce((a,b)=>a+b),i=0;while((r-=w[i])>=0)i++;return i}
