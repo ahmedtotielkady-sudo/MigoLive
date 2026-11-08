@@ -1,6 +1,4 @@
-
 const router = require("express").Router();
-const crypto = require("crypto");
 const auth = require("../middleware/auth");
 const { executeTransaction } = require("../services/walletService");
 
@@ -10,8 +8,7 @@ const GAMES = Object.freeze({
   animal_wheel: "عجلة الحيوانات"
 });
 
-// عرض الألعاب
-router.get("/", auth, (req, res) => {
+router.get("/", auth, (_req, res) => {
   res.json({
     games: Object.entries(GAMES).map(([id, name]) => ({
       id,
@@ -22,17 +19,12 @@ router.get("/", auth, (req, res) => {
   });
 });
 
-// تفاصيل اللعبة
 router.get("/:gameId", auth, (req, res) => {
   const name = GAMES[req.params.gameId];
 
-  if (!name) {
-    return res.status(404).json({
-      error: "Game not found"
-    });
-  }
+  if (!name) return res.status(404).json({ error: "Game not found" });
 
-  res.json({
+  return res.json({
     id: req.params.gameId,
     name,
     wallet: "shared",
@@ -40,30 +32,29 @@ router.get("/:gameId", auth, (req, res) => {
   });
 });
 
-// خصم رهان من المحفظة المشتركة
+// Debit is a server-side wallet operation. A client-supplied game result or
+// payout is deliberately not accepted here.
 router.post("/:gameId/debit", auth, async (req, res) => {
+  const { gameId } = req.params;
+  const { amount } = req.body;
+
+  if (!GAMES[gameId]) {
+    return res.status(404).json({ error: "Game not found" });
+  }
+
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    return res.status(400).json({ error: "Invalid bet amount" });
+  }
+
+  const suppliedKey = req.get("Idempotency-Key");
+  if (typeof suppliedKey !== "string" || !/^[A-Za-z0-9._:-]{8,128}$/.test(suppliedKey)) {
+    return res.status(400).json({ error: "A valid Idempotency-Key header is required" });
+  }
+
+  const reference = suppliedKey;
+
   try {
-    const { gameId } = req.params;
-    const { amount } = req.body;
-
-    if (!GAMES[gameId]) {
-      return res.status(404).json({
-        error: "Game not found"
-      });
-    }
-
-    if (
-      !Number.isSafeInteger(amount) ||
-      amount <= 0
-    ) {
-      return res.status(400).json({
-        error: "Invalid bet amount"
-      });
-    }
-
-    const reference = crypto.randomUUID();
-
-    const result = await executeTransaction({
+    const transaction = await executeTransaction({
       userId: req.user._id,
       amount,
       type: "game_debit",
@@ -76,21 +67,24 @@ router.post("/:gameId/debit", auth, async (req, res) => {
       }
     });
 
-    res.json({
+    return res.status(200).json({
       success: true,
       game: gameId,
       amount,
       reference,
-      transaction: result
+      duplicate: transaction.duplicate,
+      transaction
     });
-
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    if (error.message === "Insufficient balance") {
+      return res.status(409).json({ success: false, error: "Insufficient balance" });
+    }
+    if (error.message.includes("Idempotency key")) {
+      return res.status(409).json({ success: false, error: "Idempotency key conflict" });
+    }
+    console.error("Game debit failed:", error);
+    return res.status(500).json({ success: false, error: "Unable to process game debit" });
   }
 });
 
 module.exports = router;
-

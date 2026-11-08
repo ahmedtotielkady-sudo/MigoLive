@@ -1,0 +1,10 @@
+{
+  "appId": "com.migolive.app",
+  "appName": "MigoLive",
+  "webDir": "public",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": false,
+    "webContentsDebuggingEnabled": false
+  }
+}

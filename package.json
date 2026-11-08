@@ -1,12 +1,13 @@
 {
-  "name": "migolive-backend",
+  "name": "migolive",
   "version": "1.0.0",
   "private": true,
-  "description": "MigoLive backend foundation",
+  "description": "MigoLive application and backend",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js",
+    "build:cloudflare": "node scripts/build-cloudflare-assets.js"
   },
   "engines": {
     "node": ">=20"
@@ -19,6 +20,9 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.9.5"
+    "mongoose": "^9.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.102.0"
   }
 }
