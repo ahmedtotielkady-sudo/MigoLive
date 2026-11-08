@@ -1,6 +1,4 @@
-
 const router = require("express").Router();
-const crypto = require("crypto");
 const auth = require("../middleware/auth");
 const { executeTransaction } = require("../services/walletService");
 
@@ -10,87 +8,66 @@ const GAMES = Object.freeze({
   animal_wheel: "عجلة الحيوانات"
 });
 
+router.use(auth);
+
 // عرض الألعاب
-router.get("/", auth, (req, res) => {
+router.get("/", (req, res) => {
   res.json({
     games: Object.entries(GAMES).map(([id, name]) => ({
-      id,
-      name,
-      wallet: "shared",
-      settlement: "server_only"
+      id, name, wallet: "shared", settlement: "server_only"
     }))
   });
 });
 
 // تفاصيل اللعبة
-router.get("/:gameId", auth, (req, res) => {
+router.get("/:gameId", (req, res) => {
   const name = GAMES[req.params.gameId];
-
-  if (!name) {
-    return res.status(404).json({
-      error: "Game not found"
-    });
-  }
-
-  res.json({
-    id: req.params.gameId,
-    name,
-    wallet: "shared",
-    settlement: "server_only"
-  });
+  if (!name) return res.status(404).json({ error: "Game not found" });
+  res.json({ id: req.params.gameId, name, wallet: "shared", settlement: "server_only" });
 });
 
-// خصم رهان من المحفظة المشتركة
-router.post("/:gameId/debit", auth, async (req, res) => {
+// خصم الرهان مع مفتاح منع تكرار الطلب عند إعادة المحاولة.
+router.post("/:gameId/debit", async (req, res, next) => {
   try {
     const { gameId } = req.params;
-    const { amount } = req.body;
+    const { amount } = req.body || {};
 
-    if (!GAMES[gameId]) {
-      return res.status(404).json({
-        error: "Game not found"
-      });
+    if (!GAMES[gameId]) return res.status(404).json({ error: "Game not found" });
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      return res.status(400).json({ error: "Invalid bet amount" });
     }
 
-    if (
-      !Number.isSafeInteger(amount) ||
-      amount <= 0
-    ) {
+    const idempotencyKey = String(req.get("Idempotency-Key") || "").trim();
+    if (!/^[A-Za-z0-9._:-]{8,100}$/.test(idempotencyKey)) {
       return res.status(400).json({
-        error: "Invalid bet amount"
+        error: "A valid Idempotency-Key header (8–100 characters) is required"
       });
     }
 
-    const reference = crypto.randomUUID();
-
+    const reference = `game:${req.user._id}:${gameId}:${idempotencyKey}`;
     const result = await executeTransaction({
       userId: req.user._id,
       amount,
       type: "game_debit",
       direction: "debit",
       reference,
-      metadata: {
-        game: gameId,
-        gameName: GAMES[gameId],
-        action: "bet"
-      }
+      metadata: { game: gameId, gameName: GAMES[gameId], action: "bet" }
     });
 
-    res.json({
+    return res.json({
       success: true,
+      duplicate: !!result.duplicate,
       game: gameId,
       amount,
       reference,
       transaction: result
     });
-
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    if (error.message === "Insufficient balance") {
+      return res.status(409).json({ success: false, error: "Insufficient balance" });
+    }
+    return next(error);
   }
 });
 
 module.exports = router;
-
