@@ -3,6 +3,7 @@ name: Build MigoLive Android preview
 on:
   push:
     branches:
+      - main
       - android-preview
       - feature/agency-owner-approval
   workflow_dispatch:
