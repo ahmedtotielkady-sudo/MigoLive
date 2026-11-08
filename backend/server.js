@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const express = require("express");
@@ -9,13 +8,12 @@ const rateLimit = require("express-rate-limit");
 
 const app = express();
 
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
-app.set("trust proxy", 1);
-
-// API protection
 app.use("/api", rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
@@ -24,61 +22,75 @@ app.use("/api", rateLimit({
 }));
 
 // Routes
-const authRoutes = require("./routes/auth");
-const walletRoutes = require("./routes/wallet");
-const gamesRoutes = require("./routes/games");
-const agencyRoutes = require("./routes/agencies");
-const messageRoutes = require("./routes/messages");
-const appUpdateRoutes = require("./routes/appUpdates");
-app.use("/api/auth", authRoutes);
-app.use("/api/wallet", walletRoutes);
-app.use("/api/games", gamesRoutes);
-app.use("/api/agencies", agencyRoutes);
-app.use("/api/messages", messageRoutes);
-app.use("/api/app-update", appUpdateRoutes);
-// Health check
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/wallet", require("./routes/wallet"));
+app.use("/api/games", require("./routes/games"));
+app.use("/api/agencies", require("./routes/agencies"));
+app.use("/api/messages", require("./routes/messages"));
+app.use("/api/app-update", require("./routes/appUpdates"));
+
+// Readiness check: return 503 when MongoDB is unavailable.
 app.get("/api/health", (req, res) => {
-  res.json({
-    ok: true,
+  const connected = mongoose.connection.readyState === 1;
+  res.status(connected ? 200 : 503).json({
+    ok: connected,
     service: "MigoLive API",
-    database: mongoose.connection.readyState === 1
-      ? "connected"
-      : "disconnected"
+    database: connected ? "connected" : "disconnected"
   });
 });
 
-// Root
-app.get("/", (req, res) => {
-  res.send("MigoLive API is running");
+app.get("/", (req, res) => res.send("MigoLive API is running"));
+
+// Consistent JSON response for unknown API routes.
+app.use("/api", (req, res) => {
+  res.status(404).json({ error: "API route not found" });
 });
 
-// Database connection
-const PORT = process.env.PORT || 3000;
-const MONGO_URI =
-  process.env.MONGODB_URI || process.env.MONGO_URI;
+// Central error handler; never expose stack traces or secrets to clients.
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 600
+    ? error.status
+    : 500;
+  if (status >= 500) console.error("API error:", error);
+  return res.status(status).json({
+    error: status >= 500 ? "Internal server error" : error.message
+  });
+});
+
+const PORT = Number(process.env.PORT) || 3000;
+const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
 
 async function startServer() {
-  try {
-    if (!MONGO_URI) {
-      throw new Error("MONGODB_URI is missing");
-    }
-
-    if (!process.env.JWT_SECRET) {
-      throw new Error("JWT_SECRET is missing");
-    }
-
-    await mongoose.connect(MONGO_URI);
-
-    console.log("MongoDB connected successfully");
-
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`MigoLive API running on port ${PORT}`);
-    });
-
-  } catch (error) {
-    console.error("Server startup failed:", error.message);
-    process.exit(1);
+  if (!MONGO_URI) throw new Error("MONGODB_URI is missing");
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+    throw new Error("JWT_SECRET must contain at least 32 characters");
   }
+
+  await mongoose.connect(MONGO_URI, {
+    serverSelectionTimeoutMS: 10000
+  });
+  console.log("MongoDB connected successfully");
+
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`MigoLive API running on port ${PORT}`);
+  });
+
+  const shutdown = async (signal) => {
+    console.log(`${signal} received; shutting down`);
+    server.close(async () => {
+      await mongoose.disconnect();
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10000).unref();
+  };
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
+  process.once("SIGINT", () => shutdown("SIGINT"));
 }
 
-startServer();
+startServer().catch((error) => {
+  console.error("Server startup failed:", error.message);
+  process.exit(1);
+});
+
+module.exports = app;
