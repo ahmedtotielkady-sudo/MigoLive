@@ -42,22 +42,34 @@ router.get("/owner/create-requests", auth, ownerOnly, async (req, res, next) => 
   } catch (e) { next(e); }
 });
 router.patch("/owner/create-requests/:agencyId", auth, ownerOnly, async (req, res, next) => {
+  const session = await mongoose.startSession();
   try {
     const decision = req.body.decision;
     if (!["approve", "reject"].includes(decision)) return res.status(400).json({ error: "Decision must be approve or reject" });
-    const status = decision === "approve" ? "active" : "rejected";
-    const agency = await Agency.findOneAndUpdate(
-      { agencyId: req.params.agencyId, status: "pending" },
-      { $set: { status, reviewedBy: req.user._id, reviewedAt: new Date() } },
-      { new: true }
-    );
-    if (!agency) return res.status(404).json({ error: "Pending agency request not found" });
-    if (decision === "approve") {
-      await User.updateOne({ _id: agency.ownerId, agencyId: null }, { $set: { agencyId: agency._id, agencyRole: "agent" } });
-      await Agency.updateOne({ _id: agency._id }, { $addToSet: { members: agency.ownerId } });
-    }
-    return res.json({ message: decision === "approve" ? "Agency approved and activated" : "Agency request rejected", agency: agencyView(agency) });
-  } catch (e) { next(e); }
+    let result;
+    await session.withTransaction(async () => {
+      const agency = await Agency.findOne({ agencyId: req.params.agencyId, status: "pending" }).session(session);
+      if (!agency) { const error = new Error("Pending agency request not found"); error.status = 404; throw error; }
+      if (decision === "approve") {
+        const assigned = await User.updateOne(
+          { _id: agency.ownerId, agencyId: null },
+          { $set: { agencyId: agency._id, agencyRole: "agent" } },
+          { session }
+        );
+        if (assigned.modifiedCount !== 1) { const error = new Error("Applicant already belongs to an agency"); error.status = 409; throw error; }
+        agency.members.addToSet(agency.ownerId);
+        agency.status = "active";
+      } else {
+        agency.status = "rejected";
+      }
+      agency.reviewedBy = req.user._id;
+      agency.reviewedAt = new Date();
+      await agency.save({ session });
+      result = agency;
+    });
+    return res.json({ message: decision === "approve" ? "Agency approved and activated" : "Agency request rejected", agency: agencyView(result) });
+  } catch (e) { if (e.status) return res.status(e.status).json({ error: e.message }); next(e); }
+  finally { await session.endSession(); }
 });
 
 // Agency lookup by its public ID.
@@ -106,21 +118,33 @@ router.get("/join-requests", auth, agentAgency, (req, res) => {
   res.json({ requests });
 });
 router.patch("/join-requests/:requestId", auth, agentAgency, async (req, res, next) => {
+  const session = await mongoose.startSession();
   try {
     const decision = req.body.decision;
     if (!["approve", "reject"].includes(decision)) return res.status(400).json({ error: "Decision must be approve or reject" });
     if (!mongoose.isValidObjectId(req.params.requestId)) return res.status(400).json({ error: "Invalid request ID" });
-    const request = req.agency.joinRequests.id(req.params.requestId);
-    if (!request || request.status !== "pending") return res.status(404).json({ error: "Pending join request not found" });
-    if (decision === "approve") {
-      const updated = await User.updateOne({ _id: request.userId, agencyId: null }, { $set: { agencyId: req.agency._id, agencyRole: "member" } });
-      if (!updated.modifiedCount) return res.status(409).json({ error: "User already belongs to an agency" });
-      req.agency.members.addToSet(request.userId);
-    }
-    request.status = decision === "approve" ? "accepted" : "rejected";
-    request.decidedAt = new Date();
-    await req.agency.save();
-    res.json({ message: decision === "approve" ? "Member accepted" : "Join request rejected" });
-  } catch (e) { next(e); }
+    let message = "Join request rejected";
+    await session.withTransaction(async () => {
+      const agency = await Agency.findOne({ _id: req.agency._id, ownerId: req.user._id, status: "active" }).session(session);
+      if (!agency) { const error = new Error("Active agency not found"); error.status = 404; throw error; }
+      const request = agency.joinRequests.id(req.params.requestId);
+      if (!request || request.status !== "pending") { const error = new Error("Pending join request not found"); error.status = 404; throw error; }
+      if (decision === "approve") {
+        const updated = await User.updateOne(
+          { _id: request.userId, agencyId: null },
+          { $set: { agencyId: agency._id, agencyRole: "member" } },
+          { session }
+        );
+        if (updated.modifiedCount !== 1) { const error = new Error("User already belongs to an agency"); error.status = 409; throw error; }
+        agency.members.addToSet(request.userId);
+        message = "Member accepted";
+      }
+      request.status = decision === "approve" ? "accepted" : "rejected";
+      request.decidedAt = new Date();
+      await agency.save({ session });
+    });
+    return res.json({ message });
+  } catch (e) { if (e.status) return res.status(e.status).json({ error: e.message }); next(e); }
+  finally { await session.endSession(); }
 });
 module.exports = router;
