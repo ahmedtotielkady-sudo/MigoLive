@@ -59,7 +59,7 @@ function ui(){document.getElementById('bal').textContent=F(bal);document.getElem
 function snd(f,d,t='sine',g=.15){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),k=ac.createGain();o.type=t;o.frequency.value=f;k.gain.value=g;k.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(k);k.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
 function tick(f){snd(f,.08)}
 function msg(t,ms=2500){ov.textContent=t;ov.classList.add('s');clearTimeout(msg.t);msg.t=setTimeout(()=>ov.classList.remove('s'),ms)}
-function add(i){if(busy||playPromise)return;hits.forEach(([h])=>h.classList.remove('win'));if(chip>bal-total()){msg('الرصيد لا يكفي');return}bets[i]+=chip;betRound=Math.floor(Date.now()/CYC);snd(900,.1,'triangle');ui()}
+function add(i){if(busy||playPromise||playKey)return;hits.forEach(([h])=>h.classList.remove('win'));if(chip>bal-total()){msg('الرصيد لا يكفي');return}bets[i]+=chip;betRound=Math.floor(Date.now()/CYC);snd(900,.1,'triangle');ui()}
 
 let H=[];
 function renderH(){const hs=document.getElementById('hs'),bg=BG;hs.innerHTML='';for(let k=0;k<8;k++){const e=document.createElement('i'),a=A[H[k]];if(a){e.style.backgroundImage=bg;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%'}hs.appendChild(e)}}
@@ -78,7 +78,7 @@ function tick(){
  const now=Date.now(),n=Math.floor(now/CYC),t=now%CYC,fin=t>=SEND?n:n-1,c=document.getElementById('cd');
  if(n!==rn){rn=n;hits.forEach(([h])=>h.classList.remove('win'))}
  busy=t>=BET;
- if(t>=BET&&spunN<n){spunN=n;if(total()>0){playKey='';lastAttempt=0;submitRound(n)}}
+ if(t>=BET&&spunN<n){spunN=n;if(total()>0){lastAttempt=0;submitRound(n)}}
  if(t>=BET&&total()>0&&!playPromise&&Date.now()-lastAttempt>2500){lastAttempt=Date.now();submitRound(n)}
  if(doneN<fin){const live=fin===n&&t-SEND<1500;let away=0,any=false;
   for(let k=doneN+1;k<=fin;k++){const o=applyRound(k,live&&k===fin);if(o.had){any=true;away+=o.p}}
