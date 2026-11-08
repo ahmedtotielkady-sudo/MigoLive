@@ -28,6 +28,13 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Check backend JavaScript syntax
+        run: |
+          node --check backend/server.js
+          node --check backend/models/Message.js
+          node --check backend/routes/messages.js
+          node --check backend/routes/agencies.js
+
       - name: Prepare web assets
         run: |
           mkdir -p www
