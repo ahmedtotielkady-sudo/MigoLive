@@ -1059,11 +1059,14 @@ function rGames(m){
   m.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>openGame(b.dataset.g));
 }
 function rMsgs(m){
-  setTimeout(()=>{dmTo=''},0);
   const mine=DB.msgs.filter(x=>(x.to===me||x.from===me)&&!(U().blocked||[]).includes(x.from));
-  m.innerHTML=`<div class="row"><input class="in grow" id="to" value="${esc(dmTo)}" placeholder="اسم المستخدم" style="margin:0"><input class="in grow" id="tx" placeholder="الرسالة" style="margin:0" maxlength="300"><button class="btn s" id="sm">إرسال</button></div><div class="sp"></div>
-  ${mine.length?mine.slice().reverse().map(x=>`<div class="card"><b>${x.from===me?'إلى: '+esc(DB.users[x.to].name):esc(DB.users[x.from].name)}</b> <span class="mu">${x.t}</span><div>${esc(x.m)}</div></div>`).join(''):'<p class="mu" style="text-align:center;padding:30px">لا توجد رسائل</p>'}`;
-  $('#sm').onclick=()=>{const t=$('#to').value.trim().toLowerCase(),v=$('#tx').value.trim();if(!DB.users[t]||t===me)return toast('مستخدم غير موجود');if((DB.users[t].blocked||[]).includes(me))return toast('لا يمكن إرسال رسالة لهذا المستخدم');if(!v)return;DB.msgs.push({from:me,to:t,m:v,t:now()});notify(t,`رسالة جديدة من ${U().name}`,'msg');sfx('msg');save();render()};
+  const target=dmTo&&DB.users[dmTo]?DB.users[dmTo]:null;
+  m.innerHTML=`<div class="card"><b>🔎 البحث عن مستخدم بالـ ID</b><div class="sp"></div><div class="row"><input class="in grow" id="msg-id" inputmode="numeric" dir="ltr" placeholder="اكتب ID المستخدم"><button class="btn s" id="msg-find">بحث</button></div><div id="msg-found" class="mu" style="margin-top:8px">${target?'المحادثة مع: '+esc(target.name)+' · ID: '+esc(target.uid):'ابحث عن المستخدم لبدء محادثة مباشرة'}</div></div>
+  ${target?`<div class="card"><b>إرسال رسالة إلى ${esc(target.name)} · ID: ${esc(target.uid)}</b><div class="sp"></div><div class="row"><input class="in grow" id="tx" placeholder="اكتب رسالتك" maxlength="300"><button class="btn s" id="sm">إرسال</button></div></div>`:''}
+  <b>المحادثات</b><div class="sp"></div>
+  ${mine.length?mine.slice().reverse().map(x=>{const other=x.from===me?x.to:x.from;const person=DB.users[other];return `<div class="card"><b>${x.from===me?'إلى: ':'من: '}${esc(person?person.name:other)}</b> <span class="mu">${esc(x.t||'')}</span><div>${esc(x.m||'')}</div></div>`}).join(''):'<p class="mu" style="text-align:center;padding:30px">لا توجد رسائل</p>'}`;
+  $('#msg-find').onclick=()=>{const id=String($('#msg-id').value||'').trim().replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d));if(!id)return toast('اكتب ID المستخدم');const found=Object.entries(DB.users).find(([key,user])=>String(user.uid)===id&&key!==me);if(!found)return toast('لم يتم العثور على مستخدم بهذا الـ ID');dmTo=found[0];render()};
+  if($('#sm'))$('#sm').onclick=()=>{const v=$('#tx').value.trim(),to=dmTo;if(!to||!DB.users[to]||to===me)return toast('ابحث عن المستخدم أولاً');if((U().blocked||[]).includes(to)||(DB.users[to].blocked||[]).includes(me))return toast('لا يمكن إرسال رسالة لهذا المستخدم');if(!v)return toast('اكتب الرسالة');DB.msgs.push({from:me,to,m:v,t:now()});notify(to,`رسالة جديدة من ${U().name}`,'msg');sfx('msg');save();render()};
 }
 function topupCard(){const w=DB.settings.wallet,mine=DB.topups.filter(t=>t.user===me);
   return `${packsHTML()}<div class="card"><b>شحن العملات بالتحويل</b><p class="mu" style="margin:6px 0">حوّل إلى رقم المحفظة التالي، ثم ارفع صورة الإيصال واكتب الرقم الذي حوّلت منه.</p>
