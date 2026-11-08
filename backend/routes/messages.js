@@ -8,7 +8,7 @@ const Message = require("../models/Message");
 const sendLimit = rateLimit({
   windowMs: 60 * 1000,
   limit: 30,
-  keyGenerator: req => String(req.user?._id || req.ip),
+  keyGenerator: req => String(req.user._id),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many messages. Please wait a minute." }
