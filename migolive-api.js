@@ -63,10 +63,34 @@ function renderMessages(m){
  $id('api-msg-find').onclick=async()=>{const id=$id('api-msg-user').value.trim();if(!id)return state.textContent='اكتب ID الحساب';try{const d=await api('/api/messages/users/'+encodeURIComponent(id));await openChat(d.user.id);}catch(e){state.textContent=e.message;}};
  if(connected)loadConversations();else state.textContent='اضبط رابط الخادم من الزر أعلى الصفحة، ثم سجّل الدخول مجدداً.';
 }
+function renderAgency(){
+ const host=$id('main'); if(!host)return;
+ const connected=!!base()&&!!token();
+ host.innerHTML='<div class="card"><b>🏢 الوكالات عبر الخادم</b><div class="mu" id="api-agency-status">'+(connected?'الحساب متصل بالخادم':'سجّل الدخول بحساب الخادم أولاً')+'</div></div>'+
+ '<div class="card"><b>طلب إنشاء وكالة</b><input class="in w" id="api-agency-name" maxlength="60" placeholder="اسم الوكالة"><textarea class="in w" id="api-agency-desc" maxlength="500" placeholder="وصف الوكالة"></textarea><button class="btn w" id="api-agency-create">إرسال طلب للمالك</button></div>'+
+ '<div class="card"><b>الانضمام إلى وكالة</b><input class="in w" id="api-agency-code" maxlength="20" placeholder="كود الوكالة"><button class="btn o w" id="api-agency-lookup">بحث عن الوكالة</button><div id="api-agency-found" class="mu"></div></div>'+
+ '<div class="card"><b>وكالتي</b><div id="api-agency-mine" class="mu">جاري التحميل...</div><button class="btn o w" id="api-agency-refresh">تحديث</button></div>'+
+ '<div class="card"><b>طلبات الانضمام (للوكيل)</b><div id="api-agency-joins" class="mu">—</div></div>'+
+ '<div class="card"><b>طلبات إنشاء الوكالات (للمالك)</b><div id="api-agency-owner" class="mu">—</div></div>';
+ const status=$id('api-agency-status'),found=$id('api-agency-found'),mine=$id('api-agency-mine'),joins=$id('api-agency-joins'),owner=$id('api-agency-owner');
+ if(!connected){status.textContent='اضبط رابط الخادم وسجّل الدخول بحساب مسجل على الخادم.';return;}
+ async function refresh(){
+  try{const d=await api('/api/agencies/mine');mine.textContent=d.agency?d.agency.name+' · كود '+d.agency.agencyId+' · '+(d.role==='agent'?'وكيل':'عضو'):'لا تنتمي إلى وكالة حالياً';}
+  catch(e){mine.textContent=e.message;}
+  try{const d=await api('/api/agencies/join-requests');joins.innerHTML=d.requests.length?d.requests.map(x=>'<div class="row" style="justify-content:space-between;margin:6px 0"><span>'+escapeHtml(x.username)+'</span><span><button class="btn s" data-join="'+x._id+'" data-decision="approve">قبول</button> <button class="btn o s" data-join="'+x._id+'" data-decision="reject">رفض</button></span></div>').join(''):'لا توجد طلبات معلقة';joins.querySelectorAll('[data-join]').forEach(b=>b.onclick=async()=>{try{await api('/api/agencies/join-requests/'+encodeURIComponent(b.dataset.join),{method:'PATCH',body:JSON.stringify({decision:b.dataset.decision})});refresh();}catch(e){status.textContent=e.message;}});}
+  catch(e){joins.textContent=e.status===403?'هذه القائمة تظهر لوكيل وكالة نشطة فقط':e.message;}
+  try{const d=await api('/api/agencies/owner/create-requests');owner.innerHTML=d.requests.length?d.requests.map(x=>'<div style="margin:8px 0"><b>'+escapeHtml(x.name)+'</b> · '+escapeHtml(x.applicant||'')+'<div><button class="btn s" data-owner="'+escapeHtml(x.agencyId)+'" data-decision="approve">موافقة</button> <button class="btn o s" data-owner="'+escapeHtml(x.agencyId)+'" data-decision="reject">رفض</button></div></div>').join(''):'لا توجد طلبات إنشاء معلقة';owner.querySelectorAll('[data-owner]').forEach(b=>b.onclick=async()=>{try{await api('/api/agencies/owner/create-requests/'+encodeURIComponent(b.dataset.owner),{method:'PATCH',body:JSON.stringify({decision:b.dataset.decision})});refresh();}catch(e){status.textContent=e.message;}});}
+  catch(e){owner.textContent=e.status===403?'هذه القائمة للمالك فقط':e.message;}
+ }
+ $id('api-agency-create').onclick=async()=>{try{const name=$id('api-agency-name').value.trim(),description=$id('api-agency-desc').value.trim();await api('/api/agencies/create-requests',{method:'POST',body:JSON.stringify({name,description})});status.textContent='تم إرسال طلب إنشاء الوكالة للمالك.';refresh();}catch(e){status.textContent=e.message;}};
+ $id('api-agency-lookup').onclick=async()=>{try{const code=$id('api-agency-code').value.trim();const d=await api('/api/agencies/lookup/'+encodeURIComponent(code));found.innerHTML='<b>'+escapeHtml(d.agency.name)+'</b> · '+escapeHtml(d.agency.ownerUsername||'')+' · '+d.agency.memberCount+' عضو <button class="btn s" id="api-agency-join">طلب انضمام</button>';$id('api-agency-join').onclick=async()=>{try{await api('/api/agencies/join-requests',{method:'POST',body:JSON.stringify({agencyId:d.agency.agencyId})});found.textContent='تم إرسال طلب الانضمام للوكيل.';}catch(e){found.textContent=e.message;}};}catch(e){found.textContent=e.message;}};
+ $id('api-agency-refresh').onclick=refresh;refresh();
+}
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function install(){
  authHook();
  if(typeof window.rMsgs==='function')window.rMsgs=renderMessages;
+ if(typeof window.rAgency==='function')window.rAgency=renderAgency;
  if(typeof window.render==='function'&&!window.render.__apiWrapped){const old=window.render;const wrapped=function(){const out=old.apply(this,arguments);setupButton();return out};wrapped.__apiWrapped=true;window.render=wrapped;}
  setupButton();
 }
