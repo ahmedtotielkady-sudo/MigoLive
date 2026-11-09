@@ -97,11 +97,31 @@ const PAY=[{2:3,3:30,4:60,5:250},{2:4,3:35,4:80,5:300},{2:5,3:40,4:120,5:400},{3
 const LINES=[[1,1,1,1,1],[0,0,0,0,0],[2,2,2,2,2],[0,1,2,1,0],[2,1,0,1,2],[0,0,1,2,2],[2,2,1,0,0],[1,2,0,2,1],[1,0,2,0,1],[0,1,0,1,0],[2,1,2,1,2],[1,0,1,2,1],[1,2,1,0,1],[0,1,1,1,0],[2,1,1,1,2],[1,0,0,0,1],[1,2,2,2,1],[0,2,2,2,0],[2,0,0,0,2],[0,0,2,0,0],[2,2,0,2,2],[1,1,0,1,1],[1,1,2,1,1],[0,2,0,2,0],[2,0,2,0,2],[2,0,1,2,0],[0,2,1,0,2],[0,2,1,2,0],[2,0,1,0,2],[2,1,0,0,1],[0,1,2,2,1],[0,1,0,1,2],[2,1,2,1,0],[1,0,2,1,2],[1,2,0,1,0],[2,2,0,0,0],[0,0,2,2,2],[0,0,1,1,2],[2,2,1,1,0],[0,1,1,2,2]];
 const FREE={3:3,4:6,5:10};
 const MULT=[1,5,50,250],BASE=40;
-let bal=0,pend=0,ready=false,me=null,mi=0,free=0,spinning=false,stopNow=false,auto=0,sound=false,actx=null;
+let bal=0,pend=0,ready=false,token='',me=null,mi=0,free=0,spinning=false,stopNow=false,auto=0,sound=false,actx=null,pendingSpinKey='',pendingSpinIndex=null;
 function save(){if(ready)try{parent.postMessage({t:'set',v:bal+pend},'*')}catch(e){}}
 function ap(){const a=$('uav');if(!me)return;if(me.avatar){a.style.backgroundImage='url("'+me.avatar+'")';a.textContent=''}else{a.style.backgroundImage='none';a.textContent=(me.name||'').trim().charAt(0)}}
 const toWallet=()=>{try{parent.postMessage({t:'wallet'},'*')}catch(e){}};
-addEventListener('message',e=>{const d=e.data;if(!d)return;if(d.t==='bal'&&Number.isFinite(d.v)){bal=d.v;ready=true;upd()}else if(d.t==='me'){me=d;ap()}});
+function apiBase(){return String(window.MIGOLIVE_API_BASE||location.origin+'/api').replace(/\/+$/,'')}
+function pendingKeyStorage(){return 'migolive_slot777_pending_'+token.slice(-24)}
+function persistPendingSpin(){try{const k=pendingKeyStorage();if(pendingSpinKey)localStorage.setItem(k,JSON.stringify({key:pendingSpinKey,index:pendingSpinIndex}));else localStorage.removeItem(k)}catch(e){}}
+function restorePendingSpin(){try{const p=JSON.parse(localStorage.getItem(pendingKeyStorage())||'null');if(p&&typeof p.key==='string'&&Number.isInteger(p.index)&&p.index>=0&&p.index<4){pendingSpinKey=p.key;pendingSpinIndex=p.index}}catch(e){}}
+function newSpinKey(){return 'slot777-'+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2))}
+async function loadServerState(){if(!token)return;try{const r=await fetch(apiBase()+'/games/slot777/state',{headers:{Authorization:'Bearer '+token}});if(r.status===401){parent.postMessage({t:'get'},'*');return}if(!r.ok)return;const d=await r.json();free=Math.max(0,Math.min(1000,Number(d.freeSpins)||0));upd()}catch(e){}}
+async function requestServerSpin(index){
+ if(!token)throw new Error('سجّل الدخول للاتصال بالمحفظة');
+ if(!pendingSpinKey){pendingSpinKey=newSpinKey();pendingSpinIndex=index;persistPendingSpin()}
+ if(pendingSpinIndex!==index)throw new Error('هناك جولة سابقة لم يصل تأكيدها؛ أعد نفس مستوى الرهان أولاً');
+ const response=await fetch(apiBase()+'/games/slot777/spin',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Idempotency-Key':pendingSpinKey},body:JSON.stringify({multiplierIndex:index})});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok){
+   if(response.status===400||response.status===409){pendingSpinKey='';pendingSpinIndex=null;persistPendingSpin()}
+   if(response.status===401)parent.postMessage({t:'get'},'*');
+   throw new Error(data.error||('HTTP '+response.status));
+ }
+ pendingSpinKey='';pendingSpinIndex=null;persistPendingSpin();
+ return data;
+}
+addEventListener('message',e=>{if(e.source!==parent)return;const d=e.data;if(!d)return;if(d.t==='bal'&&Number.isFinite(d.v)){bal=Math.max(0,Math.floor(d.v));const incoming=String(d.token||'');if(incoming&&incoming!==token){token=incoming;restorePendingSpin();loadServerState()}ready=!!token;upd()}else if(d.t==='me'){me=d;ap()}});
 try{parent.postMessage({t:'get'},'*')}catch(e){}
 // لا تنشئ رصيدًا افتراضيًا عند فشل الاتصال بالخادم؛ الرصيد يأتي من المحفظة فقط.
 
@@ -165,16 +185,22 @@ function countUp(to){
 
 async function spin(){
   if(spinning){stopNow=true;return}
-  const bet=BASE*MULT[mi],isFree=free>0;
-  if(!isFree&&bal<bet){auto=0;updAuto();modal('العملة غير كافية',[['إلغاء',null,'g'],['تعبئة رصيد',toWallet]]);return}
+  if(!token){auto=0;updAuto();modal('سجّل الدخول أولاً لربط اللعبة بالمحفظة',[['حسنًا',null,'g']]);return}
   spinning=true;stopNow=false;
-  if(isFree)free--;else bal-=bet;
-  $('win').textContent='0';clearHit();upd();
-  $('spin').textContent='قف';$('spin').classList.add('stop');
-  const g=makeGrid(isFree);
-  const ev=evaluate(g,bet),win=ev.win;pend=win;save();
+  $('spin').textContent='جاري الاتصال';$('spin').disabled=true;
+  let server;
+  try{server=await requestServerSpin(mi)}
+  catch(error){spinning=false;$('spin').disabled=false;$('spin').textContent='دوران';$('spin').classList.remove('stop');auto=0;updAuto();$('msg').textContent=error.message;return}
+  const bet=BASE*MULT[mi],isFree=!!server.freeSpin,grid=server.grid;
+  const win=Number(server.win)||0,bonus=Number(server.bonus)||0,hit=Array.isArray(server.hit)?server.hit:[];
+  if(!Array.isArray(grid)||grid.length!==5||grid.some(c=>!Array.isArray(c)||c.length!==3)){
+    spinning=false;$('spin').disabled=false;$('spin').textContent='دوران';$('msg').textContent='استجابة الجولة غير صالحة؛ تواصل مع الدعم';return
+  }
+  $('win').textContent='0';clearHit();
+  $('spin').textContent='قف';$('spin').classList.add('stop');$('spin').disabled=false;
+  const g=grid;
   await Promise.all(cells.map((col,i)=>new Promise(res=>{
-    const t=setInterval(()=>{const p=col.map(c=>c._s);setCell(col[2],p[1]);setCell(col[1],p[0]);setCell(col[0],rnd());col.forEach(c=>c.animate([{transform:'translateY(-100%)'},{transform:'none'}],{duration:90}))},90);
+    const t=setInterval(()=>{const p=col.map(c=>c._s);setCell(col[2],p[1]);setCell(col[1],p[0]);setCell(col[0],rnd())},90);
     const stopAt=Date.now()+500+i*260;
     const chk=setInterval(()=>{
       if(Date.now()>=stopAt||stopNow){
@@ -183,13 +209,14 @@ async function spin(){
       }
     },30);
   })));
-  bal+=win;pend=0;
-  ev.hit.forEach(k=>{const[i,r]=k.split(',');cells[i][r].classList.add('hit')});
+  hit.forEach(k=>{const[i,r]=k.split(',');if(cells[Number(i)]&&cells[Number(i)][Number(r)])cells[Number(i)][Number(r)].classList.add('hit')});
+  bal=Math.max(0,Math.floor(Number(server.balance)||0));free=Math.max(0,Math.min(1000,Number(server.freeSpins)||0));pend=0;
   if(win>0){countUp(win);beep(660);setTimeout(()=>beep(880),120)}
-  if(ev.bonus>=3){free+=FREE[Math.min(ev.bonus,5)]}
   spinning=false;stopNow=false;
   $('spin').textContent='دوران';$('spin').classList.remove('stop');
-  upd();if(ev.bonus>=3)$('msg').textContent='بونص! لفات مجانية: '+free;
+  upd();if(bonus>=3)$('msg').textContent='بونص! لفات مجانية: '+free;
+  else $('msg').textContent=win>0?'ربحت '+fmt(win)+' عملة':'حظ أوفر — لم تحقق ربحًا';
+  parent.postMessage({t:'get'},'*');
   if(free>0)setTimeout(()=>{if(!spinning)spin()},1400);
   else if(auto>0){auto--;updAuto();setTimeout(()=>{if(!spinning)spin()},1000)}
 }
@@ -205,7 +232,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){auto=0;upd
 
 // initial board
 const init=makeGrid();init.forEach((c,i)=>c.forEach((s,r)=>setCell(cells[i][r],s)));
-upd();updAuto();
+upd();updAuto();if(token)loadServerState();
 </script>
 </body>
 </html>
