@@ -61,7 +61,8 @@ async function playSlot777({ userId, multiplierIndex, reference }) {
       const existing = await Slot777Round.findOne({ reference }).session(session).lean();
       if (existing) {
         if (!sameRequest(existing, userId, multiplierIndex)) throw new Error("Idempotency key conflict");
-        result = { success:true, duplicate:true, game:"slot777", grid:existing.grid, win:existing.win, bonus:existing.bonus, hit:existing.hit, freeSpin:existing.freeSpin, freeSpins:existing.freeSpins, balance:existing.balance, bet:existing.freeSpin ? 0 : bet };
+        const wallet = await Wallet.findOne({ userId }).select("balance").session(session).lean();
+        result = { success:true, duplicate:true, game:"slot777", grid:existing.grid, win:existing.win, bonus:existing.bonus, hit:existing.hit, freeSpin:existing.freeSpin, freeSpins:existing.freeSpins, balance:wallet ? wallet.balance : 0, bet:existing.freeSpin ? 0 : bet };
         return;
       }
       await Wallet.updateOne({ userId }, { $setOnInsert: { balance: 0 } }, { upsert: true, session });
