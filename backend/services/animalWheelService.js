@@ -84,6 +84,7 @@ async function executeAnimalWheelRound({ userId, bets, reference }) {
               existingCredit.metadata?.game === "animal_wheel" &&
               existingCredit.metadata?.action === "wheel_payout");
         if (!valid) throw new Error("Idempotency key conflict");
+        const wallet = await Wallet.findOne({ userId }).select("balance").session(session).lean();
         response = {
           success: true,
           duplicate: true,
@@ -93,7 +94,7 @@ async function executeAnimalWheelRound({ userId, bets, reference }) {
           winner: ANIMALS[meta.resultIndex],
           payout: meta.payout,
           net: meta.payout - totalBet,
-          balance: null
+          balance: wallet ? wallet.balance : 0
         };
         return;
       }
