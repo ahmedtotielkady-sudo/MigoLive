@@ -26,18 +26,42 @@ function setupButton(){
 }
 function authHook(){
  const btn=$id('bin'); if(!btn||btn.dataset.apiHook)return;btn.dataset.apiHook='1';
- btn.addEventListener('click',async()=>{
+ btn.addEventListener('click',async event=>{
    const url=base();if(!url)return;
+   // The local demo login handler must not run in parallel with server auth.
+   event.preventDefault();event.stopImmediatePropagation();
    const raw=($id('u')?.value||'').trim(),password=$id('p')?.value||'';
+   const phoneMode=$id('login-mode-toggle')?.textContent?.includes('ID ⇄ هاتف')===true;
+   const isRegister=($id('bin')?.textContent||'').includes('إنشاء');
+   const error=$id('aerr');
    if(!raw||!password)return;
+   if(isRegister && !/^[a-zA-Z0-9_]{3,24}$/.test(raw)){
+     if(error)error.textContent='اسم المستخدم يجب أن يكون من 3 إلى 24 حرفاً أو رقماً';
+     return;
+   }
    try{
-     // Backend accounts are separate from legacy local accounts. Never auto-create
-     // a remote account after a failed login; that could create duplicates or confusion.
-     const username=raw.toLowerCase();
-     const data=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username,password})});
-     localStorage.setItem(TOKEN,data.token);localStorage.setItem(REMOTE,JSON.stringify(data.user));
-     document.dispatchEvent(new CustomEvent('migolive:api-authenticated',{detail:data.user}));
-   }catch(e){console.warn('MigoLive API authentication:',e.message);setTimeout(()=>{if(typeof window.toast==='function')window.toast('تعذر ربط الحساب بالخادم: '+e.message)},300);}
+     const payload={username:phoneMode&&!isRegister?'':raw,password};
+     if(phoneMode&&!isRegister)payload.phone=raw.replace(/[\\s()-]/g,'');
+     if(isRegister){const phone=($id('reg-phone')?.value||'').trim();if(phone)payload.phone=phone;}
+     const data=await api(isRegister?'/api/auth/register':'/api/auth/login',{
+       method:'POST',body:JSON.stringify(payload)
+     });
+     if(!data||typeof data.token!=='string'||!data.token||!data.user||typeof data.user!=='object'){
+       throw new Error('استجابة الخادم غير مكتملة؛ لم يتم تسجيل الدخول');
+     }
+     const safeUser={id:String(data.user.id||''),username:String(data.user.username||raw),role:String(data.user.role||'user')};
+     if(!safeUser.id||!['user','admin','owner'].includes(safeUser.role)){
+       throw new Error('بيانات الحساب أو الصلاحيات غير صحيحة على الخادم');
+     }
+     localStorage.setItem(TOKEN,data.token);
+     localStorage.setItem(REMOTE,JSON.stringify(safeUser));
+     if(error)error.textContent='';
+     document.dispatchEvent(new CustomEvent('migolive:api-authenticated',{detail:safeUser}));
+     if(typeof window.toast==='function')window.toast(isRegister?'تم إنشاء الحساب على الخادم بنجاح':'تم تسجيل الدخول عبر الخادم بنجاح');
+   }catch(e){
+     console.warn('MigoLive API authentication:',e);
+     if(error)error.textContent=e.message||'تعذر تسجيل الدخول عبر الخادم';
+   }
  },true);
 }
 function renderMessages(m){
