@@ -118,7 +118,8 @@ var bet=function(){return BETS[bi]},cost=function(){return bet()*(ante?1.25:1)},
 var ready=false,token="",pendingSpinKey="",pendingSpinIndex=null;
 function save(){if(ready)try{parent.postMessage({t:"set",v:bal},"*")}catch(e){}}
 function apiBase(){return String(window.MIGOLIVE_API_BASE||location.origin+"/api").replace(/\/+$/,"")}
-function pendingKeyStorage(){return "migolive_ocean_storm_pending_"+token.slice(-24)}
+function tokenUserKey(){try{var p=token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/");return String(JSON.parse(atob(p+"=".repeat((4-p.length%4)%4))).sub||"account")}catch(e){return "account"}}
+function pendingKeyStorage(){return "migolive_ocean_storm_pending_"+tokenUserKey()}
 function persistPendingSpin(){try{var k=pendingKeyStorage();if(pendingSpinKey)localStorage.setItem(k,JSON.stringify({key:pendingSpinKey,index:pendingSpinIndex}));else localStorage.removeItem(k)}catch(e){}}
 function restorePendingSpin(){try{var p=JSON.parse(localStorage.getItem(pendingKeyStorage())||"null");if(p&&typeof p.key==="string"&&Number.isInteger(p.index)&&p.index>=0&&p.index<5){pendingSpinKey=p.key;pendingSpinIndex=p.index}}catch(e){}}
 function newSpinKey(){return "ocean-storm-"+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+"-"+Math.random().toString(36).slice(2))}
