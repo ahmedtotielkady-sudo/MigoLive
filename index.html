@@ -635,9 +635,10 @@ const banTxt=x=>x.banUntil?'محظور حتى '+fmtD(x.banUntil):'محظور ن�
 let banFor=null;
 function goBack(fb){if(history.length>1)history.back();else nav(fb)}
 function forceOut(msg){leaveRoom(true);me=null;try{localStorage.removeItem('mygo_session');localStorage.removeItem('mygo_remember_login')}catch(_){}document.body.classList.add('auth-screen');$('#app').classList.add('hide');$('#auth').classList.remove('hide');$('#p').value='';$('#aerr').textContent=msg||''}
-function start(){if(U()){U().last=Date.now();act('تسجيل دخول');save()}document.body.classList.remove('auth-screen');$('#auth').classList.add('hide');$('#app').classList.remove('hide');tab='rooms';room=null;lastKey='';try{history.replaceState(null,'','#rooms')}catch(e){}route()}
+function start(){const current=U();if(!current){forceOut('انتهت جلسة الحساب؛ سجّل الدخول مرة أخرى');return}current.last=Date.now();act('تسجيل دخول');save();document.body.classList.remove('auth-screen');$('#auth').classList.add('hide');$('#app').classList.remove('hide');tab='rooms';room=null;lastKey='';try{history.replaceState(null,'','#rooms')}catch(e){}route()}
 function render(){
   const u=U();
+  if(!u){forceOut('تعذر تحميل بيانات الحساب؛ سجّل الدخول مرة أخرى');return}
   if(isBanned(u)){forceOut('هذا الحساب '+banTxt(u));return}
   const mav=$('#myav');mav.textContent=okAv(u)?'':u.name[0].toUpperCase();mav.style.cssText=(okAv(u)?`background:url('${u.avatar}') center/cover no-repeat;`:'')+(VFRAME[vipLv(u)]||'');$('#myname').innerHTML=uName(u);
   $('#mycoins').textContent=u.coins;
