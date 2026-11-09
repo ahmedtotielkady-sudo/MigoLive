@@ -17,8 +17,10 @@ const loginLimit = rateLimit({
 router.post("/register", async (req, res, next) => {
   const username = String(req.body.username || "").trim();
   const password = String(req.body.password || "");
+  const phone = String(req.body.phone || "").replace(/[\\s()-]/g, "");
 
-  if (!/^[a-zA-Z0-9_]{3,24}$/.test(username) || password.length < 10 || password.length > 128) {
+  if (!/^[a-zA-Z0-9_]{3,24}$/.test(username) || password.length < 6 || password.length > 128 ||
+      (phone && !/^\\+?[0-9]{7,15}$/.test(phone))) {
     return res.status(400).json({ error: "Username or password does not meet requirements" });
   }
 
@@ -29,7 +31,7 @@ router.post("/register", async (req, res, next) => {
 
     // Create the account and its wallet atomically; never leave a user without a wallet.
     await session.withTransaction(async () => {
-      const [created] = await User.create([{ username, passwordHash }], { session });
+      const [created] = await User.create([{ username, phone: phone || undefined, passwordHash }], { session });
       await Wallet.create([{ userId: created._id, balance: 0 }], { session });
       user = created;
     });
@@ -56,8 +58,12 @@ router.post("/register", async (req, res, next) => {
 router.post("/login", loginLimit, async (req, res, next) => {
   try {
     const username = String(req.body.username || "").trim();
+    const phone = String(req.body.phone || "").replace(/[\\s()-]/g, "");
     const password = String(req.body.password || "");
-    const user = await User.findOne({ username }).select("+passwordHash username role status");
+    const identity = phone
+      ? { $or: [{ username }, { phone }] }
+      : { username };
+    const user = await User.findOne(identity).select("+passwordHash username phone role status");
 
     if (!user || user.status !== "active" || !(await bcrypt.compare(password, user.passwordHash))) {
       return res.status(401).json({ error: "Invalid username or password" });
