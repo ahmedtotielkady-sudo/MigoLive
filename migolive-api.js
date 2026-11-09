@@ -40,7 +40,7 @@ function authHook(){
      return;
    }
    try{
-     const payload={username:phoneMode&&!isRegister?'':raw,password};
+     const payload={username:raw,password};
      if(phoneMode&&!isRegister)payload.phone=raw.replace(/[\\s()-]/g,'');
      if(isRegister){const phone=($id('reg-phone')?.value||'').trim();if(phone)payload.phone=phone;}
      const data=await api(isRegister?'/api/auth/register':'/api/auth/login',{
