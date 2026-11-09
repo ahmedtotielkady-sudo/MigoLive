@@ -1,10 +1,80 @@
 const router = require("express").Router();
 const auth = require("../middleware/auth");
+const Ledger = require("../models/Ledger");
 
 const GAMES = Object.freeze({
   ocean_storm: "عاصفة المحيط",
   slot777: "سلوت 777",
   animal_wheel: "عجلة الحيوانات"
+});
+
+
+// Authenticated game history is read from the immutable MongoDB ledger.
+// The client never supplies balances or outcomes for these records.
+router.get("/history", auth, async (req, res) => {
+  const page = Number(req.query.page || 1);
+  const limit = Number(req.query.limit || 30);
+  const game = req.query.game ? String(req.query.game) : "";
+  if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 100) {
+    return res.status(400).json({ error: "Invalid pagination" });
+  }
+  if (game && !Object.prototype.hasOwnProperty.call(GAMES, game)) {
+    return res.status(400).json({ error: "Invalid game" });
+  }
+  try {
+    const filter = {
+      userId: req.user._id,
+      status: "posted",
+      type: { $in: ["game_debit", "game_credit"] },
+      ...(game ? { "metadata.game": game } : {})
+    };
+    const [items, total] = await Promise.all([
+      Ledger.find(filter)
+        .sort({ createdAt: -1, _id: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .select("type amount direction reference metadata createdAt")
+        .lean(),
+      Ledger.countDocuments(filter)
+    ]);
+    return res.json({ page, limit, total, pages: Math.ceil(total / limit), items });
+  } catch (error) {
+    console.error("Game history failed:", error);
+    return res.status(500).json({ error: "Unable to load game history" });
+  }
+});
+
+// Per-user totals are derived from posted ledger entries, never browser state.
+router.get("/stats", auth, async (req, res) => {
+  try {
+    const rows = await Ledger.aggregate([
+      { $match: {
+        userId: req.user._id,
+        status: "posted",
+        type: { $in: ["game_debit", "game_credit"] }
+      } },
+      { $group: {
+        _id: "$metadata.game",
+        bets: { $sum: { $cond: [{ $eq: ["$direction", "debit"] }, "$amount", 0] } },
+        payouts: { $sum: { $cond: [{ $eq: ["$direction", "credit"] }, "$amount", 0] } },
+        rounds: { $sum: { $cond: [{ $eq: ["$direction", "debit"] }, 1, 0] } }
+      } },
+      { $sort: { _id: 1 } }
+    ]);
+    return res.json({
+      games: rows.map((row) => ({
+        id: row._id,
+        name: GAMES[row._id] || row._id,
+        rounds: row.rounds,
+        totalBet: row.bets,
+        totalPayout: row.payouts,
+        net: row.payouts - row.bets
+      }))
+    });
+  } catch (error) {
+    console.error("Game stats failed:", error);
+    return res.status(500).json({ error: "Unable to load game statistics" });
+  }
 });
 
 router.get("/", auth, (_req, res) => {
