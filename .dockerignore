@@ -1,0 +1,24 @@
+# Git and local dependencies
+.git
+.gitignore
+node_modules
+**/node_modules
+
+# Secrets and local configuration
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Android/build outputs and local archives
+android
+**/build
+**/.gradle
+*.apk
+*.aab
+*.zip
+
+# Editor and OS files
+.DS_Store
+.idea
+.vscode
