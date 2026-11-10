@@ -46,14 +46,12 @@ jobs:
         run: |
           mkdir -p www
           cp index.html www/index.html
-          cp migolive-api.js www/migolive-api.js
           cp migolive-back-navigation.js www/migolive-back-navigation.js
           python3 - <<'PY'
           from pathlib import Path
           p = Path('www/index.html')
           html = p.read_text(encoding='utf-8')
           tags = [
-              '<script src="migolive-api.js"></script>',
               '<script src="migolive-back-navigation.js"></script>'
           ]
           for tag in tags:
@@ -63,7 +61,6 @@ jobs:
                   html = html.replace('</body>', tag + '\\n</body>', 1)
           p.write_text(html, encoding='utf-8')
           PY
-          node --check www/migolive-api.js
           python3 - <<'PY'
           from html.parser import HTMLParser
           from pathlib import Path
