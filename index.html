@@ -1468,8 +1468,8 @@ function rOwner(m){
       }catch(error){e.textContent='لم يتم تعديل الرصيد: '+error.message}
       return;
     }
-    if(ot==='ag'){if(U().role!=='owner')return e.textContent='إنشاء الوكالات متاح للمالك فقط';const t=DB.users[k],n=$('#an').value.trim();if(!n)return e.textContent='اكتب اسم الوكالة';if(!t)return e.textContent='المستخدم غير موجود';DB.agencies.push({id:Date.now(),name:n,head:k});if(t.role==='user')t.role='agent';logIt('مالك',`إنشاء وكالة ${n}`)}
-    else{const t=DB.users[k];if(!t)return e.textContent='المستخدم غير موجود';t.role='agent';t.locked=false;if(a>0)t.coins+=a;logIt('مالك',`تعيين ${t.name} وكيلاً (+${a||0})`)}
+    if(ot==='ag'){if(U().role!=='owner')return e.textContent='إنشاء الوكالات متاح للمالك فقط';const t=DB.users[k],n=$('#an').value.trim();if(!n)return e.textContent='اكتب اسم الوكالة';if(!t)return e.textContent='المستخدم غير موجود';if(t.shippingAgency||t.role==='shipping')return e.textContent='حساب وكالة الشحن لا يمكن تحويله إلى وكالة مضيفين';if(t.agency||DB.agencies.some(x=>x.head===k))return e.textContent='الحساب مرتبط بوكالة بالفعل';const id=Date.now();DB.agencies.push({id,name:n,head:k});t.agency=id;t.role='user';logIt('مالك',`إنشاء وكالة مضيفين ${n}`)}
+    else{return e.textContent='تم إيقاف إنشاء وكلاء الشحن؛ أنشئ وكالة شحن من قسم وكالات الشحن فقط'}
     save();render()};
 }
 
