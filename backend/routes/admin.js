@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const auth = require("../middleware/auth");
 const requireAdmin = require("../middleware/requireAdmin");
 const User = require("../models/User");
+const Agency = require("../models/Agency");
 const Wallet = require("../models/Wallet");
 const Ledger = require("../models/Ledger");
 const requireOwner = require("../middleware/requireOwner");
@@ -277,6 +278,94 @@ router.post("/wallet/adjust", requireOwner, async (req, res) => {
     console.error("Owner wallet adjustment failed:", error);
     return res.status(500).json({ error: "Unable to adjust wallet" });
   }
+});
+
+
+ // Host-agency review is isolated from shipping authorization.
+router.get("/agencies/host-requests", async (_req, res, next) => {
+  try {
+    const items = await Agency.find({ type: "host", status: "pending" })
+      .sort({ createdAt: 1 })
+      .populate("ownerId", "username legacyUid")
+      .lean();
+    return res.json({ items });
+  } catch (error) { return next(error); }
+});
+
+router.post("/agencies/host-requests/:id/approve", async (req, res, next) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: "Invalid agency id" });
+  try {
+    const agency = await Agency.findOneAndUpdate(
+      { _id: req.params.id, type: "host", status: "pending" },
+      { $set: { status: "active", reviewedBy: req.user._id, reviewedAt: new Date(), reviewNote: String(req.body.note || "").trim().slice(0, 300) } },
+      { new: true, runValidators: true }
+    );
+    if (!agency) return res.status(404).json({ error: "Pending host agency request not found" });
+    // Crucially, this operation does not edit User.role and never creates shipping membership.
+    return res.json({ success: true, agency });
+  } catch (error) { return next(error); }
+});
+
+router.post("/agencies/host-requests/:id/reject", async (req, res, next) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: "Invalid agency id" });
+  try {
+    const agency = await Agency.findOneAndUpdate(
+      { _id: req.params.id, type: "host", status: "pending" },
+      { $set: { status: "rejected", reviewedBy: req.user._id, reviewedAt: new Date(), reviewNote: String(req.body.note || "").trim().slice(0, 300) } },
+      { new: true, runValidators: true }
+    );
+    if (!agency) return res.status(404).json({ error: "Pending host agency request not found" });
+    return res.json({ success: true, agency });
+  } catch (error) { return next(error); }
+});
+
+// Only administrators/owners can create shipping agencies or assign their members.
+router.post("/agencies/shipping", async (req, res, next) => {
+  const name = String(req.body.name || "").trim();
+  const memberId = String(req.body.userId || "");
+  if (name.length < 2 || name.length > 60) return res.status(400).json({ error: "Agency name must be 2-60 characters" });
+  if (!mongoose.isValidObjectId(memberId)) return res.status(400).json({ error: "A valid initial shipping member userId is required" });
+  try {
+    const member = await User.findOne({ _id: memberId, status: "active" }).select("_id");
+    if (!member) return res.status(404).json({ error: "Active user not found" });
+    const agency = await Agency.create({
+      name, type: "shipping", status: "active", ownerId: req.user._id,
+      members: [{ userId: member._id, addedBy: req.user._id, active: true }]
+    });
+    return res.status(201).json({ success: true, agency });
+  } catch (error) { return next(error); }
+});
+
+router.post("/agencies/shipping/:id/members", async (req, res, next) => {
+  if (!mongoose.isValidObjectId(req.params.id) || !mongoose.isValidObjectId(String(req.body.userId || ""))) {
+    return res.status(400).json({ error: "Invalid agency or user id" });
+  }
+  try {
+    const member = await User.findOne({ _id: req.body.userId, status: "active" }).select("_id");
+    if (!member) return res.status(404).json({ error: "Active user not found" });
+    const agency = await Agency.findOne({ _id: req.params.id, type: "shipping", status: "active" });
+    if (!agency) return res.status(404).json({ error: "Active shipping agency not found" });
+    const existing = agency.members.find((item) => String(item.userId) === String(member._id));
+    if (existing) existing.active = true;
+    else agency.members.push({ userId: member._id, addedBy: req.user._id, active: true });
+    await agency.save();
+    return res.json({ success: true, agency });
+  } catch (error) { return next(error); }
+});
+
+router.delete("/agencies/shipping/:id/members/:userId", async (req, res, next) => {
+  if (!mongoose.isValidObjectId(req.params.id) || !mongoose.isValidObjectId(req.params.userId)) {
+    return res.status(400).json({ error: "Invalid agency or user id" });
+  }
+  try {
+    const agency = await Agency.findOne({ _id: req.params.id, type: "shipping", status: "active" });
+    if (!agency) return res.status(404).json({ error: "Active shipping agency not found" });
+    const member = agency.members.find((item) => String(item.userId) === req.params.userId);
+    if (!member || !member.active) return res.status(404).json({ error: "Active shipping member not found" });
+    member.active = false;
+    await agency.save();
+    return res.json({ success: true });
+  } catch (error) { return next(error); }
 });
 
 module.exports = router;
