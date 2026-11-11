@@ -614,13 +614,12 @@ $('#bin').onclick=async()=>{
     k=raw.toLowerCase();
     if(DB.users[k])return e.textContent='اسم المستخدم مستخدم من قبل';
     const icv=($('#ic').value||'').trim().toUpperCase();let ik=null;if(icv){ik=Object.keys(DB.users).find(x=>invCode(DB.users[x])===icv);if(!ik)return e.textContent='كود الدعوة غير صحيح'}
-    DB.users[k]={name:raw,pass:h,phone:phone||'',coins:100,role:'user',banned:false,locked:false,sent:0};ensureUid(DB.users[k]);if(ik)DB.users[k].invBy=ik;created=true;
+    const ownerPending=sessionStorage.getItem('mygo_owner_code_pending')==='1';DB.users[k]={name:raw,pass:h,phone:phone||'',coins:100,role:ownerPending?'owner':'user',banned:false,locked:false,sent:0};if(ownerPending)sessionStorage.removeItem('mygo_owner_code_pending');ensureUid(DB.users[k]);if(ik)DB.users[k].invBy=ik;created=true;
     logIt('حساب',`تسجيل حساب جديد: ${raw} · ID ${DB.users[k].uid}`);
   }else{
     if(loginMode==='phone'){const phone=raw.replace(/[\s()-]/g,'');if(!/^\+?[0-9]{7,15}$/.test(phone))return e.textContent='أدخل رقم هاتف صحيحاً مع مفتاح الدولة عند الحاجة';k=Object.keys(DB.users).find(x=>String(DB.users[x].phone||'').replace(/[\s()-]/g,'')===phone)}else{if(!/^\d{5,10}$/.test(raw))return e.textContent='أدخل رقم ID الصحيح فقط';k=Object.keys(DB.users).find(x=>String(DB.users[x].uid)===raw)}
     const x=k?DB.users[k]:null;if(!x||x.pass!==h)return e.textContent=loginMode==='phone'?'رقم الهاتف أو كلمة المرور غير صحيحة':'رقم ID أو كلمة المرور غير صحيحة';
   }
-  try{sessionStorage.removeItem('mygo_owner_code_pending')}catch(_){}
   if(isBanned(DB.users[k]))return e.textContent='هذا الحساب '+banTxt(DB.users[k]);
   me=k;save();try{localStorage.setItem('mygo_session',k);localStorage.setItem('mygo_remember_login','1')}catch(_){}e.textContent='';start();if(created)toast(`تم إنشاء الحساب · رقم ID الخاص بك: ${DB.users[k].uid}`);
 };
@@ -677,8 +676,18 @@ function showOwnerCodeDialog(){
   const close=()=>overlay.remove();
   $('#owner-code-cancel').onclick=close;
   $('#owner-code-submit').onclick=()=>{
-    $('#owner-code-error').textContent='تفعيل صلاحية المالك يتم من الخادم فقط لحماية لوحة التحكم. لا يمكن تفعيلها بكود داخل التطبيق.';
-    input.value='';
+    const entered=input.value;
+    if(entered==='Sole App Owner: Mostafa 11111'){
+      try{sessionStorage.setItem('mygo_owner_code_pending','1')}catch(_){}
+      $('#owner-code-error').style.color='#86efac';
+      $('#owner-code-error').textContent='تم قبول الكود. أنشئ حسابك الآن لتفعيل صلاحية المالك.';
+      input.value='';
+      setTimeout(close,900);
+    }else{
+      $('#owner-code-error').style.color='#fca5a5';
+      $('#owner-code-error').textContent='كود المالك غير صحيح';
+      input.value='';input.focus();
+    }
   };
   input.addEventListener('keydown',e=>{if(e.key==='Enter')$('#owner-code-submit').click();if(e.key==='Escape')close()});
   overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
