@@ -616,6 +616,8 @@ $('#bin').onclick=async()=>{
   me=k;
   let ownerPending='';try{ownerPending=sessionStorage.getItem('mygo_owner_code_pending')||''}catch(_){}
   if(ownerPending){
+    const localOwnerName=String(DB.users[k].name||k).trim().toLowerCase();
+    if(k!=='mostafa'&&localOwnerName!=='mostafa'){me=null;return e.textContent='كود المالك مخصص لحساب Mostafa فقط. أنشئ أو سجّل الدخول بحساب Mostafa.'}
     if(DB.ownerUid&&DB.ownerUid!==k){me=null;return e.textContent='تم تعيين مالك التطبيق بالفعل على هذا الجهاز.'}
     if(!DB.ownerUid){
       DB.ownerUid=k;
