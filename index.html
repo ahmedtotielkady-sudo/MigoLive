@@ -1102,7 +1102,7 @@ function rMe(m){
   <button class="btn w" id="gfr">👥 الأصدقاء</button><div class="sp"></div>
   <button class="btn w" id="ginv">🎁 دعوة الأصدقاء</button><div class="sp"></div>
   <button class="btn w" id="gsec">🔒 الأمان والنشاط والدعم</button><div class="sp"></div>
-  <button class="btn w" id="ag">🏢 الانضمام لوكالة</button><div class="sp"></div><button class="btn o w" id="th">تبديل الوضع (فاتح/داكن)</button><div class="sp"></div>
+  ${u.agency&&ag(u.agency)&&ag(u.agency).head===me?'<button class="btn w" id="ga">🏢 لوحة الوكالة</button><div class="sp"></div>':u.agency&&ag(u.agency)?'<button class="btn w" id="ag">🎙️ أداء المضيف</button><div class="sp"></div>':'<button class="btn w" id="ag">🏢 الانضمام لوكالة</button><div class="sp"></div>'}<button class="btn o w" id="th">تبديل الوضع (فاتح/داكن)</button><div class="sp"></div>
   <button class="btn r w" id="lo">تسجيل الخروج</button>`;
   $('#profile-edit-open').onclick=()=>$('#profile-edit-panel').classList.remove('hide');$('#profile-edit-close').onclick=()=>$('#profile-edit-panel').classList.add('hide');
   let newAvatar=null,deleteAvatar=false;
@@ -1128,7 +1128,7 @@ function rMe(m){
   };
   if($('#go'))$('#go').onclick=()=>{tab='owner';render()};
   $('#gvip').onclick=()=>{tab='vip';render()};$('#gfr').onclick=()=>{tab='friends';render()};$('#ginv').onclick=()=>{tab='invite';render()};$('#gsec').onclick=()=>{tab='security';render()};
-  if($('#ga'))$('#ga').onclick=()=>{tab='agent';render()};if($('#gship'))$('#gship').onclick=()=>{tab='shipping';render()};
+  if($('#ga'))$('#ga').onclick=()=>{tab='agency';render()};if($('#gship'))$('#gship').onclick=()=>{tab='shipping';render()};
   $('#ag').onclick=()=>{tab='agency';render()};$('#th').onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='light'?'dark':'light'};
   $('#lo').onclick=()=>{if(U())U().last=Date.now();forceOut('')};
 }
@@ -1305,7 +1305,7 @@ function rOwner(m){
   if($('#ssw'))$('#ssw').onclick=()=>{DB.settings.wallet=$('#sw').value.trim().slice(0,40);save();toast('تم الحفظ')};
   const go=$('#go');if(go)go.onclick=()=>{const k=findUser($('#tu').value)||$('#tu').value.trim().toLowerCase(),a=+(($('#am')||{}).value),e=$('#er');
     if(ot==='coins'){const r=transfer(null,k,a);if(r&&!(a<0&&DB.users[k]))return e.textContent=r;if(a<0){DB.users[k].coins=Math.max(0,DB.users[k].coins+a);logIt('مالك',`خصم ${-a} من ${DB.users[k].name}`)}}
-    else if(ot==='ag'){if(U().role!=='owner')return e.textContent='إنشاء الوكالات متاح للمالك فقط';const t=DB.users[k],n=$('#an').value.trim();if(!n)return e.textContent='اكتب اسم الوكالة';if(!t)return e.textContent='المستخدم غير موجود';DB.agencies.push({id:Date.now(),name:n,head:k});if(t.role==='user')t.role='agent';logIt('مالك',`إنشاء وكالة ${n}`)}
+    else if(ot==='ag'){if(U().role!=='owner')return e.textContent='إنشاء الوكالات متاح للمالك فقط';const t=DB.users[k],n=$('#an').value.trim();if(!n)return e.textContent='اكتب اسم الوكالة';if(!t)return e.textContent='المستخدم غير موجود';const id=Date.now();DB.agencies.push({id,name:n,head:k});t.agency=id;if(t.role==='user')t.role='agent';logIt('مالك',`إنشاء وكالة ${n}`)}
     else{const t=DB.users[k];if(!t)return e.textContent='المستخدم غير موجود';t.role='agent';t.locked=false;if(a>0)t.coins+=a;logIt('مالك',`تعيين ${t.name} وكيلاً (+${a||0})`)}
     save();render()};
 }
