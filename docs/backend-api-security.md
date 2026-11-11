@@ -40,6 +40,15 @@ Legacy IDs must be 5-10 digits. Legacy passwords must be 6-128 characters to pre
 - `POST /api/admin/topups/:reference/approve` or `/reject`: records the reviewer and review note. Approval credits the wallet and posts the ledger row in the same MongoDB transaction; rejection does not credit coins.
 - `POST /api/admin/wallet/adjust`: primary-owner-only manual credit/debit. Requires `userId`, positive integer `amount`, `direction`, a non-empty `reason`, and an `Idempotency-Key`. Every adjustment is written to the ledger.
 
+
+## Agency and shipping authorization
+
+- `POST /api/agencies/host-request` submits a host-agency request; `GET /api/agencies/me` reads the authenticated user's memberships.
+- Administrators review host requests through `GET /api/admin/agencies/host-requests` and the `/approve` or `/reject` actions. Approval activates only a host agency and does not modify the user's role or grant shipping permissions.
+- Only administrators/owners can create a shipping agency through `POST /api/admin/agencies/shipping`, add members through `POST /api/admin/agencies/shipping/:id/members`, or deactivate members through `DELETE /api/admin/agencies/shipping/:id/members/:userId`.
+- `POST /api/shipping/topups` credits another active user's wallet only for active shipping-agency members or administrators/owners. The server records the actor and agency in the ledger. Host-agency membership is never considered shipping authorization.
+- These APIs are server-side controls. The existing agency screens in `index.html` still need client integration; localStorage agency state is not authoritative and is not migrated by these endpoints.
+
 ## Games
 
 - `GET /api/games`: lists the configured game IDs.

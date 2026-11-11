@@ -2,7 +2,7 @@
   "name": "migolive",
   "version": "1.0.0",
   "private": true,
-  "description": "MigoLive application and backend",
+  "description": "MigoLive Android application and backend",
   "main": "server.js",
   "scripts": {
     "start": "node backend/server.js",

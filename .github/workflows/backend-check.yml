@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [codex/wallet-security-audit]
+    branches: [codex/wallet-security-audit, fix/host-agency-no-shipping]
 
 permissions:
   contents: read
