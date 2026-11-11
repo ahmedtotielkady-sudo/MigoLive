@@ -1335,32 +1335,12 @@ function rOwner(m){
 
 /* ===== Server-controlled application updates ===== */
 function appUpdateOwnerHTML(){
- const remote=(()=>{try{return JSON.parse(localStorage.getItem('migolive_remote_user')||'null')}catch(_){return null}})();
- return `<div class="card"><b>📲 إدارة تحديث التطبيق</b><div class="mu">الإعدادات تُحفظ على الخادم وتصل لكل المستخدمين. يلزم تسجيل الدخول بحساب المالك على الخادم.</div><div id="app-update-status" class="mu" style="margin-top:8px">${remote?'جاري تحميل إعدادات الإصدار...':'حساب الخادم غير مربوط'}</div></div>
- <div class="card"><label>أحدث إصدار</label><input class="in" id="au-version" dir="ltr" placeholder="مثال: 1.2.0"><label>رقم البناء</label><input class="in" id="au-build" type="number" min="1" placeholder="مثال: 12"><label>رابط تحميل APK</label><input class="in" id="au-url" dir="ltr" placeholder="https://.../MigoLive.apk"><label>أقل إصدار مسموح به</label><input class="in" id="au-min" dir="ltr" placeholder="مثال: 1.1.0"><label>ملاحظات التحديث</label><textarea class="in" id="au-notes" maxlength="2000" placeholder="ما الجديد في هذا الإصدار؟"></textarea><label class="row"><input type="checkbox" id="au-force"> فرض التحديث ومنع استخدام الإصدارات الأقدم</label><label class="row"><input type="checkbox" id="au-active" checked> نشر هذا الإصدار للمستخدمين</label><button class="btn g w" id="au-save">حفظ ونشر إعدادات التحديث</button><button class="btn o w" id="au-load" style="margin-top:8px">إعادة تحميل الإعدادات</button></div>
- <div class="card"><b>تنبيه مهم</b><div class="mu">فرض التحديث يحتاج رابط APK مباشر صالح، ورقم إصدار التطبيق المثبت داخل كل نسخة. لا تفعّل الفرض قبل رفع النسخة الجديدة والتأكد من الرابط.</div></div>`;
+ return '<div class="card"><b>📲 إصدار التطبيق</b><div class="mu">MigoLive يعمل محلياً على هذا الجهاز. تحديث التطبيق يتم ببناء APK جديد وتثبيته يدوياً؛ لا يوجد اتصال بخادم تحديثات.</div></div>';
 }
-function appUpdateOwnerBind(m){
- const status=m.querySelector('#app-update-status'),get=()=>window.MigoLiveAppUpdates;
- async function load(){
-  try{if(!get())throw Error('ملف اتصال الخادم غير جاهز');const d=await get().adminGet();const x=d.release||{};
-   $('#au-version').value=x.version||'';$('#au-build').value=x.build||'';$('#au-url').value=x.downloadUrl||'';$('#au-min').value=x.minVersion||'';$('#au-notes').value=x.notes||'';$('#au-force').checked=!!x.force;$('#au-active').checked=x.active!==false;status.textContent='تم تحميل إعدادات الخادم · آخر تحديث: '+(x.updatedAt?new Date(x.updatedAt).toLocaleString('ar-EG'):'لم يُنشر بعد');
-  }catch(e){status.textContent=e.message;}
- }
- $('#au-load').onclick=load;
- $('#au-save').onclick=async()=>{
-  const version=$('#au-version').value.trim(),build=Math.floor(($('#au-build').value||0)),downloadUrl=$('#au-url').value.trim(),minVersion=$('#au-min').value.trim(),notes=$('#au-notes').value.trim(),force=$('#au-force').checked,active=$('#au-active').checked;
-  if(!/^\d+\.\d+\.\d+$/.test(version)||!/^\d+\.\d+\.\d+$/.test(minVersion))return status.textContent='اكتب الإصدار وأقل إصدار بصيغة 1.2.3';
-  if(!(build>0))return status.textContent='رقم البناء يجب أن يكون أكبر من صفر';
-  if(active&&(!/^https:\/\//i.test(downloadUrl)))return status.textContent='أدخل رابط APK يبدأ بـ https://';
-  if(force&&!active)return status.textContent='لا يمكن فرض تحديث غير منشور';
-  try{const d=await get().adminSave({version,build,downloadUrl,minVersion,notes,force,active});status.textContent=d.message||'تم حفظ إعدادات التحديث على الخادم';}
-  catch(e){status.textContent=e.message;}
- };
- load();
-}
+function appUpdateOwnerBind(m){}
 
 /* ===== مركز الإدارة الموسع: شحن، رسائل، فعاليات، دفاتر ===== */
+
 function adminLog(type,detail){DB.audit.unshift({t:Date.now(),by:me||'local',type,detail});DB.audit=DB.audit.slice(0,5000);}
 function ownerDashboardHTML(tabsO=[]){
  const us=Object.values(DB.users),pending=DB.topups.filter(x=>x.status==='pending').length;
