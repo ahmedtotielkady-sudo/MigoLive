@@ -1096,7 +1096,7 @@ function rMe(m){
   <div class="mu" style="margin-top:8px">${u.countrySetOnce?'تغيير البلد مرة أخرى يتطلب 100,000 عملة وموافقة المالك حصراً.':'يمكنك تعيين البلد لأول مرة مجاناً.'}</div>
   <div class="sp"></div><div class="err" id="profile-edit-error" role="alert"></div><button class="btn g w" id="profile-edit-save">حفظ التعديلات</button></div>
   ${isStaff(u)?`<button class="btn g w" id="go">${u.role==='owner'?'👑 لوحة المالك':'🛠️ لوحة الإدارة'}</button><div class="sp"></div>`:''}
-  ${u.role==='agent'?'<button class="btn w" id="ga">🛡️ لوحة الوكيل</button><div class="sp"></div>':''}
+  ${u.role==='agent'&&!u.agency?'<button class="btn w" id="gagent">🛡️ لوحة الوكيل</button><div class="sp"></div>':''}
   ${u.shippingAgency?'<button class="btn w" id="gship">🏦 لوحة وكالة الشحن</button><div class="sp"></div>':''}
   <button class="btn g w" id="gvip">👑 عضويات VIP</button><div class="sp"></div>
   <button class="btn w" id="gfr">👥 الأصدقاء</button><div class="sp"></div>
@@ -1128,7 +1128,7 @@ function rMe(m){
   };
   if($('#go'))$('#go').onclick=()=>{tab='owner';render()};
   $('#gvip').onclick=()=>{tab='vip';render()};$('#gfr').onclick=()=>{tab='friends';render()};$('#ginv').onclick=()=>{tab='invite';render()};$('#gsec').onclick=()=>{tab='security';render()};
-  if($('#ga'))$('#ga').onclick=()=>{tab='agency';render()};if($('#gship'))$('#gship').onclick=()=>{tab='shipping';render()};
+  if($('#ga'))$('#ga').onclick=()=>{tab='agency';render()};if($('#gagent'))$('#gagent').onclick=()=>{tab='agent';render()};if($('#gship'))$('#gship').onclick=()=>{tab='shipping';render()};
   $('#ag').onclick=()=>{tab='agency';render()};$('#th').onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='light'?'dark':'light'};
   $('#lo').onclick=()=>{if(U())U().last=Date.now();forceOut('')};
 }
