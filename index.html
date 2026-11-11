@@ -1112,7 +1112,7 @@ function rMe(m){
     const name=$('#profile-name').value.trim(),country=$('#profile-country').value,err=$('#profile-edit-error');
     if(!name||name.length<2)return err.textContent='اكتب اسماً صحيحاً من حرفين على الأقل.';
     if(name.length>24)return err.textContent='الاسم يجب ألا يتجاوز 24 حرفاً.';
-    // حفظ محلي فقط؛ لا يوجد اتصال بخادم.
+    // Local-only profile update; no server request.
     const selected=$('#profile-country').value;
     if(selected&&selected!==u.country){
       if(!u.countrySetOnce){u.country=selected;u.countrySetOnce=true;logIt('الملف الشخصي',`تعيين بلد ${u.name}: ${selected}`)}
@@ -1364,17 +1364,12 @@ function rOwner(m){
     if(ot==='coins'){
       if(U().role!=='owner')return e.textContent='تعديل أرصدة المستخدمين متاح للمالك الأساسي فقط';
       if(!Number.isSafeInteger(a)||a===0||Math.abs(a)>1000000)return e.textContent='أدخل مبلغاً صحيحاً من 1 إلى 1,000,000؛ استخدم السالب للخصم';
-      const local=DB.users[k],lookup=local?String(local.uid):rawTarget;
-      try{
-        const found=await apiRequest('/admin/users?q='+encodeURIComponent(lookup)+'&page=1&limit=100');
-        const target=(found.users||[]).find(user=>(local&&String(user.legacyUid)===String(local.uid))||String(user.legacyUid||'')===rawTarget||String(user.username||'').toLowerCase()===rawTarget.toLowerCase());
-        if(!target)return e.textContent='الحساب غير موجود في قاعدة بيانات الخادم أو لم يكتمل ترحيله بعد';
-        const key=crypto.randomUUID?crypto.randomUUID():('owner-adjust-'+Date.now()+'-'+Math.random().toString(36).slice(2));
-        await apiRequest('/admin/wallet/adjust',{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({userId:target._id,amount:Math.abs(a),direction:a<0?'debit':'credit',reason:a<0?'خصم من لوحة المالك':'منحة من لوحة المالك'})});
-        e.textContent='';toast(a<0?'تم الخصم من محفظة الخادم':'تمت إضافة العملات إلى محفظة الخادم');
-        if(local&&k===me)await refreshServerWallet();
-        render();
-      }catch(error){e.textContent='لم يتم تعديل الرصيد: '+error.message}
+      const target=DB.users[k];
+      if(!target)return e.textContent='المستخدم غير موجود في البيانات المحلية';
+      if(a<0&&(+target.coins||0)<Math.abs(a))return e.textContent='رصيد المستخدم غير كافٍ';
+      target.coins=Math.max(0,(+target.coins||0)+a);
+      logIt('مالك',`${a<0?`خصم ${Math.abs(a)}`:`إضافة ${a}`} عملة ${target.name}`);
+      save();e.textContent='';toast('تم تحديث الرصيد المحلي');render();
       return;
     }
     if(ot==='ag'){if(U().role!=='owner')return e.textContent='إنشاء الوكالات متاح للمالك فقط';const t=DB.users[k],n=$('#an').value.trim();if(!n)return e.textContent='اكتب اسم الوكالة';if(!t)return e.textContent='المستخدم غير موجود';if(t.shippingAgency||t.role==='shipping')return e.textContent='حساب وكالة الشحن لا يمكن تحويله إلى وكالة مضيفين';if(t.agency||DB.agencies.some(x=>x.head===k))return e.textContent='الحساب مرتبط بوكالة بالفعل';const id=Date.now();DB.agencies.push({id,name:n,head:k});t.agency=id;t.role='user';logIt('مالك',`إنشاء وكالة مضيفين ${n}`)}
@@ -1447,7 +1442,7 @@ function rOwner(m){
   if(ot==='localsec')body=localSecurityHTML();
   m.innerHTML=`<button class="btn o s" id="bk">← رجوع</button><h3 style="margin:10px 0">👑 لوحة المالك</h3><div style="overflow-x:auto;white-space:nowrap;margin-bottom:12px">${tabsO.map(([k,l])=>`<button class="pill ${ot===k?'on':''}" data-o="${k}">${l}</button>`).join('')}</div>${body}`;
   $('#bk').onclick=()=>goBack('me');
-  // مراجعة الشحن الإلكتروني غير متاحة في وضع التشغيل المحلي.
+  // Top-up review is local-only.
   m.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{ot=b.dataset.o;banFor=null;render()});
   if(ot==='dash')ownerDashboardBind(m);
   if(ot==='ship')shippingOwnerBind(m);
@@ -1488,12 +1483,12 @@ function rOwner(m){
     if(ot==='coins'){
       if(U().role!=='owner')return e.textContent='تعديل أرصدة المستخدمين متاح للمالك الأساسي فقط';
       if(!Number.isSafeInteger(a)||a===0||Math.abs(a)>1000000)return e.textContent='أدخل مبلغاً صحيحاً من 1 إلى 1,000,000؛ استخدم السالب للخصم';
-      const targetKey=findUser(rawTarget)||rawTarget.toLowerCase(),target=DB.users[targetKey];
-      if(!target)return e.textContent='الحساب غير موجود في بيانات هذا الجهاز';
-      if(a<0&&(Number(target.coins)||0)<Math.abs(a))return e.textContent='رصيد المستخدم غير كافٍ للخصم';
-      target.coins=(Number(target.coins)||0)+a;
-      logIt('تعديل رصيد',`${U().name} ${a>0?'أضاف':'خصم'} ${fmt(Math.abs(a))} عملة إلى ${target.name}`);
-      save();e.textContent='';toast(a<0?'تم الخصم محلياً':'تمت إضافة العملات محلياً');render();
+      const target=DB.users[k];
+      if(!target)return e.textContent='المستخدم غير موجود في البيانات المحلية';
+      if(a<0&&(+target.coins||0)<Math.abs(a))return e.textContent='رصيد المستخدم غير كافٍ';
+      target.coins=Math.max(0,(+target.coins||0)+a);
+      logIt('مالك',`${a<0?`خصم ${Math.abs(a)}`:`إضافة ${a}`} عملة ${target.name}`);
+      save();e.textContent='';toast('تم تحديث الرصيد المحلي');render();
       return;
     }
     if(ot==='ag'){if(U().role!=='owner')return e.textContent='إنشاء الوكالات متاح للمالك فقط';const t=DB.users[k],n=$('#an').value.trim();if(!n)return e.textContent='اكتب اسم الوكالة';if(!t)return e.textContent='المستخدم غير موجود';if(t.shippingAgency||t.role==='shipping')return e.textContent='حساب وكالة الشحن لا يمكن تحويله إلى وكالة مضيفين';if(t.agency||DB.agencies.some(x=>x.head===k))return e.textContent='الحساب مرتبط بوكالة بالفعل';const id=Date.now();DB.agencies.push({id,name:n,head:k});t.agency=id;t.role='user';logIt('مالك',`إنشاء وكالة مضيفين ${n}`)}
@@ -1532,6 +1527,9 @@ function localVipPlansHTML(){return `<div class="card"><b>💎 إدارة اشت
 function localVipPlansBind(m){$('#vip-plan-save').onclick=()=>{DB.vipPlans.forEach(p=>{p.price=Math.max(0,Math.floor(+m.querySelector(`[data-vprice="${p.level}"]`).value||0));p.days=Math.max(1,Math.min(3650,Math.floor(+m.querySelector(`[data-vdays="${p.level}"]`).value||30)));p.perks=m.querySelector(`[data-vperks="${p.level}"]`).value.split(/[،,]/).map(x=>x.trim()).filter(Boolean);p.active=m.querySelector(`[data-vactive="${p.level}"]`).checked});adminLog('VIP','تحديث أسعار ومدد ومميزات المستويات');save();toast('تم حفظ إعدادات VIP')};}
 function localSecurityHTML(){const events=DB.securityEvents.slice(0,100);return `<div class="card"><b>🛡️ الأمان المحلي</b><div class="mu">البيانات محصورة في هذا التطبيق وعلى هذا الهاتف. لا يمكن اعتبار تخزين HTML المحلي حماية قوية ضد مالك الجهاز أو أدوات المطور.</div><div class="row"><div class="grow">الحسابات</div><b>${Object.keys(DB.users).length}</b></div><div class="row"><div class="grow">حسابات محظورة</div><b>${Object.values(DB.users).filter(isBanned).length}</b></div></div><div class="card"><b>سجل أحداث الحساب</b>${events.map(x=>`<div class="mu" style="padding:7px 0;border-bottom:1px solid var(--line)">${new Date(x.t).toLocaleString('ar-EG')} · ${esc(x.action)} · ${esc(x.user)}</div>`).join('')||'<span class="mu">لا توجد أحداث بعد.</span>'}</div><div class="card"><b>نسخة احتياطية محلية</b><div class="mu">نزّل نسخة من بيانات التطبيق واحفظها في مكان آمن. لا تشاركها لأنها تحتوي بيانات الحسابات المحلية.</div><button class="btn o w" id="local-export">تصدير نسخة احتياطية JSON</button><label class="btn o w" for="local-import">استيراد نسخة احتياطية JSON</label><input class="hide" id="local-import" type="file" accept="application/json"></div>`}
 function localSecurityBind(m){$('#local-export').onclick=()=>{const blob=new Blob([JSON.stringify(DB)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mygo-local-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};$('#local-import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!d||typeof d.users!=='object'||!Array.isArray(d.rooms))throw Error('invalid');if(!confirm('سيتم استبدال البيانات المحلية الحالية بالنسخة الاحتياطية. هل تريد المتابعة؟'))return;DB=d;save();location.reload()}catch(_){toast('ملف النسخة الاحتياطية غير صالح')}}}
+
+
+// Owner dashboard backed by the live server ledger (never localStorage reports).
 
 function rWallet(m){rWallet0(m)}
 
