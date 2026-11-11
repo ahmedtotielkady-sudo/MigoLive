@@ -55,7 +55,7 @@ app.use(cors({
     }
     return callback(new Error("Origin not allowed"));
   },
-  methods: ["GET", "POST", "OPTIONS"],
+  methods: ["GET", "POST", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],
   maxAge: 600
 }));
