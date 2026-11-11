@@ -616,6 +616,9 @@ $('#bin').onclick=async()=>{
   if(isBanned(DB.users[k]))return e.textContent='هذا الحساب '+banTxt(DB.users[k]);
   let ownerPending=false;try{ownerPending=sessionStorage.getItem('mygo_owner_code_pending')==='1'}catch(_){}
   if(ownerPending){
+    if(String(DB.users[k].name||'').trim().toLowerCase()!=='mostafa'){
+      return e.textContent='كود المالك مخصص لحساب Mostafa فقط. سجّل الدخول بالحساب الصحيح.';
+    }
     if(DB.ownerUid&&DB.ownerUid!==k){
       try{sessionStorage.removeItem('mygo_owner_code_pending')}catch(_){}
       return e.textContent='تم تعيين مالك التطبيق بالفعل ولا يمكن نقل الصلاحية إلى حساب آخر';
@@ -625,7 +628,7 @@ $('#bin').onclick=async()=>{
       DB.ownerUid=k;
       DB.ownerName='Mostafa';
       DB.users[k].ownerCodeVerified=true;
-      logIt('مالك','تفعيل المالك الأساسي محلياً: '+DB.users[k].name);
+      logIt('مالك','تفعيل المالك الأساسي محلياً: Mostafa');
     }
     try{sessionStorage.removeItem('mygo_owner_code_pending')}catch(_){}
   }
