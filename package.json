@@ -1,18 +1,17 @@
 {
-  "name": "migolive-local",
-  "version": "2.0.0",
+  "name": "migolive-app",
+  "version": "1.0.0",
   "private": true,
-  "description": "MigoLive local-first Android application",
+  "description": "MigoLive local-only Android application",
   "scripts": {
-    "android:sync": "npx cap sync android",
-    "android:debug": "cd android && ./gradlew assembleDebug"
+    "android:sync": "cap sync android",
+    "android:open": "cap open android"
   },
   "dependencies": {
-    "@capacitor/android": "^8.5.3",
-    "@capacitor/app": "^8.5.3",
     "@capacitor/core": "^8.5.3"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.5.3"
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/android": "^8.5.3"
   }
 }
