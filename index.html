@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>مايجو لايف</title>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+
 <style>
 :root{--bg:#0a0618;--card:#150d2e;--line:#3b2570;--tx:#f3ecff;--mu:#a392d0;--pu:#7c3aed;--pu2:#a855f7;--gd:#ffc24a;--gd2:#f59e0b;--rd:#e11d48;--gr:#a3e635;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 :root[data-theme="light"]{--bg:#f4efff;--card:#fff;--line:#d9c9f7;--tx:#1a0b3d;--mu:#6b5a9a}
 @media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4efff;--card:#fff;--line:#d9c9f7;--tx:#1a0b3d;--mu:#6b5a9a}}
 *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
-body{background:radial-gradient(circle at 50% -10%,#3b1a7a 0,var(--bg) 55%) no-repeat var(--bg);color:var(--tx);font-family:Cairo,Tahoma,sans-serif;max-width:520px;margin:auto;overflow-x:hidden}
+body{background:radial-gradient(circle at 50% -10%,#3b1a7a 0,var(--bg) 55%) no-repeat var(--bg);color:var(--tx);font-family:system-ui,'Noto Sans Arabic',Tahoma,sans-serif;max-width:520px;margin:auto;overflow-x:hidden}
 body.auth-screen #tabs{display:none!important}
 body.game-active .top,body.game-active #tabs{display:none!important}
 body.auth-screen #app{display:none!important}
@@ -490,10 +490,10 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 
 <div id="rs" class="hide" data-lenis-prevent></div>
 <div id="gm" class="hide"><button id="gx" class="btn gl s">✕ رجوع</button><iframe id="gf" title="لعبة" allow="autoplay"></iframe></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.min.js"></script>
+
+
 <script>
-// لا تُخزّن أكواد أو أسرار المالك داخل تطبيق العميل؛ تفعيل المالك يتم من الخادم فقط.
+// تفعيل المالك محلياً عبر كود المالك المضمّن في نسخة التطبيق.
 try{if(window.Lenis){window.lenis=new Lenis();const raf=t=>{lenis.raf(t);requestAnimationFrame(raf)};requestAnimationFrame(raf)}}catch(e){}
 const $=s=>document.querySelector(s);
 addEventListener('focusin',e=>{if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)&&e.target.type!=='file')document.body.classList.add('kb')});
