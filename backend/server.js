@@ -83,6 +83,8 @@ app.use("/api/auth", require("./routes/auth"));
 app.use("/api/wallet", require("./routes/wallet"));
 app.use("/api/games", require("./routes/games"));
 app.use("/api/admin", require("./routes/admin"));
+app.use("/api/agencies", require("./routes/agencies"));
+app.use("/api/shipping", require("./routes/shipping"));
 
 app.get("/api/config", (_req, res) => {
   res.set("Cache-Control", "no-store");
