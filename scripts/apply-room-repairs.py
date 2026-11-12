@@ -241,5 +241,147 @@ body:not(.inroom) #main{padding-bottom:calc(88px + env(safe-area-inset-bottom,0p
 </style>'''
     html = html.replace("</head>", nav_css + "\\n</head>", 1)
 
+
+# Fix drag positioning: the previous CSS used !important left/top values,
+# which overrode normal inline coordinates and pinned the mini-window in place.
+drag_layout_fix_id = 'mygo-room-drag-layout-polish-v2'
+if drag_layout_fix_id not in html:
+    old_drag = """function bindRoomMini(mini){
+  if(!mini||mini.dataset.dragBound==='1')return;
+  mini.dataset.dragBound='1';
+  let sx=0,sy=0,bx=0,by=0,active=false,moved=false;
+  mini.addEventListener('pointerdown',e=>{
+    if(e.button!==undefined&&e.button!==0)return;
+    const r=mini.getBoundingClientRect();sx=e.clientX;sy=e.clientY;bx=r.left;by=r.top;active=true;moved=false;
+    mini.style.position='fixed';mini.style.left=bx+'px';mini.style.top=by+'px';mini.style.right='auto';mini.style.bottom='auto';
+    try{mini.setPointerCapture(e.pointerId)}catch(_){}
+    e.preventDefault();
+  });
+  mini.addEventListener('pointermove',e=>{
+    if(!active)return;
+    const dx=e.clientX-sx,dy=e.clientY-sy;
+    if(Math.abs(dx)>4||Math.abs(dy)>4)moved=true;
+    if(!moved)return;
+    const r=mini.getBoundingClientRect();
+    mini.style.left=Math.max(0,Math.min(innerWidth-r.width,bx+dx))+'px';
+    mini.style.top=Math.max(0,Math.min(innerHeight-r.height,by+dy))+'px';
+  });
+  const end=e=>{
+    if(!active)return;active=false;
+    try{mini.releasePointerCapture(e.pointerId)}catch(_){}
+    if(moved){mini.dataset.justDragged='1';setTimeout(()=>delete mini.dataset.justDragged,350)}
+  };
+  mini.addEventListener('pointerup',end);mini.addEventListener('pointercancel',end);
+  mini.onclick=e=>{if(mini.dataset.justDragged==='1'){e.preventDefault();e.stopPropagation();return}restoreRoom()};
+}"""
+    new_drag = """function bindRoomMini(mini){
+  if(!mini||mini.dataset.dragBound==='1')return;
+  mini.dataset.dragBound='1';
+  let sx=0,sy=0,bx=0,by=0,active=false,moved=false,pid=null;
+  const place=(x,y)=>{
+    const r=mini.getBoundingClientRect();
+    const nx=Math.max(4,Math.min(window.innerWidth-r.width-4,x));
+    const ny=Math.max(4,Math.min(window.innerHeight-r.height-4,y));
+    mini.style.setProperty('position','fixed','important');
+    mini.style.setProperty('left',nx+'px','important');
+    mini.style.setProperty('top',ny+'px','important');
+    mini.style.setProperty('right','auto','important');
+    mini.style.setProperty('bottom','auto','important');
+  };
+  mini.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse'&&e.button!==0)return;
+    const r=mini.getBoundingClientRect();
+    sx=e.clientX;sy=e.clientY;bx=r.left;by=r.top;active=true;moved=false;pid=e.pointerId;
+    mini.style.setProperty('touch-action','none');
+    try{mini.setPointerCapture(e.pointerId)}catch(_){}
+    e.preventDefault();e.stopPropagation();
+  },{passive:false});
+  window.addEventListener('pointermove',e=>{
+    if(!active||pid!==e.pointerId)return;
+    const dx=e.clientX-sx,dy=e.clientY-sy;
+    if(Math.abs(dx)>3||Math.abs(dy)>3)moved=true;
+    if(moved){place(bx+dx,by+dy);e.preventDefault()}
+  },{passive:false});
+  const end=e=>{
+    if(!active|| (e.pointerId!==undefined&&pid!==e.pointerId))return;
+    active=false;pid=null;
+    if(moved){mini.dataset.justDragged='1';setTimeout(()=>delete mini.dataset.justDragged,500)}
+  };
+  window.addEventListener('pointerup',end);window.addEventListener('pointercancel',end);
+  mini.onclick=e=>{
+    if(mini.dataset.justDragged==='1'){e.preventDefault();e.stopPropagation();return}
+    restoreRoom();
+  };
+}"""
+    if old_drag not in html:
+        raise SystemExit("Could not find existing draggable mini-window function")
+    html = html.replace(old_drag,new_drag,1)
+    # Remove the fixed !important coordinates that pinned the mini-window.
+    html = html.replace(
+        "position:fixed!important;left:8px!important;top:calc(env(safe-area-inset-top,0px) + 8px)!important;\\n  right:auto!important;bottom:auto!important;",
+        "position:fixed!important;left:8px;top:calc(env(safe-area-inset-top,0px) + 8px);\\n  right:auto;bottom:auto;",
+        1
+    )
+    room_css = '''<style id="mygo-room-interior-organized-v1">
+/* Clear room hierarchy: title, host, seats, chat, and fixed composer. */
+#room-float:not(.minimized) #room-float-panel{
+  display:block!important;box-sizing:border-box!important;
+  padding:calc(env(safe-area-inset-top,0px) + 8px) 12px calc(88px + env(safe-area-inset-bottom,0px))!important;
+  background:linear-gradient(180deg,#4a2b30 0%,#8b5038 34%,#3a2529 100%)!important;
+}
+#room-float-panel .mygo-room-top{
+  min-height:44px!important;height:auto!important;gap:6px!important;
+  padding:5px 7px!important;margin:0 0 8px!important;border:1px solid #ffffff30!important;
+  border-radius:14px!important;box-sizing:border-box!important;
+}
+#room-float-panel .room-title-card{max-width:48%!important}
+#room-float-panel .mygo-room-stage{
+  height:96px!important;min-height:96px!important;margin:0 0 8px!important;
+  border-radius:16px!important;background:linear-gradient(135deg,#ffffff16,#ffffff08)!important;
+  border:1px solid #ffffff22!important;
+}
+#room-float-panel .mygo-room-host{gap:3px!important}
+#room-float-panel .rbg{
+  margin:0 0 10px!important;padding:8px!important;border-radius:16px!important;
+  background:#24182045!important;border:1px solid #ffffff28!important;
+}
+#room-float-panel .seats,#room-float-panel .seats.many{
+  display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  gap:12px 5px!important;width:100%!important;max-height:34dvh!important;
+  overflow-y:auto!important;overflow-x:hidden!important;padding:6px 2px 10px!important;
+  align-content:start!important;overscroll-behavior:contain!important;
+}
+#room-float-panel .seats .seat{
+  min-width:0!important;width:100%!important;display:flex!important;
+  flex-direction:column!important;align-items:center!important;gap:4px!important;
+  font-size:10px!important;line-height:1.2!important;
+}
+#room-float-panel .seats .seat .av{
+  width:clamp(38px,10vw,50px)!important;height:clamp(38px,10vw,50px)!important;
+  margin:0 auto!important;flex:none!important;
+}
+#room-float-panel #ch{
+  height:auto!important;min-height:110px!important;max-height:23dvh!important;
+  overflow-y:auto!important;padding:10px!important;margin:0 0 10px!important;
+  border:1px solid #ffffff28!important;border-radius:15px!important;
+  background:#21151d88!important;overscroll-behavior:contain!important;
+}
+#room-float-panel .room-compose{
+  position:fixed!important;left:0!important;right:0!important;bottom:0!important;
+  width:100%!important;max-width:none!important;transform:none!important;
+  z-index:999!important;padding:9px 10px calc(9px + env(safe-area-inset-bottom,0px))!important;
+  box-sizing:border-box!important;background:#21151df2!important;
+  border-top:1px solid #ffffff26!important;backdrop-filter:blur(14px)!important;
+}
+#room-float-panel .room-compose .row{gap:5px!important}
+#room-float-panel .room-compose button{width:38px!important;min-width:38px!important;flex:0 0 38px!important}
+#room-float-panel .room-compose #mi{min-width:0!important;flex:1 1 auto!important;width:auto!important}
+@media(max-width:360px){
+  #room-float-panel .seats,#room-float-panel .seats.many{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  #room-float-panel .room-compose button{width:34px!important;min-width:34px!important;flex-basis:34px!important}
+}
+</style>'''
+    html = html.replace("</head>",room_css + "\\n</head>",1)
+
 path.write_text(html, encoding="utf-8")
 print("Applied MigoLive room modal and interaction fixes.")
