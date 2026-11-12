@@ -1016,7 +1016,7 @@ function renderRoom(m){
   <div class="rbg${bgCss(r)?' has':''}" style="${bgCss(r)}"><div class="seats${N>8?' many':''}"${N>8?' data-lenis-prevent':''}>${r.seats.map((s,i)=>`<button class="seat ${s?'on':''} ${s===me&&talk?'talk':''}" data-s="${i}"><div class="av"${s?avS(DB.users[s]):''}>${s?avL(DB.users[s]):'🎤'}${s?'<em class="mb">'+(mt(s,i)?'🔇':'🎙️')+'</em>':''}</div>${s?uName(DB.users[s]):r.lock.includes(i)?'🔒 مقفل':(i===0&&r.mgr)?'مقعد المدير':''}${mt(s,i)?' 🔇':''}${i===0&&s?' 👑':''}</button>`).join('')}</div></div>
   ${mg}
   <div class="chat" id="ch" data-lenis-prevent>${chat.length?chat.map(c=>c.system?`<div class="room-system-line">${esc(c.m)}</div>`:`<div class="msg"><span class="av s2"${avS(DB.users[c.u]||DB.users[String(c.n).toLowerCase()])}>${okAv(DB.users[c.u]||DB.users[String(c.n).toLowerCase()])?'':esc(String(c.n)[0])}</span><div class="bb"><b>${(()=>{const x=DB.users[c.u]||DB.users[String(c.n).toLowerCase()];return x?uName(x):esc(c.n)})()}</b><div>${esc(c.m)}</div></div></div>`).join(''):'<p class="mu">ابدأ المحادثة...</p>'}</div>
-  <div class="room-compose"><div class="row" style="margin:0"><button class="btn o s rnd" id="roomGames" aria-label="ألعاب الغرفة" title="ألعاب الغرفة">🎮</button><button class="btn o s rnd" id="emo" aria-label="إيموجي">😊</button><button class="btn o s rnd" id="gift" aria-label="هدية">🎁</button>${r.lucky?'<button class="btn o s rnd" id="dice" aria-label="رقم الحظ">🎲</button>':''}<input class="in grow" id="mi" placeholder="اكتب رسالة..." style="margin:0" maxlength="200"><button class="btn s rnd" id="sd" aria-label="إرسال">➤</button><button class="btn s rnd ${talk?'g':''}" id="mic" aria-label="ميكروفون">🎙️</button></div></div>`;
+  <div class="room-compose"><div class="row" style="margin:0"><button class="btn o s rnd" id="inviteRoom" aria-label="دعوة الأصدقاء" title="دعوة الأصدقاء">👥</button><button class="btn o s rnd" id="roomGames" aria-label="ألعاب الغرفة" title="ألعاب الغرفة">🎮</button><button class="btn o s rnd" id="emo" aria-label="إيموجي">😊</button><button class="btn o s rnd" id="gift" aria-label="هدية">🎁</button>${r.lucky?'<button class="btn o s rnd" id="dice" aria-label="رقم الحظ">🎲</button>':''}<input class="in grow" id="mi" placeholder="اكتب رسالة..." style="margin:0" maxlength="200"><button class="btn s rnd" id="sd" aria-label="إرسال">➤</button><button class="btn s rnd ${talk?'g':''}" id="mic" aria-label="ميكروفون">🎙️</button></div></div>`;
   m.dataset.rid=r.id;const ns=m.querySelector('.seats');if(ns&&sy)ns.scrollTop=sy;
   const ch=$('#ch');ch.scrollTop=ch.scrollHeight;
   $('#lv').onclick=showRoomCloseChoice;
@@ -1027,6 +1027,7 @@ function renderRoom(m){
     gd.querySelector('#dok').onclick=()=>gd.remove();
   };
   $('#shareRoom').onclick=async()=>{const shareText='انضم إلى غرفة '+r.name+' في ميجو لايف · ID: '+r.id;try{if(navigator.share)await navigator.share({title:r.name,text:shareText});else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(shareText);toast('تم نسخ بيانات الغرفة للمشاركة')}else toast(shareText)}catch(e){if(e?.name!=='AbortError')toast('تعذر فتح المشاركة')}};
+  $('#inviteRoom').onclick=()=>$('#shareRoom').click();
   $('#onl').onclick=()=>showOnline(r);
   $('#hostMic').onclick=()=>{
     if(r.hostUser&&r.hostUser!==me)return toast('مايك المضيف مشغول');
