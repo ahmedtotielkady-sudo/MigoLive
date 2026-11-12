@@ -383,5 +383,87 @@ if drag_layout_fix_id not in html:
 </style>'''
     html = html.replace("</head>",room_css + "\\n</head>",1)
 
+
+# Premium purple-and-gold room and microphone treatment.
+room_premium_id = "mygo-room-premium-purple-gold-v1"
+if room_premium_id not in html:
+    premium_css = r"""
+#room-float:not(.minimized) #room-float-panel{
+  background:
+    radial-gradient(ellipse at 50% 18%,#54318b 0%,#281548 48%,#10091f 100%)!important;
+  color:#fff7e8!important;
+}
+#room-float-panel .mygo-room-top{
+  background:linear-gradient(110deg,#24113f,#452568 55%,#24113f)!important;
+  border:1px solid #d9b76b99!important;box-shadow:0 5px 18px #0006!important;
+}
+#room-float-panel .mygo-room-stage{
+  background:
+    radial-gradient(ellipse at 50% 100%,#b78335aa 0%,transparent 60%),
+    linear-gradient(145deg,#3b205f,#1a102d)!important;
+  border:1px solid #e5c477!important;
+  box-shadow:inset 0 0 22px #d6a84a22,0 8px 20px #0005!important;
+}
+#room-float-panel .mygo-room-host .av,
+#room-float-panel .mygo-room-stage .av{
+  border:2px solid #f2d58b!important;
+  box-shadow:0 0 0 4px #d5a94b33,0 0 22px #e8bd62aa!important;
+}
+#room-float-panel .rbg{
+  background:linear-gradient(145deg,#211334dd,#382052dd)!important;
+  border:1px solid #c9a45b88!important;
+  box-shadow:inset 0 1px #ffffff18,0 8px 22px #0004!important;
+}
+#room-float-panel .seats .seat .av{
+  border:2px solid #c49a4d!important;
+  background:radial-gradient(circle at 35% 25%,#67458d,#24143c)!important;
+  box-shadow:0 0 0 3px #d8b15b22,0 4px 12px #0008!important;
+  position:relative!important;overflow:visible!important;
+}
+#room-float-panel .seats .seat:has(.av):not(:has(img)) .av{
+  color:#f4d88d!important;
+}
+#room-float-panel .seats .seat .av img{
+  border-radius:50%!important;border:1px solid #f0d18a!important;
+}
+#room-float-panel .seats .seat{color:#fff1d0!important;text-shadow:0 1px 3px #000!important}
+#room-float-panel .seats .seat:has(.av.talking) .av,
+#room-float-panel .seats .seat.talking .av{
+  border-color:#ffe7a0!important;
+  box-shadow:0 0 0 4px #f4d36b55,0 0 0 8px #e5a83c33,0 0 24px #ffdc78!important;
+  animation:migoMicPulse 1.15s ease-in-out infinite!important;
+}
+#room-float-panel #ch{
+  background:linear-gradient(145deg,#180e29ee,#29183fee)!important;
+  border:1px solid #c9a45b88!important;color:#fff4df!important;
+}
+#room-float-panel .room-compose{
+  background:linear-gradient(100deg,#170d28f7,#302044f7)!important;
+  border-top:1px solid #d9b76b!important;
+}
+#room-float-panel .room-compose button{
+  border:1px solid #d7b35f!important;border-radius:12px!important;
+  background:linear-gradient(145deg,#70469a,#392052)!important;color:#fff0c8!important;
+}
+#room-float-panel .room-compose #mi{
+  background:#160d25!important;border:1px solid #a98950!important;color:#fff!important;
+  border-radius:13px!important;
+}
+#room-float.minimized #room-float-mini{
+  background:linear-gradient(145deg,#5b3788,#1a0d30)!important;
+  border:1px solid #e4c476!important;color:#ffe7a6!important;
+}
+@keyframes migoMicPulse{
+  0%,100%{filter:brightness(1);transform:scale(1)}
+  50%{filter:brightness(1.3);transform:scale(1.045)}
+}
+@media(prefers-reduced-motion:reduce){
+  #room-float-panel .seats .seat .av{animation:none!important}
+}"""
+    premium_style = '<style id="' + room_premium_id + '">' + premium_css + '</style>\n'
+    if "</head>" not in html:
+        raise SystemExit("Could not find </head> for premium room styling")
+    html = html.replace("</head>", premium_style + "</head>", 1)
+
 path.write_text(html, encoding="utf-8")
 print("Applied MigoLive room modal and interaction fixes.")
