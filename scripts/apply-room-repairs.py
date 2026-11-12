@@ -218,5 +218,28 @@ function hideRoomKeyboard(){
     html = html.replace(anchor, keyboard_fix + "\n" + anchor, 1)
     html = html.replace("</head>", '<style id="mygo-room-keyboard-dismiss-v1">#room-float.minimized{will-change:transform}#room-float-panel{overscroll-behavior:contain}</style>\n</head>', 1)
 
+
+# When the room is minimized, restore the app shell and bottom navigation.
+minimized_nav_fix_id = 'mygo-minimized-room-app-navigation-v1'
+if minimized_nav_fix_id not in html:
+    old_state = "document.body.classList.toggle('inroom',!!room);"
+    new_state = "document.body.classList.toggle('inroom',!!room&&!roomMinimized);"
+    if old_state not in html:
+        raise SystemExit("Could not find room app-shell state marker")
+    html = html.replace(old_state, new_state, 1)
+    html = html.replace(
+        "b.dataset.t)&&!room));",
+        "b.dataset.t)&&(!room||roomMinimized)));",
+        1
+    )
+    nav_css = '''<style id="mygo-minimized-room-app-navigation-v1">
+/* Minimized room remains alive, while the normal app pages and bottom tabs are usable. */
+body:not(.inroom) #tabs{display:flex!important;visibility:visible!important;pointer-events:auto!important}
+body:not(.inroom) #main{padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))!important}
+#room-float.minimized{pointer-events:none!important}
+#room-float.minimized #room-float-mini{pointer-events:auto!important}
+</style>'''
+    html = html.replace("</head>", nav_css + "\\n</head>", 1)
+
 path.write_text(html, encoding="utf-8")
 print("Applied MigoLive room modal and interaction fixes.")
