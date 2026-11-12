@@ -1239,7 +1239,7 @@ function rAgent(m){
     const t=DB.users[k],fee=Math.floor(amt*rate/100);
     dlg('تأكيد التحويل',`<p>تحويل <b>🪙 ${amt}</b> إلى <b>${esc(t.name)}</b> (ID ${t.uid})</p><p class="mu">عمولتك: 🪙 ${fee}</p>`,d=>{const r=transfer(me,k,amt);if(r){d.querySelector('#dle').textContent=r;return false}toast('تم التحويل');render()},'تحويل')};
   $('#srg').onclick=()=>{const amt=Math.floor(+$('#sr').value),e=$('#sre');if(!(amt>0))return e.textContent='اكتب عدد عملات صحيح';if(DB.sreq.some(x=>x.user===me&&x.status==='pending'))return e.textContent='لديك طلب قيد المراجعة بالفعل';
-    DB.sreq.unshift({id:Date.now(),user:me,amt,status:'pending',t:now()});logIt('وكيل',`${u.name} طلب رصيد ${amt} عملة`);save();toast('تم إرسال الطلب');render()};
+    DB.sreq.unshift({id:Date.now(),user:me,amt,status:'pending',t:now()});logIt('وكيل',`${u.name} طلب رصيد ${amt} عملة`);notifyOwner(`طلب رصيد جديد من الوكيل ${u.name} (ID ${u.uid}) بقيمة ${fmt(amt)} عملة`,'request');notifyUserResult(me,`تم استلام طلب الرصيد بقيمة ${fmt(amt)} عملة وهو قيد مراجعة المالك`);save();toast('تم إرسال الطلب');render()};
 }
 function agentsOwnerHTML(agents){
   const pend=DB.sreq.map((x,i)=>({x,i})).filter(({x})=>x.status==='pending'&&DB.users[x.user]);
@@ -1255,8 +1255,8 @@ function agentsOwnerBind(m){
   $('#adrs').onclick=()=>{DB.settings.agentRate=Math.min(100,Math.max(0,Math.floor(+$('#adr').value)||0));logIt('مالك','تحديث نسبة عمولة الوكلاء');save();toast('تم الحفظ')};
   m.querySelectorAll('[data-as]').forEach(b=>b.onclick=()=>{const k=b.dataset.as,a=DB.users[k],n=Math.floor(+f(b,'stock').value);if(!a||!(n>0))return toast('اكتب مبلغاً صحيحاً');a.coins+=n;DB.tx.unshift({t:Date.now(),k:'st',to:k,amt:n});notify(k,`تم إضافة ${fmt(n)} عملة إلى رصيد وكالتك بواسطة المالك`,'shipping');logIt('مالك',`إضافة رصيد ${n} للوكيل ${a.name}`);save();toast('تمت الإضافة');render()});
   m.querySelectorAll('[data-ar]').forEach(b=>b.onclick=()=>{const a=DB.users[b.dataset.ar],r=f(b,'rate').value.trim(),l=Math.floor(+f(b,'limit').value)||0;if(!a)return;if(r==='')delete a.rate;else a.rate=Math.min(100,Math.max(0,Math.floor(+r)||0));a.limit=Math.max(0,l);logIt('مالك',`تحديث إعدادات الوكيل ${a.name}`);save();toast('تم الحفظ');render()});
-  m.querySelectorAll('[data-sqo]').forEach(b=>b.onclick=()=>{const q=DB.sreq[b.dataset.sqo],a=q&&DB.users[q.user];if(!a||q.status!=='pending')return;q.status='ok';a.coins+=q.amt;DB.tx.unshift({t:Date.now(),k:'st',to:q.user,amt:q.amt});logIt('مالك',`شحن رصيد ${q.amt} للوكيل ${a.name} (طلب)`);save();render()});
-  m.querySelectorAll('[data-sqn]').forEach(b=>b.onclick=()=>{const q=DB.sreq[b.dataset.sqn];if(q)q.status='no';save();render()});
+  m.querySelectorAll('[data-sqo]').forEach(b=>b.onclick=()=>{const q=DB.sreq[b.dataset.sqo],a=q&&DB.users[q.user];if(!a||q.status!=='pending')return;q.status='ok';a.coins+=q.amt;DB.tx.unshift({t:Date.now(),k:'st',to:q.user,amt:q.amt});notifyUserResult(q.user,`وافق المالك على طلب الرصيد وتمت إضافة ${fmt(q.amt)} عملة إلى حسابك`);logIt('مالك',`شحن رصيد ${q.amt} للوكيل ${a.name} (طلب)`);save();render()});
+  m.querySelectorAll('[data-sqn]').forEach(b=>b.onclick=()=>{const q=DB.sreq[b.dataset.sqn];if(q&&q.status==='pending'){q.status='no';notifyUserResult(q.user,`تم رفض طلب الرصيد بقيمة ${fmt(q.amt)} عملة`)}save();render()});
 }
 function agencyOwnerHTML(){
   const owner=U()&&U().role==='owner';
