@@ -218,13 +218,13 @@ body.kb.inroom #ch{max-height:calc(100dvh - 470px)}
 </style>
 
 <style id="mygo-room-layout-fix-v2">
-/* Room microphone seats: 30 slots, six columns on every row */
+/* MigoLive premium room: 25 microphone seats in five balanced columns */
 body.inroom .seats, body.inroom .seats.many {
   display:grid !important;
-  grid-template-columns:repeat(6,minmax(0,1fr)) !important;
+  grid-template-columns:repeat(5,minmax(0,1fr)) !important;
   gap:8px 4px !important;
   width:100% !important;
-  max-height:46dvh !important;
+  max-height:48dvh !important;
   overflow-y:auto !important;
   overflow-x:hidden !important;
   align-content:start;
@@ -256,6 +256,20 @@ body.inroom #ch {padding-bottom:16px !important;overscroll-behavior:contain;}
 body.inroom .room-compose .row {display:flex !important;align-items:center !important;flex-wrap:nowrap !important;gap:6px !important;}
 body.inroom .room-compose #mi {flex:1 1 0 !important;min-width:0 !important;width:1% !important;}
 body.inroom .room-compose button {flex:0 0 40px !important;width:40px !important;min-width:40px !important;}
+
+/* Premium, realistic room finish */
+body.inroom .mygo-room-top{min-height:48px!important;height:48px!important;gap:7px!important;padding:4px 6px!important;border:1px solid rgba(246,207,105,.32)!important;background:linear-gradient(110deg,rgba(25,13,42,.88),rgba(72,38,83,.76))!important;box-shadow:0 5px 18px rgba(0,0,0,.22)!important}
+body.inroom .room-close,body.inroom .room-top-action{width:36px!important;height:36px!important;flex-basis:36px!important;border:1px solid rgba(255,255,255,.2)!important;background:linear-gradient(145deg,rgba(255,255,255,.22),rgba(255,255,255,.07))!important;box-shadow:inset 0 1px rgba(255,255,255,.18),0 3px 8px rgba(0,0,0,.18)!important}
+body.inroom .room-title-card{max-width:48%!important;border:1px solid rgba(246,207,105,.38)!important;background:linear-gradient(120deg,rgba(52,27,73,.94),rgba(91,48,92,.86))!important;box-shadow:inset 0 1px rgba(255,255,255,.14)!important}
+body.inroom .room-title-name{font-size:13px!important;letter-spacing:.1px}
+body.inroom .room-title-meta{font-size:10px!important}
+body.inroom .room-vip-badge{border:1px solid rgba(255,220,135,.6)!important;box-shadow:0 0 12px rgba(214,153,255,.22)!important}
+body.inroom .mygo-room-stage{height:118px!important;margin:2px 0 6px!important}
+body.inroom .host-mic-seat{background:linear-gradient(145deg,rgba(255,255,255,.34),rgba(80,50,87,.55))!important;border:3px solid #f4d27d!important;box-shadow:0 0 0 4px rgba(255,222,154,.15),0 5px 18px rgba(0,0,0,.28),0 0 22px rgba(246,207,105,.3)!important}
+body.inroom .host-mic-label{padding:3px 12px!important;border:1px solid rgba(246,207,105,.55)!important;border-radius:20px!important;background:linear-gradient(110deg,rgba(48,23,69,.92),rgba(104,59,98,.88))!important;color:#ffe6a4!important;font-size:13px!important;box-shadow:0 3px 10px rgba(0,0,0,.2)!important}
+body.inroom .seats .seat .av{border:1.5px solid rgba(255,224,164,.62)!important;background:linear-gradient(145deg,rgba(255,255,255,.24),rgba(69,42,74,.55))!important;box-shadow:inset 0 1px 3px rgba(255,255,255,.18),0 3px 9px rgba(0,0,0,.2)!important}
+body.inroom .seats .seat.on .av{border:2px solid #f5cf72!important;background:linear-gradient(145deg,#9b62cb,#4b286f)!important;box-shadow:0 0 0 2px rgba(255,223,151,.16),0 0 16px rgba(197,134,255,.38)!important}
+body.inroom .seats .seat{color:#fff1d0!important;text-shadow:0 1px 4px rgba(0,0,0,.75)!important;font-size:11px!important}
 </style>
 
 <style id="mygo-persistent-user-header-fix">
@@ -528,7 +542,7 @@ let DB={users:{},log:[],hosts:[],msgs:[],rooms:[
  {id:104,name:'دردشة حرة',seats:Array(8).fill(null),chat:[]}]};
 try{const s=localStorage.getItem('mygo');if(s)DB=JSON.parse(s)}catch(e){}
 DB.agencies=DB.agencies||[];DB.joins=DB.joins||[];DB.agencyApplications=DB.agencyApplications||[];DB.topups=DB.topups||[];DB.countryRequests=DB.countryRequests||[];DB.settings=DB.settings||{wallet:''};
-const SEATMAX=24;
+const SEATMAX=25;
 const okImg=x=>typeof x==='string'&&/^data:image\//.test(x);
 function normRoom(r){r.seats=Array.isArray(r.seats)?r.seats:[];if(!r.v2){while(r.seats.length<SEATMAX)r.seats.push(null);r.v2=1}else{if(r.seats.length>SEATMAX)r.seats=r.seats.slice(0,SEATMAX);if(r.seats.length<1)r.seats=Array(SEATMAX).fill(null)}
   ['muted','lock','smute','admins','hosts','kicked','members','ok','chat','online'].forEach(k=>{r[k]=r[k]||[]});r.vipMin=r.vipMin||0;
@@ -998,7 +1012,7 @@ function renderRoom(m){
     mg=s?`<div class="card"><b>${esc(DB.users[s].name)}</b><div class="sec" style="margin-top:8px"><button class="btn s" data-a="mute">${r.muted.includes(s)?'إلغاء الكتم':'كتم'}</button><button class="btn r s" data-a="kick">إخراج</button><button class="btn o s" data-a="kicklock">إخراج وقفل</button>${isAdm(r,s)?'':'<button class="btn r s" data-a="ban">طرد من الغرفة</button>'}</div></div>`:r.lock.includes(sel)?`<div class="card"><b>مقعد مقفل</b><div class="sec" style="margin-top:8px"><button class="btn s" data-a="unlock">فتح المقعد</button></div></div>`:''}
   const oldS=m.querySelector('.seats'),sy=(oldS&&m.dataset.rid==r.id)?oldS.scrollTop:0;
   m.innerHTML=`<div class="mygo-room-top"><button class="room-close" id="lv" aria-label="مغادرة الغرفة">×</button><button class="room-top-action" id="onl" aria-label="المتواجدون">👥</button>${adm?'<button class="room-top-action" id="adm" aria-label="إعدادات الغرفة">⚙</button>':''}<div class="room-title-card"><div class="room-title-name">${esc(r.name)}${r.pass?' 🔒':''}</div><div class="room-title-meta">ID: ${r.id} · ${r.seats.filter(Boolean).length}/${N} · 👁 ${(r.online||[]).length} متواجد</div></div><div class="room-vip-badge">VIP ${vipLv(U())||0}</div></div>
-  <div class="mygo-room-stage"><div class="mygo-room-host" aria-label="مايك المضيف"><button type="button" class="host-mic-seat ${r.hostUser?'active':''} ${r.hostUser===me&&r.hostTalk?'talking':''}" id="hostMic" aria-label="مايك المضيف">${r.hostUser&&DB.users[r.hostUser]?`<span class="host-mic-avatar" ${avS(DB.users[r.hostUser])}>${avL(DB.users[r.hostUser])}</span>`:'🎤'}<span class="host-mic-state">${r.hostUser===me?(r.hostTalk?'🎙️':'🔇'):r.hostUser?'🎙️':'+'}</span></button><b class="host-mic-label">${r.hostUser&&DB.users[r.hostUser]?esc(DB.users[r.hostUser].name):'المضيف'}</b></div></div>
+  <div class="mygo-room-stage"><div class="mygo-room-host" aria-label="مايك المضيف"><button type="button" class="host-mic-seat ${r.hostUser?'active':''} ${r.hostUser===me&&r.hostTalk?'talking':''}" id="hostMic" aria-label="مايك المضيف">${r.hostUser&&DB.users[r.hostUser]?`<span class="host-mic-avatar" ${avS(DB.users[r.hostUser])}>${avL(DB.users[r.hostUser])}</span>`:'🎤'}<span class="host-mic-state">${r.hostUser===me?(r.hostTalk?'🎙️':'🔇'):r.hostUser?'🎙️':'+'}</span></button><b class="host-mic-label">${r.hostUser&&DB.users[r.hostUser]?'المضيف · '+esc(DB.users[r.hostUser].name):'المضيف'}</b></div></div>
   <div class="rbg${bgCss(r)?' has':''}" style="${bgCss(r)}"><div class="seats${N>8?' many':''}"${N>8?' data-lenis-prevent':''}>${r.seats.map((s,i)=>`<button class="seat ${s?'on':''} ${s===me&&talk?'talk':''}" data-s="${i}"><div class="av"${s?avS(DB.users[s]):''}>${s?avL(DB.users[s]):'🎤'}${s?'<em class="mb">'+(mt(s,i)?'🔇':'🎙️')+'</em>':''}</div>${s?uName(DB.users[s]):r.lock.includes(i)?'🔒 مقفل':(i===0&&r.mgr)?'مقعد المدير':''}${mt(s,i)?' 🔇':''}${i===0&&s?' 👑':''}</button>`).join('')}</div></div>
   ${mg}
   <div class="chat" id="ch" data-lenis-prevent>${chat.length?chat.map(c=>c.system?`<div class="room-system-line">${esc(c.m)}</div>`:`<div class="msg"><span class="av s2"${avS(DB.users[c.u]||DB.users[String(c.n).toLowerCase()])}>${okAv(DB.users[c.u]||DB.users[String(c.n).toLowerCase()])?'':esc(String(c.n)[0])}</span><div class="bb"><b>${(()=>{const x=DB.users[c.u]||DB.users[String(c.n).toLowerCase()];return x?uName(x):esc(c.n)})()}</b><div>${esc(c.m)}</div></div></div>`).join(''):'<p class="mu">ابدأ المحادثة...</p>'}</div>
