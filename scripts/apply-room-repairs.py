@@ -215,8 +215,8 @@ function hideRoomKeyboard(){
     anchor = "function bindRoomMini(mini){"
     if anchor not in html:
         raise SystemExit("Could not find room mini interaction insertion point")
-    html = html.replace(anchor, keyboard_fix + "\\n" + anchor, 1)
-    html = html.replace("</head>", '<style id="mygo-room-keyboard-dismiss-v1">#room-float.minimized{will-change:transform}#room-float-panel{overscroll-behavior:contain}</style>\\n</head>', 1)
+    html = html.replace(anchor, keyboard_fix + "\n" + anchor, 1)
+    html = html.replace("</head>", '<style id="mygo-room-keyboard-dismiss-v1">#room-float.minimized{will-change:transform}#room-float-panel{overscroll-behavior:contain}</style>\n</head>', 1)
 
 path.write_text(html, encoding="utf-8")
 print("Applied MigoLive room modal and interaction fixes.")
