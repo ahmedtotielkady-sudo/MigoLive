@@ -30,6 +30,9 @@ body.migo-game-open #main{padding-bottom:0!important}
 #migo-game-picker .migo-picker-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
 #migo-game-picker button{padding:13px 8px;border:1px solid #d9aa4b;border-radius:14px;background:#240d40;color:#ffe6a2;font-weight:800}
 #migo-game-picker .migo-picker-close{margin-top:12px;background:#54132e;color:#fff}
+/* Improve tap response without changing existing visual design. */
+#migo-game-overlay button,#migo-game-picker button,#migo-room-game-launcher button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px}
+body.migo-game-open{overflow:hidden!important;overscroll-behavior:none}
 </style>
 """
 
@@ -93,12 +96,14 @@ js = r"""
   b.addEventListener("click",openPicker);wrap.appendChild(b);panel.appendChild(wrap);
  }
  function sync(){
-  cleanText();addRoomButton();
+  addRoomButton();
   const active=!!(overlay&&!overlay.hidden);
   document.body.classList.toggle("migo-game-open",active);
  }
- const mo=new MutationObserver(sync);
- function start(){ensureUI();sync();mo.observe(document.body,{subtree:true,childList:true,characterData:true});}
+ // Clean existing stray escape text once. Re-scanning the entire page on every
+ // DOM mutation made typing, scrolling and room controls unnecessarily slow.
+ const mo=new MutationObserver(()=>{addRoomButton()});
+ function start(){ensureUI();cleanText();sync();mo.observe(document.body,{subtree:true,childList:true});}
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
  window.MigoRoomGames={openPicker,openGame,closeGame};
 })();
