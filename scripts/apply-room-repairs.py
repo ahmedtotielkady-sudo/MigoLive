@@ -460,7 +460,7 @@ if room_premium_id not in html:
 @media(prefers-reduced-motion:reduce){
   #room-float-panel .seats .seat .av{animation:none!important}
 }"""
-    premium_style = '<style id="' + room_premium_id + '">' + premium_css + '</style>\\n'
+    premium_style = '<style id="' + room_premium_id + '">' + premium_css + '</style>\n'
     if "</head>" not in html:
         raise SystemExit("Could not find </head> for premium room styling")
     html = html.replace("</head>", premium_style + "</head>", 1)
