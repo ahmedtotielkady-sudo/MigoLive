@@ -1368,7 +1368,8 @@ function ownerPendingCount(section){
  switch(section){case 'tp':return count(DB.topups);case 'countries':return count(DB.countryRequests);case 'ag':return count(DB.agencyApplications);case 'agents':return count(DB.sreq);case 'hostapps':return count(DB.hostApplications);case 'referrals':return count(DB.referrals);case 'support':return count(DB.tickets,'open');default:return 0;}
 }
 function ownerPendingTotal(){return ['tp','countries','ag','agents','hostapps','referrals','support'].reduce((n,k)=>n+ownerPendingCount(k),0)}
-function ownerPendingBadge(section){const n=ownerPendingCount(section);return n?'<span class="owner-menu-pending" aria-label="'+n+' طلب معلق">'+(n>99?'99+':n)+'</span>':''}\nfunction ownerTotalBadge(){const n=ownerPendingTotal();return n?'<span class="owner-menu-pending" aria-label="'+n+' إجراء معلق">'+(n>99?'99+':n)+'</span>':''}
+function ownerPendingBadge(section){const n=ownerPendingCount(section);return n?'<span class="owner-menu-pending" aria-label="'+n+' طلب معلق">'+(n>99?'99+':n)+'</span>':''}
+function ownerTotalBadge(){const n=ownerPendingTotal();return n?'<span class="owner-menu-pending" aria-label="'+n+' إجراء معلق">'+(n>99?'99+':n)+'</span>':''}
 function ownerDashboardHTML(tabsO=[]){
  const us=Object.values(DB.users),pending=ownerPendingCount('tp'),allPending=ownerPendingTotal();
  const icons={tp:'🧾',set:'⚙️',coins:'🪙',agents:'🛡️',users:'👥',hosts:'🎙️',alog:'📋',ag:'🏢',ship:'🏦',ledger:'📒',vip:'💎',gifts:'🎁',broadcast:'📣',events:'🎉',staff:'🔐',appupdate:'📲',countries:'🌍',support:'🆘',hostapps:'🎤',referrals:'🎟️',vipplans:'💠',localsec:'🛡️'};
