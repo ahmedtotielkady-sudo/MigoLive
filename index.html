@@ -859,15 +859,15 @@ function rFriends(m){const u=U();u.friends=u.friends||[];u.blocked=u.blocked||[]
   m.querySelectorAll('[data-fr]').forEach(b=>b.onclick=()=>{u.friends=u.friends.filter(x=>x!==b.dataset.fr);act('حذف صديق '+DB.users[b.dataset.fr].name);save();render()});
   m.querySelectorAll('[data-fb]').forEach(b=>b.onclick=()=>{const k=b.dataset.fb;u.friends=u.friends.filter(x=>x!==k);if(!u.blocked.includes(k))u.blocked.push(k);act('حظر المستخدم '+DB.users[k].name);save();toast('تم الحظر');render()});
   m.querySelectorAll('[data-fu]').forEach(b=>b.onclick=()=>{u.blocked=u.blocked.filter(x=>x!==b.dataset.fu);save();render()})}
-function rNotes(m){const u=U(),mine=DB.notes.filter(n=>n.to===me).slice(0,50),off=u.noff||{};
-  m.innerHTML=`<button class="btn o s" id="bk">← رجوع</button><h3 style="margin:10px 0">🔔 الإشعارات</h3>
+function rNotes(m){const u=U(),mine=DB.notes.filter(n=>n.to===me).slice(0,50),off=u.noff||{},unread=mine.filter(n=>!n.read).length,visibleNoteIds=new Set(mine.map(n=>n.id));
+  m.innerHTML=`<button class="btn o s" id="bk">← رجوع</button><h3 style="margin:10px 0">🔔 الإشعارات ${unread?'<span class="owner-menu-pending">'+unread+'</span>':''}</h3>
   <div class="card"><b>التحكم في الإشعارات</b>${[['friend','دخول وإضافات الأصدقاء'],['gift','الهدايا'],['msg','الرسائل'],['vip','المستويات'],['sys','الدعوات والنظام'],['request','الطلبات والموافقات'],['result','نتائج طلباتي والشحن'],['shipping','عمليات وكالات الشحن']].map(([k,l])=>`<label class="rsr" for="no-${k}" style="min-height:44px"><div class="grow">${l}</div>${swt('no-'+k,!off[k])}</label>`).join('')}</div>
   <div class="sec" style="margin-bottom:10px"><button class="btn o s" id="nclr">مسح الكل</button></div>
   ${mine.length?mine.map(n=>`<div class="card nt ${n.read?'':'un'}"><div>${esc(n.txt)}</div><div class="mu">${new Date(n.t).toLocaleString('ar-EG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div></div>`).join(''):'<p class="mu" style="text-align:center;padding:24px">لا توجد إشعارات</p>'}`;
   $('#bk').onclick=()=>goBack('me');
   ['friend','gift','msg','vip','sys','request','result','shipping'].forEach(k=>{$('#no-'+k).onchange=e=>{u.noff=u.noff||{};u.noff[k]=!e.target.checked;save()}});
   $('#nclr').onclick=()=>{DB.notes=DB.notes.filter(n=>n.to!==me);save();render()};
-  if(mine.some(n=>!n.read)){setTimeout(()=>{DB.notes.forEach(n=>{if(n.to===me)n.read=true});save();const nb=$('#nb');if(nb)nb.style.display='none'},600)}}
+  if(unread){setTimeout(()=>{let changed=false;DB.notes.forEach(n=>{if(n.to===me&&visibleNoteIds.has(n.id)&&!n.read){n.read=true;changed=true}});if(changed){save();const nb=$('#nb');if(nb){const left=DB.notes.filter(n=>n.to===me&&!n.read).length;nb.textContent=left||'';nb.style.display=left?'flex':'none'}}},600)}}
 function rInvite(m){const u=U(),code=invCode(u),inv=Object.values(DB.users).filter(x=>x.invBy===me),paid=inv.filter(x=>x.invPaid).length,lvl=paid>=50?'🥇 ذهبي':paid>=20?'🥈 فضي':paid>=5?'🥉 برونزي':'مبتدئ';
   const top=Object.entries(DB.users).map(([k,x])=>({k,x,n:Object.values(DB.users).filter(y=>y.invBy===k&&y.invPaid).length})).filter(r=>r.n>0).sort((a,b)=>b.n-a.n).slice(0,10);
   m.innerHTML=`<button class="btn o s" id="bk">← رجوع</button><h3 style="margin:10px 0">🎁 دعوة الأصدقاء</h3>
@@ -1126,7 +1126,7 @@ function rMe(m){
   ${pendingCountry?`<div class="mu" style="margin-top:8px">طلب تغيير البلد إلى <b>${esc(pendingCountry.country)}</b> قيد مراجعة المالك.</div>`:''}
   <div class="mu" style="margin-top:8px">${u.countrySetOnce?'تغيير البلد مرة أخرى يتطلب 100,000 عملة وموافقة المالك حصراً.':'يمكنك تعيين البلد لأول مرة مجاناً.'}</div>
   <div class="sp"></div><div class="err" id="profile-edit-error" role="alert"></div><button class="btn g w" id="profile-edit-save">حفظ التعديلات</button></div>
-  ${isStaff(u)?`<button class="btn g w" id="go">${u.role==='owner'?'👑 لوحة المالك':'🛠️ لوحة الإدارة'}</button><div class="sp"></div>`:''}
+  ${isStaff(u)?`<button class="btn g w" id="go">${u.role==='owner'?'👑 لوحة المالك':'🛠️ لوحة الإدارة'}${u.role==='owner'?ownerTotalBadge():''}</button><div class="sp"></div>`:''}
   ${u.role==='agent'&&!DB.agencies.some(a=>a.head===me)?'<button class="btn w" id="ga">🛡️ لوحة الوكيل</button><div class="sp"></div>':''}
   ${u.shippingAgency?'<button class="btn w" id="gship">🏦 لوحة وكالة الشحن</button><div class="sp"></div>':''}
   ${DB.agencies.some(a=>a.head===me)?'<button class="btn g w" id="gaDash">🏢 لوحة الوكالة</button><div class="sp"></div>':''}${u.agency&&ag(u.agency)?'<button class="btn w" id="gperf">📊 أداء المضيف</button><div class="sp"></div>':(!DB.agencies.some(a=>a.head===me)&&!u.agency?'<button class="btn w" id="ag">🏢 الانضمام لوكالة</button><div class="sp"></div>':'')}
@@ -1368,7 +1368,7 @@ function ownerPendingCount(section){
  switch(section){case 'tp':return count(DB.topups);case 'countries':return count(DB.countryRequests);case 'ag':return count(DB.agencyApplications);case 'agents':return count(DB.sreq);case 'hostapps':return count(DB.hostApplications);case 'referrals':return count(DB.referrals);case 'support':return count(DB.tickets,'open');default:return 0;}
 }
 function ownerPendingTotal(){return ['tp','countries','ag','agents','hostapps','referrals','support'].reduce((n,k)=>n+ownerPendingCount(k),0)}
-function ownerPendingBadge(section){const n=ownerPendingCount(section);return n?'<span class="owner-menu-pending" aria-label="'+n+' طلب معلق">'+(n>99?'99+':n)+'</span>':''}
+function ownerPendingBadge(section){const n=ownerPendingCount(section);return n?'<span class="owner-menu-pending" aria-label="'+n+' طلب معلق">'+(n>99?'99+':n)+'</span>':''}\nfunction ownerTotalBadge(){const n=ownerPendingTotal();return n?'<span class="owner-menu-pending" aria-label="'+n+' إجراء معلق">'+(n>99?'99+':n)+'</span>':''}
 function ownerDashboardHTML(tabsO=[]){
  const us=Object.values(DB.users),pending=ownerPendingCount('tp'),allPending=ownerPendingTotal();
  const icons={tp:'🧾',set:'⚙️',coins:'🪙',agents:'🛡️',users:'👥',hosts:'🎙️',alog:'📋',ag:'🏢',ship:'🏦',ledger:'📒',vip:'💎',gifts:'🎁',broadcast:'📣',events:'🎉',staff:'🔐',appupdate:'📲',countries:'🌍',support:'🆘',hostapps:'🎤',referrals:'🎟️',vipplans:'💠',localsec:'🛡️'};
