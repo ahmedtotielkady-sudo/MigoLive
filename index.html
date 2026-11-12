@@ -544,7 +544,7 @@ try{const s=localStorage.getItem('mygo');if(s)DB=JSON.parse(s)}catch(e){}
 DB.agencies=DB.agencies||[];DB.joins=DB.joins||[];DB.agencyApplications=DB.agencyApplications||[];DB.topups=DB.topups||[];DB.countryRequests=DB.countryRequests||[];DB.settings=DB.settings||{wallet:''};
 const SEATMAX=25;
 const okImg=x=>typeof x==='string'&&/^data:image\//.test(x);
-function normRoom(r){r.seats=Array.isArray(r.seats)?r.seats:[];if(!r.v2){while(r.seats.length<SEATMAX)r.seats.push(null);r.v2=1}else{if(r.seats.length>SEATMAX)r.seats=r.seats.slice(0,SEATMAX);if(r.seats.length<1)r.seats=Array(SEATMAX).fill(null)}
+function normRoom(r){r.seats=Array.isArray(r.seats)?r.seats:[];if(!r.v2){while(r.seats.length<SEATMAX)r.seats.push(null);r.v2=1}else{if(r.seats.length>SEATMAX)r.seats=r.seats.slice(0,SEATMAX);while(r.seats.length<SEATMAX)r.seats.push(null)}
   ['muted','lock','smute','admins','hosts','kicked','members','ok','chat','online'].forEach(k=>{r[k]=r[k]||[]});r.vipMin=r.vipMin||0;
   if(r.free===undefined)r.free=true;r.lucky=!!r.lucky;r.mgr=!!r.mgr;r.pass=r.pass||'';
   if(r.owner&&!r.members.includes(r.owner))r.members.unshift(r.owner);return r}
