@@ -468,6 +468,7 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 }
 </style>
 
+<style id="mygo-owner-pending-badges-v1">.owner-menu-pending{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;margin-inline-start:6px;border-radius:999px;background:#dc2626;color:#fff;font-size:11px;font-weight:900;line-height:1;box-shadow:0 0 0 2px #dc262633;animation:migoPendingPulse 1.8s ease-in-out infinite}.owner-pending-summary{border:1px solid #dc262655!important;border-radius:10px;padding:8px;background:#dc262610}.owner-pending-summary b{color:#ef4444!important}@keyframes migoPendingPulse{0%,100%{box-shadow:0 0 0 2px #dc262622}50%{box-shadow:0 0 0 5px #dc262622}}@media(prefers-reduced-motion:reduce){.owner-menu-pending{animation:none}}</style>
 </head>
 <body class="auth-screen">
 
@@ -1306,7 +1307,7 @@ function rOwner(m){
   if(ot==='vipplans')body=localVipPlansHTML();
   if(ot==='localsec')body=localSecurityHTML();
   const currentOwnerLabel=(tabsO.find(([k])=>k===ot)||['dash','📊 الرئيسية'])[1];
-  m.innerHTML=`<div class="owner-page-head"><button class="btn o s" id="bk">${ot==='dash'?'← رجوع للتطبيق':'→ رجوع للرئيسية'}</button><h3>${ot==='dash'?'👑 لوحة المالك':currentOwnerLabel}</h3></div>${body}`;
+  m.innerHTML=`<div class="owner-page-head"><button class="btn o s" id="bk">${ot==='dash'?'← رجوع للتطبيق':'→ رجوع للرئيسية'}</button><h3>${ot==='dash'?'👑 لوحة المالك':currentOwnerLabel}${ot!=='dash'?ownerPendingBadge(ot):''}</h3></div>${body}`;
   $('#bk').onclick=()=>{if(ot==='dash'){goBack('me')}else{ot='dash';banFor=null;render()}};
 
   if(ot==='dash')ownerDashboardBind(m);
@@ -1362,12 +1363,18 @@ function appUpdateOwnerBind(m){}
 /* ===== مركز الإدارة الموسع: شحن، رسائل، فعاليات، دفاتر ===== */
 
 function adminLog(type,detail){DB.audit.unshift({t:Date.now(),by:me||'local',type,detail});DB.audit=DB.audit.slice(0,5000);}
+function ownerPendingCount(section){
+ const count=(a,status='pending')=>Array.isArray(a)?a.filter(x=>x&&x.status===status).length:0;
+ switch(section){case 'tp':return count(DB.topups);case 'countries':return count(DB.countryRequests);case 'ag':return count(DB.agencyApplications);case 'agents':return count(DB.sreq);case 'hostapps':return count(DB.hostApplications);case 'referrals':return count(DB.referrals);case 'support':return count(DB.tickets,'open');default:return 0;}
+}
+function ownerPendingTotal(){return ['tp','countries','ag','agents','hostapps','referrals','support'].reduce((n,k)=>n+ownerPendingCount(k),0)}
+function ownerPendingBadge(section){const n=ownerPendingCount(section);return n?'<span class="owner-menu-pending" aria-label="'+n+' طلب معلق">'+(n>99?'99+':n)+'</span>':''}
 function ownerDashboardHTML(tabsO=[]){
- const us=Object.values(DB.users),pending=DB.topups.filter(x=>x.status==='pending').length;
+ const us=Object.values(DB.users),pending=ownerPendingCount('tp'),allPending=ownerPendingTotal();
  const icons={tp:'🧾',set:'⚙️',coins:'🪙',agents:'🛡️',users:'👥',hosts:'🎙️',alog:'📋',ag:'🏢',ship:'🏦',ledger:'📒',vip:'💎',gifts:'🎁',broadcast:'📣',events:'🎉',staff:'🔐',appupdate:'📲',countries:'🌍',support:'🆘',hostapps:'🎤',referrals:'🎟️',vipplans:'💠',localsec:'🛡️'};
- const cards=tabsO.filter(([k])=>k!=='dash').map(([k,label])=>`<button type="button" class="owner-menu-item" data-jump="${k}"><span class="owner-menu-icon">${icons[k]||'📂'}</span><span class="owner-menu-label">${label.replace(/^\S+\s/,'')}</span><span class="owner-menu-arrow">‹</span></button>`).join('');
+ const cards=tabsO.filter(([k])=>k!=='dash').map(([k,label])=>`<button type="button" class="owner-menu-item" data-jump="${k}"><span class="owner-menu-icon">${icons[k]||'📂'}</span><span class="owner-menu-label">${label.replace(/^\S+\s/,'')}</span>${ownerPendingBadge(k)}<span class="owner-menu-arrow">‹</span></button>`).join('');
  return `<section class="owner-summary card"><b>📊 ملخص التطبيق</b><div class="owner-stats">
- <div><span>الحسابات</span><b>${us.length}</b></div><div><span>إجمالي العملات</span><b>${fmt(us.reduce((a,x)=>a+(+x.coins||0),0))}</b></div><div><span>طلبات الشحن المعلقة</span><b>${pending}</b></div>
+ <div><span>الحسابات</span><b>${us.length}</b></div><div><span>إجمالي العملات</span><b>${fmt(us.reduce((a,x)=>a+(+x.coins||0),0))}</b></div><div><span>طلبات الشحن المعلقة</span><b>${pending}</b></div><div class="owner-pending-summary"><span>كل الإجراءات المعلقة</span><b>${allPending}</b></div>
  <div><span>الهدايا</span><b>${DB.giftCat.length}</b></div><div><span>الغرف</span><b>${DB.rooms.length}</b></div><div><span>وكالات المضيفين</span><b>${DB.agencies.length}</b></div><div><span>وكالات الشحن</span><b>${DB.shippingAgencies.length}</b></div><div><span>الفعاليات النشطة</span><b>${DB.events.filter(e=>e.active!==false&&(!e.until||e.until>Date.now())).length}</b></div>
  </div></section><section class="owner-menu-section"><h4>أقسام الإدارة</h4><p class="mu">اختار القسم المطلوب؛ كل قسم هيفتح في صفحة مستقلة.</p><div class="owner-menu-grid">${cards}</div></section>
  <section class="card"><b>آخر سجل إداري</b><div class="sp"></div>${(DB.audit||[]).slice(0,8).map(x=>`<div class="mu" style="padding:6px 0;border-bottom:1px solid var(--line)">${new Date(x.t).toLocaleString('ar-EG')} · ${esc(x.type)} · ${esc(x.detail)}</div>`).join('')||'<span class="mu">لا توجد عمليات بعد</span>'}</section>`;
