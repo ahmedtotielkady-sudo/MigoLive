@@ -67,5 +67,37 @@ for old, new in replacements:
             # Do not fail when a specific action was already changed upstream.
             continue
 
+
+mini_style_id = 'mygo-room-mini-upper-left-v1'
+if mini_style_id not in html:
+    mini_style = '''
+<style id="mygo-room-mini-upper-left-v1">
+/* Compact minimized room shortcut at the upper-left. */
+#room-float.minimized{
+  inset:calc(env(safe-area-inset-top,0px) + 8px) auto auto 8px!important;
+  width:auto!important;height:auto!important;padding:0!important;
+  background:transparent!important;z-index:9500!important;
+}
+#room-float.minimized #room-float-panel{display:none!important}
+#room-float.minimized #room-float-mini{
+  display:flex!important;flex-direction:column;align-items:center;justify-content:center;
+  width:76px!important;min-width:76px!important;height:64px!important;min-height:64px!important;
+  padding:5px!important;border-radius:13px!important;border:1px solid #d8b66a!important;
+  font-size:12px!important;line-height:1.2!important;text-align:center!important;
+  background:linear-gradient(145deg,#39205f,#170d31)!important;
+  box-shadow:0 4px 16px #0009!important;
+}
+#room-float.minimized #room-float-mini small{display:block;font-size:11px;font-weight:700}
+</style>
+'''
+    if "</head>" not in html:
+        raise SystemExit("Could not find </head> for minimized-room style")
+    html = html.replace("</head>", mini_style + "\\n</head>", 1)
+    html = html.replace(
+        'aria-label="العودة إلى الغرفة">🎙️ العودة إلى الغرفة</button>',
+        'aria-label="العودة إلى الغرفة">🎙️<small>الغرفة</small></button>',
+        1
+    )
+
 path.write_text(html, encoding="utf-8")
 print("Applied MigoLive room modal and interaction fixes.")
