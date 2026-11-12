@@ -99,5 +99,72 @@ if mini_style_id not in html:
         1
     )
 
+
+# Keep the minimized room alive while returning to normal app navigation.
+old_render = "const mini=roomFloat.querySelector('#room-float-mini');if(mini)mini.onclick=restoreRoom;renderRoom($('#room-float-panel'));"
+new_render = "const mini=roomFloat.querySelector('#room-float-mini');if(mini)bindRoomMini(mini);renderRoom($('#room-float-panel'));"
+if old_render in html:
+    html = html.replace(old_render, new_render, 1)
+
+old_room_functions = """function minimizeRoom(){if(!room)return;roomMinimized=true;const o=$('#room-float');if(o)o.classList.add('minimized');const m=o&&o.querySelector('#room-float-mini');if(m)m.onclick=restoreRoom;}
+function restoreRoom(){if(!room)return;roomMinimized=false;const o=$('#room-float');if(o)o.classList.remove('minimized');if(location.hash!=='#room-'+room.id){try{history.pushState({migoRoom:true},'','#room-'+room.id)}catch(e){}}renderRoom($('#room-float-panel'));}"""
+new_room_functions = """function bindRoomMini(mini){
+  if(!mini||mini.dataset.dragBound==='1')return;
+  mini.dataset.dragBound='1';
+  let sx=0,sy=0,bx=0,by=0,active=false,moved=false;
+  mini.addEventListener('pointerdown',e=>{
+    if(e.button!==undefined&&e.button!==0)return;
+    const r=mini.getBoundingClientRect();sx=e.clientX;sy=e.clientY;bx=r.left;by=r.top;active=true;moved=false;
+    mini.style.position='fixed';mini.style.left=bx+'px';mini.style.top=by+'px';mini.style.right='auto';mini.style.bottom='auto';
+    try{mini.setPointerCapture(e.pointerId)}catch(_){}
+    e.preventDefault();
+  });
+  mini.addEventListener('pointermove',e=>{
+    if(!active)return;
+    const dx=e.clientX-sx,dy=e.clientY-sy;
+    if(Math.abs(dx)>4||Math.abs(dy)>4)moved=true;
+    if(!moved)return;
+    const r=mini.getBoundingClientRect();
+    mini.style.left=Math.max(0,Math.min(innerWidth-r.width,bx+dx))+'px';
+    mini.style.top=Math.max(0,Math.min(innerHeight-r.height,by+dy))+'px';
+  });
+  const end=e=>{
+    if(!active)return;active=false;
+    try{mini.releasePointerCapture(e.pointerId)}catch(_){}
+    if(moved){mini.dataset.justDragged='1';setTimeout(()=>delete mini.dataset.justDragged,350)}
+  };
+  mini.addEventListener('pointerup',end);mini.addEventListener('pointercancel',end);
+  mini.onclick=e=>{if(mini.dataset.justDragged==='1'){e.preventDefault();e.stopPropagation();return}restoreRoom()};
+}
+function minimizeRoom(){if(!room)return;roomMinimized=true;render();}
+function restoreRoom(){
+  if(!room)return;
+  roomMinimized=false;
+  const o=$('#room-float'),m=o&&o.querySelector('#room-float-mini');
+  if(o)o.classList.remove('minimized');
+  if(m){m.style.position='';m.style.left='';m.style.top='';m.style.right='';m.style.bottom='';}
+  if(location.hash!=='#room-'+room.id){try{history.pushState({migoRoom:true},'','#room-'+room.id)}catch(e){}}
+  renderRoom($('#room-float-panel'));
+}"""
+if old_room_functions in html:
+    html = html.replace(old_room_functions, new_room_functions, 1)
+
+old_popstate = "if(room){try{history.pushState({migoRoom:true},'','#'+(roomMinimized?tab:'room-'+room.id))}catch(e){}showRoomCloseChoice();return}route()"
+new_popstate = "if(room){if(roomMinimized){route();return}try{history.pushState({migoRoom:true},'','#room-'+room.id)}catch(e){}showRoomCloseChoice();return}route()"
+if old_popstate in html:
+    html = html.replace(old_popstate, new_popstate, 1)
+
+mini_drag_style_id = 'mygo-room-mini-draggable-v1'
+if mini_drag_style_id not in html:
+    mini_drag_style = '''<style id="mygo-room-mini-draggable-v1">
+#room-float.minimized #room-float-mini{
+  position:fixed!important;left:8px!important;top:calc(env(safe-area-inset-top,0px) + 8px)!important;
+  right:auto!important;bottom:auto!important;touch-action:none!important;cursor:grab!important;
+  user-select:none!important;-webkit-user-select:none!important;z-index:99999!important;
+}
+#room-float.minimized #room-float-mini:active{cursor:grabbing!important}
+</style>'''
+    html = html.replace("</head>", mini_drag_style + "\\n</head>", 1)
+
 path.write_text(html, encoding="utf-8")
 print("Applied MigoLive room modal and interaction fixes.")
