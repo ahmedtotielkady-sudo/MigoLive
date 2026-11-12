@@ -1170,12 +1170,9 @@ function agentStats(k){const mine=DB.tx.filter(x=>x.k==='tr'&&x.from===k),td=new
   return{ops:mine.length,total:mine.reduce((p,x)=>p+x.amt,0),fee:mine.reduce((p,x)=>p+(x.fee||0),0),day:mine.filter(x=>new Date(x.t).toDateString()===td).reduce((p,x)=>p+x.amt,0)}}
 function findUser(q){q=String(q||'').trim().toLowerCase();if(/^\d{5,9}$/.test(q)){const e=Object.entries(DB.users).find(([,x])=>String(x.uid)===q);return e?e[0]:null}return DB.users[q]?q:null}
 function transfer(from,to,amt){
-  const t=DB.users[to];if(!t)return'المستخدم غير موجود';amt=Math.floor(+amt);if(!(amt>0))return'مبلغ غير صحيح';let fee=0;
-  if(from){return'شحن المستخدمين متاح لوكالات الشحن المعتمدة والإدارة فقط';}if(from===to)return'لا يمكن التحويل لنفسك';if(f.coins<amt)return'رصيدك غير كافٍ';
-    if(f.limit>0){const used=agentStats(from).day;if(used+amt>f.limit)return`تجاوزت الحد اليومي (${f.limit}) · المتبقي ${Math.max(0,f.limit-used)}`}
-    f.coins-=amt;f.sent=(f.sent||0)+amt;fee=Math.floor(amt*agentRate(f)/100);if(fee>0){f.coins+=fee;f.earn=(f.earn||0)+fee}
-    DB.tx.unshift({t:Date.now(),k:'tr',from,to,amt,fee});DB.tx=DB.tx.slice(0,3000)}
-  t.coins+=amt;addCharge(to,amt);logIt(from?'وكيل':'مالك',`${from?DB.users[from].name:'المالك'} ← ${t.name}: ${amt} عملة`);return''
+  const t=DB.users[to];if(!t)return'المستخدم غير موجود';amt=Math.floor(+amt);if(!(amt>0))return'مبلغ غير صحيح';
+  if(from)return'شحن المستخدمين متاح لوكالات الشحن المعتمدة والإدارة فقط';
+  t.coins=(+t.coins||0)+amt;addCharge(to,amt);logIt('مالك',`المالك ← ${t.name}: ${amt} عملة`);return''
 }
 function ag(id){return DB.agencies.find(a=>a.id==id)}
 function reqs(f){const l=DB.joins.map((j,i)=>({j,i})).filter(({j})=>j.status==='pending'&&ag(j.agency)&&DB.users[j.user]&&f(ag(j.agency)));
