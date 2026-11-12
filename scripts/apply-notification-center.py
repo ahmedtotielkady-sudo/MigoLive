@@ -102,7 +102,7 @@ js = r"""
  }
  function renderShortcuts(){
   if(!shortcuts)return;
-  categories.forEach(c=>{const b=shortcuts.querySelector('[data-cat="'+c.id+'"] .migo-ns-count');const n=unread(mine().filter(x=>x.category===c.id));b.textContent=n>99?"99+":String(n);b.hidden=!n});
+  categories.forEach(c=>{const b=shortcuts.querySelector('[data-cat="'+c.id+'"] .migo-ns-count');const n=unread(mine().filter(x=>x.category===c.id));const label=n>99?"99+":String(n);if(b.textContent!==label)b.textContent=label;if(b.hidden===!!n)b.hidden=!n});
  }
  function renderPanel(){
   if(!panel)return;
