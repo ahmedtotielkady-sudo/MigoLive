@@ -1171,7 +1171,7 @@ function agentStats(k){const mine=DB.tx.filter(x=>x.k==='tr'&&x.from===k),td=new
 function findUser(q){q=String(q||'').trim().toLowerCase();if(/^\d{5,9}$/.test(q)){const e=Object.entries(DB.users).find(([,x])=>String(x.uid)===q);return e?e[0]:null}return DB.users[q]?q:null}
 function transfer(from,to,amt){
   const t=DB.users[to];if(!t)return'المستخدم غير موجود';amt=Math.floor(+amt);if(!(amt>0))return'مبلغ غير صحيح';let fee=0;
-  if(from){const f=DB.users[from];if(!f||f.role!=='agent'||DB.agencies.some(a=>a.head===from)||f.shippingAgency||f.role==='shipping')return'صلاحية تحويل العملات متاحة لوكلاء الشحن المعتمدين فقط';if(from===to)return'لا يمكن التحويل لنفسك';if(f.coins<amt)return'رصيدك غير كافٍ';
+  if(from){return'شحن المستخدمين متاح لوكالات الشحن المعتمدة والإدارة فقط';}if(from===to)return'لا يمكن التحويل لنفسك';if(f.coins<amt)return'رصيدك غير كافٍ';
     if(f.limit>0){const used=agentStats(from).day;if(used+amt>f.limit)return`تجاوزت الحد اليومي (${f.limit}) · المتبقي ${Math.max(0,f.limit-used)}`}
     f.coins-=amt;f.sent=(f.sent||0)+amt;fee=Math.floor(amt*agentRate(f)/100);if(fee>0){f.coins+=fee;f.earn=(f.earn||0)+fee}
     DB.tx.unshift({t:Date.now(),k:'tr',from,to,amt,fee});DB.tx=DB.tx.slice(0,3000)}
