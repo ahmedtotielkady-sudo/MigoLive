@@ -35,6 +35,9 @@ jobs:
       - name: Apply in-room game launcher and display cleanup
         run: python3 scripts/apply-game-room-launcher.py
 
+      - name: Apply local notification center
+        run: python3 scripts/apply-notification-center.py
+
       - name: Prepare web assets
         run: |
           mkdir -p www
