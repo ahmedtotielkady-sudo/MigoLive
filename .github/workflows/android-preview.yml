@@ -32,6 +32,9 @@ jobs:
       - name: Apply MigoLive room interaction fixes
         run: python3 scripts/apply-room-repairs.py
 
+      - name: Apply in-room game launcher and display cleanup
+        run: python3 scripts/apply-game-room-launcher.py
+
       - name: Prepare web assets
         run: |
           mkdir -p www
