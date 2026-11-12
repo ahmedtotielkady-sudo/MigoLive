@@ -885,13 +885,13 @@ function rSecurity(m){const u=U(),acts=(u.act||[]).slice(0,30),mt=DB.tickets.fil
   $('#bk').onclick=()=>goBack('me');
   $('#t-sfx').onchange=e=>{u.sfxOff=!e.target.checked;save()};
   $('#pws').onclick=async()=>{const e=$('#pwe'),o=$('#pw0').value,n=$('#pw1').value,c=$('#pw2').value;e.textContent='';if(await hash(o)!==u.pass)return e.textContent='كلمة المرور الحالية غير صحيحة';if(n.length<6)return e.textContent='كلمة المرور الجديدة 6 أحرف على الأقل';if(n!==c)return e.textContent='التأكيد غير مطابق';if(n===o)return e.textContent='اختر كلمة مختلفة عن الحالية';
-    u.pass=await hash(n);act('تغيير كلمة المرور');save();toast('تم تغيير كلمة المرور');render()};
-  $('#tks').onclick=()=>{const v=$('#tkt').value.trim(),e=$('#tke');if(v.length<5)return e.textContent='اكتب تفاصيل أكثر';DB.tickets.unshift({id:Date.now(),user:me,txt:v,status:'open',reply:'',t:now()});act('إرسال شكوى للدعم');save();toast('تم إرسال الشكوى');render()}}
+    u.pass=await hash(n);notifyUserResult(me,'تم تغيير كلمة المرور بنجاح');act('تغيير كلمة المرور');save();toast('تم تغيير كلمة المرور');render()};
+  $('#tks').onclick=()=>{const v=$('#tkt').value.trim(),e=$('#tke');if(v.length<5)return e.textContent='اكتب تفاصيل أكثر';DB.tickets.unshift({id:Date.now(),user:me,txt:v,status:'open',reply:'',t:now()});notifyOwner(`شكوى دعم جديدة من ${U().name} (ID ${U().uid})`,'request');notifyUserResult(me,'تم استلام شكواك وإرسالها للدعم');act('إرسال شكوى للدعم');save();toast('تم إرسال الشكوى');render()}}
 function staffOwnerHTML(){const st=Object.entries(DB.users).filter(([,x])=>['gm','mod','agm','sup'].includes(x.role));
   return `<div class="card"><b>تعيين طاقم الإدارة</b><div class="mu">المدير العام: إدارة المشروع · المشرف: المستخدمون والغرف · مسؤول الوكالات · مسؤول الدعم: الشكاوى</div><div class="sp"></div><input class="in" id="sf-u" placeholder="اسم المستخدم أو ID"><select class="in" id="sf-r"><option value="gm">المدير العام</option><option value="mod">المشرف</option><option value="agm">مسؤول الوكالات</option><option value="sup">مسؤول الدعم</option></select><div class="err" id="sf-e" role="alert"></div><button class="btn g w" id="sf-go">تعيين</button></div>
   ${st.map(([k,x])=>`<div class="card row"><div class="grow"><b>${esc(x.name)}</b><div class="mu">${ROLEL[x.role]}</div></div><button class="btn r s" data-sfr="${k}">إزالة</button></div>`).join('')||'<p class="mu">لا يوجد طاقم بعد</p>'}`}
 function staffOwnerBind(m){$('#sf-go').onclick=()=>{const k=findUser($('#sf-u').value),e=$('#sf-e');if(!k)return e.textContent='المستخدم غير موجود';const x=DB.users[k];if(x.role!=='user')return e.textContent='هذا المستخدم له دور بالفعل';x.role=$('#sf-r').value;logIt('مالك',`تعيين ${x.name}: ${ROLEL[x.role]}`);notify(k,`تم تعيينك: ${ROLEL[x.role]}`,'sys');notifyUserResult(k,`تم تفعيل صلاحية ${ROLEL[x.role]} لحسابك`);save();toast('تم التعيين');render()};
-  m.querySelectorAll('[data-sfr]').forEach(b=>b.onclick=()=>{const x=DB.users[b.dataset.sfr];if(!x)return;x.role='user';logIt('مالك',`إزالة ${x.name} من الطاقم`);save();render()})}
+  m.querySelectorAll('[data-sfr]').forEach(b=>b.onclick=()=>{const x=DB.users[b.dataset.sfr];if(!x)return;x.role='user';notifyUserResult(b.dataset.sfr,'تمت إزالة صلاحية الطاقم من حسابك وإعادتك إلى مستخدم عادي');logIt('مالك',`إزالة ${x.name} من الطاقم`);save();render()})}
 function supportOwnerHTML(){return DB.tickets.length?DB.tickets.map((x,i)=>`<div class="card"><div class="row"><b class="grow">${esc(DB.users[x.user]?DB.users[x.user].name:x.user)}</b><span class="badge">${x.status==='open'?'مفتوحة':'مغلقة'}</span></div><div class="mu">${x.t}</div><div>${esc(x.txt)}</div>${x.reply?`<div class="mu">الرد: ${esc(x.reply)}</div>`:''}${x.status==='open'?`<div class="sp"></div><input class="in" data-rp="${i}" placeholder="اكتب الرد" maxlength="300"><button class="btn s w" data-rs="${i}">رد وإغلاق</button>`:''}</div>`).join(''):'<p class="mu">لا توجد شكاوى</p>'}
 function supportOwnerBind(m){m.querySelectorAll('[data-rs]').forEach(b=>b.onclick=()=>{const t=DB.tickets[b.dataset.rs],v=m.querySelector(`[data-rp="${b.dataset.rs}"]`).value.trim();if(!t||!v)return toast('اكتب الرد');t.reply=v;t.status='closed';notifyUserResult(t.user,'تم الرد على شكواك وإغلاق الطلب');logIt('دعم',`رد على شكوى ${DB.users[t.user]?DB.users[t.user].name:''}`);save();render()})}
 
@@ -1238,7 +1238,7 @@ function rAgent(m){
     const t=DB.users[k],fee=Math.floor(amt*rate/100);
     dlg('تأكيد التحويل',`<p>تحويل <b>🪙 ${amt}</b> إلى <b>${esc(t.name)}</b> (ID ${t.uid})</p><p class="mu">عمولتك: 🪙 ${fee}</p>`,d=>{const r=transfer(me,k,amt);if(r){d.querySelector('#dle').textContent=r;return false}toast('تم التحويل');render()},'تحويل')};
   $('#srg').onclick=()=>{const amt=Math.floor(+$('#sr').value),e=$('#sre');if(!(amt>0))return e.textContent='اكتب عدد عملات صحيح';if(DB.sreq.some(x=>x.user===me&&x.status==='pending'))return e.textContent='لديك طلب قيد المراجعة بالفعل';
-    DB.sreq.unshift({id:Date.now(),user:me,amt,status:'pending',t:now()});logIt('وكيل',`${u.name} طلب رصيد ${amt} عملة`);save();toast('تم إرسال الطلب');render()};
+    DB.sreq.unshift({id:Date.now(),user:me,amt,status:'pending',t:now()});logIt('وكيل',`${u.name} طلب رصيد ${amt} عملة`);notifyOwner(`طلب رصيد وكالة جديد من ${u.name} بقيمة ${fmt(amt)} عملة`,'request');notify(me,'تم استلام طلب رصيد الوكالة وهو قيد مراجعة الإدارة','result');save();toast('تم إرسال الطلب');render()};
 }
 function agentsOwnerHTML(agents){
   const pend=DB.sreq.map((x,i)=>({x,i})).filter(({x})=>x.status==='pending'&&DB.users[x.user]);
@@ -1254,8 +1254,8 @@ function agentsOwnerBind(m){
   $('#adrs').onclick=()=>{DB.settings.agentRate=Math.min(100,Math.max(0,Math.floor(+$('#adr').value)||0));logIt('مالك','تحديث نسبة عمولة الوكلاء');save();toast('تم الحفظ')};
   m.querySelectorAll('[data-as]').forEach(b=>b.onclick=()=>{const k=b.dataset.as,a=DB.users[k],n=Math.floor(+f(b,'stock').value);if(!a||!(n>0))return toast('اكتب مبلغاً صحيحاً');a.coins+=n;DB.tx.unshift({t:Date.now(),k:'st',to:k,amt:n});notify(k,`تم إضافة ${fmt(n)} عملة إلى رصيد وكالتك بواسطة المالك`,'shipping');logIt('مالك',`إضافة رصيد ${n} للوكيل ${a.name}`);save();toast('تمت الإضافة');render()});
   m.querySelectorAll('[data-ar]').forEach(b=>b.onclick=()=>{const a=DB.users[b.dataset.ar],r=f(b,'rate').value.trim(),l=Math.floor(+f(b,'limit').value)||0;if(!a)return;if(r==='')delete a.rate;else a.rate=Math.min(100,Math.max(0,Math.floor(+r)||0));a.limit=Math.max(0,l);logIt('مالك',`تحديث إعدادات الوكيل ${a.name}`);save();toast('تم الحفظ');render()});
-  m.querySelectorAll('[data-sqo]').forEach(b=>b.onclick=()=>{const q=DB.sreq[b.dataset.sqo],a=q&&DB.users[q.user];if(!a||q.status!=='pending')return;q.status='ok';a.coins+=q.amt;DB.tx.unshift({t:Date.now(),k:'st',to:q.user,amt:q.amt});logIt('مالك',`شحن رصيد ${q.amt} للوكيل ${a.name} (طلب)`);save();render()});
-  m.querySelectorAll('[data-sqn]').forEach(b=>b.onclick=()=>{const q=DB.sreq[b.dataset.sqn];if(q)q.status='no';save();render()});
+  m.querySelectorAll('[data-sqo]').forEach(b=>b.onclick=()=>{const q=DB.sreq[b.dataset.sqo],a=q&&DB.users[q.user];if(!a||q.status!=='pending')return;q.status='ok';a.coins+=q.amt;DB.tx.unshift({t:Date.now(),k:'st',to:q.user,amt:q.amt});notifyUserResult(q.user,`تمت الموافقة على طلب رصيد الوكالة وإضافة ${fmt(q.amt)} عملة. رصيدك الآن ${fmt(a.coins)}`);logIt('مالك',`شحن رصيد ${q.amt} للوكيل ${a.name} (طلب)`);save();render()});
+  m.querySelectorAll('[data-sqn]').forEach(b=>b.onclick=()=>{const q=DB.sreq[b.dataset.sqn];if(q&&q.status==='pending'){q.status='no';notifyUserResult(q.user,`تم رفض طلب رصيد الوكالة بقيمة ${fmt(q.amt)} عملة`)}save();render()});
 }
 function agencyOwnerHTML(){
   const owner=U()&&U().role==='owner';
@@ -1328,8 +1328,8 @@ function rOwner(m){
   if(ot==='vipplans')localVipPlansBind(m);
   if(ot==='localsec')localSecurityBind(m);
   if(ot==='coins')packsOwnerBind(m);
-  m.querySelectorAll('[data-lk]').forEach(b=>b.onclick=()=>{const a=DB.users[b.dataset.lk];a.locked=!a.locked;logIt('مالك',`${a.locked?'قفل':'فتح'} الوكيل ${a.name}`);render()});
-  m.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const a=DB.users[b.dataset.rm];a.role='user';a.locked=false;logIt('مالك',`إزالة الوكيل ${a.name}`);render()});
+  m.querySelectorAll('[data-lk]').forEach(b=>b.onclick=()=>{const a=DB.users[b.dataset.lk];a.locked=!a.locked;notifyUserResult(b.dataset.lk,a.locked?'تم إيقاف حساب الوكالة مؤقتاً بواسطة المالك':'تم إعادة تفعيل حساب الوكالة بواسطة المالك');logIt('مالك',`${a.locked?'قفل':'فتح'} الوكيل ${a.name}`);render()});
+  m.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const a=DB.users[b.dataset.rm];a.role='user';a.locked=false;notifyUserResult(b.dataset.rm,'تم إلغاء صلاحية الوكيل من حسابك بواسطة المالك');logIt('مالك',`إزالة الوكيل ${a.name}`);render()});
   m.querySelectorAll('[data-bn]').forEach(b=>b.onclick=()=>{banFor=banFor===b.dataset.bn?null:b.dataset.bn;render()});
   m.querySelectorAll('[data-bc]').forEach(b=>b.onclick=()=>{const a=DB.users[b.dataset.bc],n=Math.floor(+$('#bd').value),t=$('#bu').value,e=$('#be');if(!a||a.role==='owner'||(isStaff(a)&&U().role!=='owner'))return;
     let until=0,lbl='نهائياً';
@@ -1337,8 +1337,8 @@ function rOwner(m){
       if(n>(t==='d'?3650:120))return e.textContent=t==='d'?'الحد الأقصى 3650 يوماً':'الحد الأقصى 120 شهراً';
       if(t==='d')until=Date.now()+n*DAY;else{const d=new Date();d.setMonth(d.getMonth()+n);until=d.getTime()}
       lbl=n+(t==='d'?' يوم':' شهر')}
-    a.banned=true;a.banUntil=until;banFor=null;logIt('مالك',`حظر ${a.name} (${lbl})`);save();toast('تم الحظر');render()});
-  m.querySelectorAll('[data-ub]').forEach(b=>b.onclick=()=>{const a=DB.users[b.dataset.ub];if(!a)return;a.banned=false;a.banUntil=0;logIt('مالك',`رفع حظر ${a.name}`);save();toast('تم رفع الحظر');render()});
+    a.banned=true;a.banUntil=until;banFor=null;notifyUserResult(b.dataset.bc,`تم حظر حسابك بواسطة الإدارة (${lbl})`);logIt('مالك',`حظر ${a.name} (${lbl})`);save();toast('تم الحظر');render()});
+  m.querySelectorAll('[data-ub]').forEach(b=>b.onclick=()=>{const a=DB.users[b.dataset.ub];if(!a)return;a.banned=false;a.banUntil=0;notifyUserResult(b.dataset.ub,'تم رفع الحظر عن حسابك ويمكنك استخدام التطبيق مجدداً');logIt('مالك',`رفع حظر ${a.name}`);save();toast('تم رفع الحظر');render()});
   m.querySelectorAll('[data-da]').forEach(b=>b.onclick=()=>{DB.agencies=DB.agencies.filter(a=>a.id!=b.dataset.da);Object.values(DB.users).forEach(x=>{if(x.agency==b.dataset.da)x.agency=null});save();render()});
   bindReqs(m);
   m.querySelectorAll('[data-tok]').forEach(b=>b.onclick=()=>{const t=DB.topups[b.dataset.tok],x=DB.users[t.user];if(t.status!=='pending'||!x)return;t.status='ok';x.coins+=t.amount;addCharge(t.user,t.amount);notifyUserResult(t.user,`تم تنفيذ شحن ${fmt(t.amount)} عملة بنجاح. رصيدك الآن ${fmt(x.coins)} عملة`);logIt('مالك',`شحن ${t.amount} عملة لـ ${x.name} (إيصال)`);save();toast('تم الشحن');render()});
@@ -1365,7 +1365,8 @@ function adminLog(type,detail){DB.audit.unshift({t:Date.now(),by:me||'local',typ
 function ownerDashboardHTML(tabsO=[]){
  const us=Object.values(DB.users),pending=DB.topups.filter(x=>x.status==='pending').length;
  const icons={tp:'🧾',set:'⚙️',coins:'🪙',agents:'🛡️',users:'👥',hosts:'🎙️',alog:'📋',ag:'🏢',ship:'🏦',ledger:'📒',vip:'💎',gifts:'🎁',broadcast:'📣',events:'🎉',staff:'🔐',appupdate:'📲',countries:'🌍',support:'🆘',hostapps:'🎤',referrals:'🎟️',vipplans:'💠',localsec:'🛡️'};
- const cards=tabsO.filter(([k])=>k!=='dash').map(([k,label])=>`<button type="button" class="owner-menu-item" data-jump="${k}"><span class="owner-menu-icon">${icons[k]||'📂'}</span><span class="owner-menu-label">${label.replace(/^\S+\s/,'')}</span><span class="owner-menu-arrow">‹</span></button>`).join('');
+ const pendingFor=k=>({tp:(DB.topups||[]).filter(x=>x.status==='pending').length,agents:(DB.sreq||[]).filter(x=>x.status==='pending').length,ag:(DB.agencyApplications||[]).filter(x=>x.status==='pending').length,countries:(DB.countryRequests||[]).filter(x=>x.status==='pending').length,support:(DB.tickets||[]).filter(x=>x.status==='open').length,hostapps:(DB.hostApplications||[]).filter(x=>x.status==='pending').length}[k]||0);
+ const cards=tabsO.filter(([k])=>k!=='dash').map(([k,label])=>{const n=pendingFor(k);return `<button type="button" class="owner-menu-item" data-jump="${k}"><span class="owner-menu-icon">${icons[k]||'📂'}</span><span class="owner-menu-label">${label.replace(/^\S+\s/,'')}</span>${n?`<span class="owner-menu-dot" aria-label="${n} طلبات تحتاج مراجعة">${n>99?'99+':n}</span>`:''}<span class="owner-menu-arrow">‹</span></button>`}).join('');
  return `<section class="owner-summary card"><b>📊 ملخص التطبيق</b><div class="owner-stats">
  <div><span>الحسابات</span><b>${us.length}</b></div><div><span>إجمالي العملات</span><b>${fmt(us.reduce((a,x)=>a+(+x.coins||0),0))}</b></div><div><span>طلبات الشحن المعلقة</span><b>${pending}</b></div>
  <div><span>الهدايا</span><b>${DB.giftCat.length}</b></div><div><span>الغرف</span><b>${DB.rooms.length}</b></div><div><span>وكالات المضيفين</span><b>${DB.agencies.length}</b></div><div><span>وكالات الشحن</span><b>${DB.shippingAgencies.length}</b></div><div><span>الفعاليات النشطة</span><b>${DB.events.filter(e=>e.active!==false&&(!e.until||e.until>Date.now())).length}</b></div>
@@ -1532,6 +1533,8 @@ body.auth-screen #auth .or{flex:0 0 auto!important;margin:12px 0!important}
 .owner-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
 .owner-menu-item{min-width:0;min-height:82px;display:flex;align-items:center;gap:9px;padding:12px 10px;border-radius:15px;border:1px solid var(--line);background:linear-gradient(145deg,var(--card),rgba(124,58,237,.13));color:var(--tx);text-align:right;cursor:pointer}
 .owner-menu-item:active{transform:scale(.98)}
+.owner-menu-dot{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:#e11d48;color:#fff;font-size:11px;font-weight:900;box-shadow:0 0 0 2px var(--card);flex:none;animation:ownerDotPulse 1.8s infinite}
+@keyframes ownerDotPulse{0%,100%{box-shadow:0 0 0 2px var(--card),0 0 0 0 rgba(225,29,72,.25)}50%{box-shadow:0 0 0 2px var(--card),0 0 0 5px rgba(225,29,72,0)}}
 .owner-menu-icon{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:12px;background:rgba(124,58,237,.2);font-size:23px}
 .owner-menu-label{flex:1;min-width:0;font-size:13px;font-weight:800;line-height:1.45}
 .owner-menu-arrow{color:var(--gd);font-size:24px}
