@@ -166,5 +166,57 @@ if mini_drag_style_id not in html:
 </style>'''
     html = html.replace("</head>", mini_drag_style + "\\n</head>", 1)
 
+
+# Hide the Android/WebView keyboard before switching between the app and room.
+keyboard_fix_id = 'mygo-room-keyboard-dismiss-v1'
+if keyboard_fix_id not in html:
+    keyboard_fix = '''
+function hideRoomKeyboard(){
+  try{
+    const active=document.activeElement;
+    if(active&&active!==document.body&&active!==document.documentElement&&
+       (active.matches('input,textarea,select,[contenteditable="true"]')||active.isContentEditable)){
+      active.blur();
+    }
+  }catch(_){}
+  try{
+    const keyboard=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Keyboard;
+    if(keyboard&&typeof keyboard.hide==='function')keyboard.hide();
+  }catch(_){}
+}
+'''
+    minimize_old = "function minimizeRoom(){if(!room)return;roomMinimized=true;render();}"
+    minimize_new = "function minimizeRoom(){if(!room)return;hideRoomKeyboard();roomMinimized=true;render();}"
+    if minimize_old in html:
+        html = html.replace(minimize_old, minimize_new, 1)
+    restore_old = """function restoreRoom(){
+  if(!room)return;
+  roomMinimized=false;
+  const o=$('#room-float'),m=o&&o.querySelector('#room-float-mini');
+  if(o)o.classList.remove('minimized');
+  if(m){m.style.position='';m.style.left='';m.style.top='';m.style.right='';m.style.bottom='';}
+  if(location.hash!=='#room-'+room.id){try{history.pushState({migoRoom:true},'','#room-'+room.id)}catch(e){}}
+  renderRoom($('#room-float-panel'));
+}"""
+    restore_new = """function restoreRoom(){
+  if(!room)return;
+  hideRoomKeyboard();
+  roomMinimized=false;
+  const o=$('#room-float'),m=o&&o.querySelector('#room-float-mini');
+  if(o)o.classList.remove('minimized');
+  if(m){m.style.position='';m.style.left='';m.style.top='';m.style.right='';m.style.bottom='';}
+  if(location.hash!=='#room-'+room.id){try{history.pushState({migoRoom:true},'','#room-'+room.id)}catch(e){}}
+  renderRoom($('#room-float-panel'));
+}"""
+    if restore_old in html:
+        html = html.replace(restore_old, restore_new, 1)
+    if minimize_new not in html or restore_new not in html:
+        raise SystemExit("Could not safely patch room keyboard dismissal")
+    anchor = "function bindRoomMini(mini){"
+    if anchor not in html:
+        raise SystemExit("Could not find room mini interaction insertion point")
+    html = html.replace(anchor, keyboard_fix + "\\n" + anchor, 1)
+    html = html.replace("</head>", '<style id="mygo-room-keyboard-dismiss-v1">#room-float.minimized{will-change:transform}#room-float-panel{overscroll-behavior:contain}</style>\\n</head>', 1)
+
 path.write_text(html, encoding="utf-8")
 print("Applied MigoLive room modal and interaction fixes.")
