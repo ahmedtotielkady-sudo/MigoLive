@@ -114,11 +114,12 @@ js = r"""
  }
  function show(filter){ensure();active=filter||"all";panel.hidden=false;renderPanel();items=items.map(x=>x.recipient===account()?{...x,read:true}:x);save();renderPanel()}
  function attach(){
+  const main=document.querySelector("#main")||document.querySelector("main")||document.body;
+  const pageText=(main.innerText||main.textContent||"").slice(0,1800);
+  // The app's message tab uses a localized label/content rather than a stable
+  // data-t="messages" value, so detect its visible search/conversation headings.
+  const isMessages=/المحادثات|ابحث عن مستخدم بال.?ID|ابحث عن المستخدم|لا توجد رسائل/.test(pageText);
   ensure();
-  // Show shortcuts on the messages view only; otherwise keep the home layout untouched.
-  const tabs=document.querySelector("#tabs");
-  const msg=tabs&&tabs.querySelector('[data-t="messages"]');
-  const isMessages=!!(msg&&(msg.classList.contains("active")||msg.getAttribute("aria-selected")==="true"||location.hash.includes("messages")));
   shortcuts.hidden=!isMessages;
   renderShortcuts();
  }
