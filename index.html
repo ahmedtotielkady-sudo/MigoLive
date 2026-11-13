@@ -446,6 +446,18 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 }
 </style>
 
+
+<style id="mygo-auth-room-composer-visibility-fix">
+/* Never show the in-room message composer on login/register screens. */
+body.auth-screen .room-compose,
+body.auth-screen #app .room-compose,
+body.auth-screen .room-compose * {
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
+body.auth-screen #app { display:none !important; visibility:hidden !important; }
+</style>
 </head>
 <body class="auth-screen">
 
