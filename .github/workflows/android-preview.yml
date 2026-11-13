@@ -106,17 +106,39 @@ jobs:
           #app{padding:8px 12px 10px!important}
           .top{gap:7px!important}.chip{font-size:14px!important;padding:2px 10px!important}
           .prize{margin:7px auto 4px!important;padding:3px 20px!important}.prize b{font-size:23px!important}
-          .arena{gap:8px!important}.card{height:84%!important;border-width:2px!important}
-          .card .fighter{font-size:82px!important}.card .name{font-size:16px!important;padding:3px 0!important}
-          .drawbtn{margin-top:4px!important;padding:2px 18px!important}
-          .status{margin:6px auto!important;padding:2px 16px!important;font-size:13px!important}
-          .bet{gap:7px!important}.step{width:48px!important;font-size:27px!important}
-          .go{font-size:18px!important;padding:5px 0!important}.go small{font-size:15px!important}
-          .note{margin-top:4px!important}
-          @media(max-height:640px){.card .fighter{font-size:58px!important}.card{height:82%!important}.prize{margin:4px auto 2px!important}.status{margin:4px auto!important}}
+          .top{transform:translateY(11px)!important;position:relative;z-index:5}
+          .arena{gap:7px!important}.card{height:75%!important;max-height:calc(100dvh - 430px)!important;border-width:2px!important}
+          .card .fighter{font-size:74px!important}.card .name{font-size:15px!important;padding:2px 0!important}
+          .drawbtn{margin-top:2px!important;padding:1px 16px!important}
+          .status{margin:3px auto!important;padding:2px 14px!important;font-size:12px!important}
+          .bet{gap:6px!important}.step{width:44px!important;font-size:25px!important}
+          .go{font-size:17px!important;padding:4px 0!important}.go small{font-size:14px!important}
+          .note{margin-top:2px!important}
+          #app{padding-bottom:16px!important}
+          @media(max-height:640px){.card .fighter{font-size:54px!important}.card{height:72%!important}.prize{margin:4px auto 2px!important}.status{margin:3px auto!important}}
           </style>
           """
           if 'migo-warrior-compact-v1' not in html:
+              html = html.replace('</head>', css + '\\n</head>', 1)
+          p.write_text(html, encoding='utf-8')
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('www/games/cleopatra-gold.html')
+          html = p.read_text(encoding='utf-8')
+          css = """
+          <style id="migo-cleopatra-safe-layout-v1">
+          html,body{width:100%;height:100%;height:100dvh;overflow:hidden!important}
+          body{margin:0!important;padding:0!important}
+          .app{box-sizing:border-box!important;height:100dvh!important;min-height:0!important;padding-top:calc(env(safe-area-inset-top,0px) + 5px)!important;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 5px)!important;gap:4px!important}
+          .hero{margin-top:0!important;flex-shrink:0!important}
+          .top{flex-shrink:0!important}
+          .stage{min-height:0!important;overflow:hidden!important}
+          .stage .reels{max-height:100%!important;max-width:100%!important}
+          .ctl{padding-bottom:env(safe-area-inset-bottom,0px)!important}
+          </style>
+          """
+          if 'migo-cleopatra-safe-layout-v1' not in html:
               html = html.replace('</head>', css + '\\n</head>', 1)
           p.write_text(html, encoding='utf-8')
           PY
