@@ -26,6 +26,11 @@ if rocket_entry not in html:
         raise SystemExit("Could not find Cleopatra entry to register Rocket Space")
     html = html.replace(cleopatra_entry, cleopatra_entry + "," + rocket_entry, 1)
 
+# Fail the build rather than silently shipping without the Rocket Space asset.
+rocket_asset = Path("games/rocket-crash.html")
+if not rocket_asset.is_file() or rocket_asset.stat().st_size < 1000:
+    raise SystemExit("Rocket Space game asset is missing or incomplete")
+
 # Route Cleopatra, Big Warrior, and Rocket to their local HTML assets.
 if "k==='rocket'" not in html:
     loader_condition = "if(k==='cleopatra'||k==='warrior'){"
