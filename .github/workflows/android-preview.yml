@@ -147,14 +147,16 @@ jobs:
           <style id="migo-cleopatra-safe-layout-v1">
           html,body{width:100%;height:100%;height:100dvh;overflow:hidden!important}
           body{margin:0!important;padding:0!important}
-          .app{box-sizing:border-box!important;width:100%!important;height:100dvh!important;min-height:0!important;padding:4px 8px calc(6px + env(safe-area-inset-bottom,0px))!important;display:flex!important;flex-direction:column!important;justify-content:flex-start!important;gap:8px!important}
+          .app{box-sizing:border-box!important;width:100%!important;height:100dvh!important;min-height:0!important;padding:calc(env(safe-area-inset-top,0px) + 6px) 8px calc(env(safe-area-inset-bottom,0px) + 8px)!important;display:flex!important;flex-direction:column!important;justify-content:space-between!important;gap:0!important}
           .hero{width:100%!important;height:auto!important;aspect-ratio:900/581!important;max-height:28dvh!important;min-height:0!important;margin:0!important;flex:0 0 auto!important;background-position:center 78%!important}
-          .top{flex:0 0 auto!important;margin:0!important;min-height:48px!important;padding:3px 10px!important;position:relative!important;z-index:4!important}
+          .top{flex:0 0 auto!important;margin:0!important;min-height:4.5dvh!important;padding:3px 10px!important;position:relative!important;z-index:4!important}
           .stage{flex:0 0 auto!important;width:100%!important;min-height:0!important;overflow:hidden!important;transform:none!important;align-items:center!important;justify-content:center!important;padding:0!important;margin:0!important;box-sizing:border-box!important}
           .stage .reels{width:100%!important;height:auto!important;max-height:none!important;max-width:100%!important;margin:0 auto!important}
-          .info{flex:0 0 auto!important;min-height:34px!important;line-height:34px!important;margin:0!important}
+          .info{flex:0 0 auto!important;min-height:5dvh!important;line-height:1.2!important;margin:0!important}
           .ctl{flex:0 0 auto!important;margin:0!important;padding-bottom:env(safe-area-inset-bottom,0px)!important}
-          @media(max-height:700px){.hero{max-height:24dvh!important}.top{min-height:42px!important}.app{gap:6px!important}.ctl .sm{height:40px!important}.ctl .spin{height:48px!important}}
+          .ctl .sm{height:7dvh!important;min-height:48px!important}
+          .ctl .spin{height:7dvh!important;min-height:56px!important}
+          @media(max-height:700px){.hero{max-height:24dvh!important}.top{min-height:42px!important}.ctl .sm{height:42px!important}.ctl .spin{height:50px!important}}
           </style>
           """
           import re
