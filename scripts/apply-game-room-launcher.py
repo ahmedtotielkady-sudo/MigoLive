@@ -14,7 +14,14 @@ css = r"""
 <style id="migo-game-room-launcher-style-v1">
 /* Keep the active room underneath; hide app chrome only while a game is running. */
 body.migo-game-open #tabs,body.migo-game-open nav#tabs,body.migo-game-open .bottom-nav,
-body.migo-game-open #bottom-nav,body.migo-game-open .app-bottom-nav{display:none!important}
+body.migo-game-open #bottom-nav,body.migo-game-open .app-bottom-nav,
+body.migo-game-open .tab-bar,body.migo-game-open .bottom-tabs,
+body.migo-game-open .main-tabs,body.migo-game-open .navigation-bar,
+body.migo-game-open .app-navigation,body.migo-game-open footer,
+body.migo-game-open [role="navigation"],
+body.migo-game-open [style*="position: fixed"][style*="bottom"]{
+ display:none!important;visibility:hidden!important;pointer-events:none!important
+}
 body.migo-game-open{overflow:hidden!important;overscroll-behavior:none}
 #migo-game-overlay{position:fixed;inset:0;z-index:2147483000;background:#10051d;display:flex;flex-direction:column;padding:0}
 #migo-game-overlay[hidden]{display:none!important}
@@ -113,6 +120,13 @@ js = r"""
   const active=!!(overlay&&!overlay.hidden);
   document.body.classList.toggle("migo-game-open",active);
  }
+ // Any supported game opened through this launcher uses the same full-screen
+ // layer, regardless of whether it was launched from the room or Games page.
+ window.addEventListener("migo:open-game",e=>{
+  const d=e.detail||{};
+  const game=games.find(g=>g.url===d.url||g.name===d.name);
+  if(game)openGame(game);
+ });
  // Clean once, then watch only for tab replacement/navigation.
  const mo=new MutationObserver(()=>{if(!document.documentElement.dataset.migoRoomGameAction)bindRoomGameAction()});
  function start(){ensureUI();cleanText();sync();mo.observe(document.body,{subtree:true,childList:true});}
