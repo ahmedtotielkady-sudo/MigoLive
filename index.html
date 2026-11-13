@@ -592,7 +592,7 @@ $('#app').style.overflow='hidden';
 gameOn=k;
 document.body.classList.add('game-active');
 try{window.MyGoNative.enterFullscreen()}catch(e){}
-$('#gf').srcdoc=dec(GB[k]);
+const offlineGameHtml=dec(GB[k]).replace(/<link\\b[^>]*href=[\"']https?:\\/\\/[^\"']+[\"'][^>]*>/gi,'');\n$('#gf').srcdoc=offlineGameHtml;
 $('#gm').classList.remove('hide');
 try{history.pushState({mygoGame:true},'','#game-'+k)}catch(e){}
 }
