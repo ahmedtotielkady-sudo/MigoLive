@@ -147,17 +147,20 @@ jobs:
           <style id="migo-cleopatra-safe-layout-v1">
           html,body{width:100%;height:100%;height:100dvh;overflow:hidden!important}
           body{margin:0!important;padding:0!important}
-          .app{box-sizing:border-box!important;height:100dvh!important;min-height:0!important;padding-top:calc(env(safe-area-inset-top,0px) + 20px)!important;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 5px)!important;gap:3px!important}
-          .hero{height:clamp(50px,9dvh,78px)!important;min-height:50px!important;margin-top:0!important;flex:0 0 auto!important;aspect-ratio:auto!important;background-position:center 72%!important}
-          .top{flex-shrink:0!important;margin-top:38px!important;min-height:38px!important;position:relative!important;z-index:4!important}
-          .stage{flex:1 1 auto!important;min-height:0!important;overflow:hidden!important;transform:translateY(-58px)!important;align-items:flex-start!important;padding-top:12px!important;box-sizing:border-box!important}
-          .stage .reels{width:min(100%,calc((100dvh - 185px)*1.25))!important;max-height:100%!important;max-width:100%!important;margin:0 auto!important}
-          .info{flex:0 0 auto!important}
+          .app{box-sizing:border-box!important;width:100%!important;height:100dvh!important;min-height:0!important;padding:4px 8px calc(6px + env(safe-area-inset-bottom,0px))!important;gap:6px!important;justify-content:space-between!important}
+          .hero{width:100%!important;height:auto!important;aspect-ratio:900/581!important;max-height:29dvh!important;min-height:0!important;margin-top:0!important;flex:0 0 auto!important;background-position:center 78%!important}
+          .top{flex-shrink:0!important;margin-top:2dvh!important;min-height:40px!important;padding:3px 10px!important;position:relative!important;z-index:4!important}
+          .stage{flex:1 1 auto!important;min-height:0!important;overflow:hidden!important;transform:none!important;align-items:center!important;justify-content:center!important;padding:0!important;box-sizing:border-box!important}
+          .stage .reels{width:100%!important;max-height:100%!important;max-width:100%!important;margin:0 auto!important}
+          .info{flex:0 0 auto!important;min-height:34px!important;line-height:34px!important}
           .ctl{flex:0 0 auto!important;padding-bottom:env(safe-area-inset-bottom,0px)!important}
-          @media(max-height:650px){.top{margin-top:30px!important}.stage{transform:translateY(-42px)!important;padding-top:8px!important}.stage .reels{width:min(100%,calc((100dvh - 155px)*1.25))!important}}
+          @media(max-height:700px){.hero{max-height:25dvh!important}.top{margin-top:1dvh!important}.ctl .sm{height:40px!important}.ctl .spin{height:48px!important}}
           </style>
           """
-          if 'migo-cleopatra-safe-layout-v1' not in html:
+          import re
+          if 'migo-cleopatra-safe-layout-v1' in html:
+              html = re.sub(r'<style id="migo-cleopatra-safe-layout-v1">.*?</style>', lambda _: css.strip(), html, count=1, flags=re.S)
+          else:
               html = html.replace('</head>', css + '\\n</head>', 1)
           p.write_text(html, encoding='utf-8')
           PY
