@@ -19,9 +19,14 @@ body.migo-game-open .tab-bar,body.migo-game-open .bottom-tabs,
 body.migo-game-open .main-tabs,body.migo-game-open .navigation-bar,
 body.migo-game-open .app-navigation,body.migo-game-open footer,
 body.migo-game-open [role="navigation"],
-body.migo-game-open [style*="position: fixed"][style*="bottom"]{
- display:none!important;visibility:hidden!important;pointer-events:none!important
+body.migo-game-open [style*="position: fixed"][style*="bottom"],
+body.migo-game-open .safe-area-bottom,body.migo-game-open .bottom-navigation{
+ display:none!important;visibility:hidden!important;pointer-events:none!important;height:0!important
 }
+body.migo-game-open #migo-game-overlay .migo-game-head.room-origin{display:flex!important;height:48px;min-height:48px;padding:0 14px;align-items:center;justify-content:flex-end;background:#19082c;color:#ffe18a;border-bottom:1px solid #d6a83c}
+body.migo-game-open #migo-game-overlay .migo-game-head.room-origin button{border:1px solid #e6bd58;border-radius:14px;background:#54132e;color:#fff;padding:8px 16px;font-weight:900}
+body.migo-game-open #migo-game-overlay.room-origin iframe{height:calc(100dvh - 48px)!important;min-height:calc(100dvh - 48px)!important}
+
 body.migo-game-open{overflow:hidden!important;overscroll-behavior:none}
 #migo-game-overlay{position:fixed;inset:0;z-index:2147483000;background:#10051d;display:flex;flex-direction:column;padding:0}
 #migo-game-overlay[hidden]{display:none!important}
@@ -80,12 +85,16 @@ js = r"""
   }
  }
  function openPicker(){ensureUI();picker.hidden=false}
- function openGame(g){
+ function openGame(g,source="room"){
   ensureUI();picker.hidden=true;
   const frame=overlay.querySelector("iframe");
   frame.src=g.url;overlay.querySelector("b").textContent=g.name;
+  overlay.classList.toggle("room-origin",source==="room");
+  const head=overlay.querySelector(".migo-game-head");
+  head.classList.toggle("room-origin",source==="room");
+  head.querySelector("button").textContent="خروج من اللعبة";
   overlay.hidden=false;document.body.classList.add("migo-game-open");
-  try{history.pushState({migoGame:true},"","#migo-game")}catch(_){}
+  try{history.pushState({migoGame:true,source},"","#migo-game")}catch(_){}
  }
  function closeGame(fromHistory=false){
   if(!overlay||overlay.hidden)return;
@@ -100,7 +109,28 @@ js = r"""
   if(!button||!button.closest("#room-float-panel"))return false;
   const label=[button.textContent,button.getAttribute("aria-label"),button.title,
     button.dataset.action,button.className].filter(Boolean).join(" ").toLowerCase();
-  return /🎮|gamepad|game|الألعاب|العاب|لعبة|العاب/.test(label);
+  return /🎮|gamepad|game|الألعاب|العاب|لعبة/.test(label);
+ }
+ function gameFromLink(button){
+  if(!button)return null;
+  const raw=button.getAttribute("href")||button.dataset.game||button.dataset.url||"";
+  const label=[button.textContent,button.getAttribute("aria-label"),button.title,raw].filter(Boolean).join(" ").toLowerCase();
+  return games.find(g=>raw.includes(g.url)||label.includes(g.name.toLowerCase())||
+    (g.name==="عجلة الحيوانات"&&/wheel-animals/.test(raw))||
+    (g.name==="عاصفة المحيط"&&/slot-ocean-storm/.test(raw))||
+    (g.name==="سلوت 777"&&/slot-777/.test(raw)));
+ }
+ function bindGamesEverywhere(){
+  if(document.documentElement.dataset.migoGamesEverywhere==="1")return;
+  document.documentElement.dataset.migoGamesEverywhere="1";
+  document.addEventListener("click",e=>{
+   const el=e.target&&e.target.closest&&e.target.closest("a,button,[role=button]");
+   if(!el||el.closest("#migo-game-overlay,#migo-game-picker,#room-float-panel"))return;
+   const game=gameFromLink(el);
+   if(!game)return;
+   e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+   openGame(game,"section");
+  },true);
  }
  // The gamepad action inside the room composer opens the game picker in-place.
  // Do not hijack the global Games tab: it must continue to show the Games page.
@@ -128,8 +158,8 @@ js = r"""
   if(game)openGame(game);
  });
  // Clean once, then watch only for tab replacement/navigation.
- const mo=new MutationObserver(()=>{if(!document.documentElement.dataset.migoRoomGameAction)bindRoomGameAction()});
- function start(){ensureUI();cleanText();sync();mo.observe(document.body,{subtree:true,childList:true});}
+ const mo=new MutationObserver(()=>{bindRoomGameAction();bindGamesEverywhere()});
+ function start(){ensureUI();cleanText();sync();bindGamesEverywhere();mo.observe(document.body,{subtree:true,childList:true});}
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
  window.MigoRoomGames={openPicker,openGame,closeGame};
 })();
