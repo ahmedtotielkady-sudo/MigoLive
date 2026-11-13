@@ -58,10 +58,10 @@ body.migo-game-open .safe-area-bottom,body.migo-game-open .bottom-navigation{
  display:none!important;visibility:hidden!important;pointer-events:none!important;height:0!important
 }
 /* One consistent floating exit control for every game launch path. Align it with the in-game coin row. */
-body.migo-game-open #migo-game-overlay .migo-game-head{display:flex!important;position:absolute!important;z-index:20;top:calc(env(safe-area-inset-top,0px) + 52px);right:22px;left:auto;width:auto;height:auto;min-height:0;padding:0;background:transparent;border:0;align-items:center;justify-content:flex-end;pointer-events:none}
+body.migo-game-open #migo-game-overlay .migo-game-head{display:flex!important;position:absolute!important;z-index:20;top:calc(env(safe-area-inset-top,0px) + 52px);left:22px;right:auto;width:auto;height:auto;min-height:0;padding:0;background:transparent;border:0;align-items:center;justify-content:flex-start;pointer-events:none}
 body.migo-game-open #migo-game-overlay .migo-game-head b{display:none!important}
 body.migo-game-open #migo-game-overlay .migo-game-head button{pointer-events:auto;border:2px solid #e6bd58;border-radius:16px;background:linear-gradient(145deg,#64152f,#3b0922);color:#fff;padding:9px 18px;font-size:16px;font-weight:900;min-height:46px;box-shadow:0 3px 12px #0007}
-@media(max-width:420px){body.migo-game-open #migo-game-overlay .migo-game-head{right:14px;top:calc(env(safe-area-inset-top,0px) + 52px)}body.migo-game-open #migo-game-overlay .migo-game-head button{padding:7px 13px;font-size:14px}}
+@media(max-width:420px){body.migo-game-open #migo-game-overlay .migo-game-head{left:14px;right:auto;top:calc(env(safe-area-inset-top,0px) + 52px)}body.migo-game-open #migo-game-overlay .migo-game-head button{padding:7px 13px;font-size:14px}}
 
 body.migo-game-open{overflow:hidden!important;overscroll-behavior:none}
 #migo-game-overlay{position:fixed;inset:0;z-index:2147483000;background:#10051d;display:flex;flex-direction:column;padding:0}
