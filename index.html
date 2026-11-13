@@ -604,11 +604,27 @@ addEventListener('message',e=>{
  else if(d.t==='cleopatra-spin'){
   const bets=[10,20,50,100,200,500,1000],bi=Number(d.betIndex),requestId=String(d.requestId||'');
   if(!Number.isInteger(bi)||bi<0||bi>=bets.length){e.source.postMessage({t:'cleopatra-round',requestId,error:'اختيار الرهان غير صحيح'},'*');return}
-  const bet=bets[bi];if((Number(u.coins)||0)<bet){e.source.postMessage({t:'cleopatra-round',requestId,error:'Insufficient balance'},'*');return}
-  u.coins-=bet;const symbols=['Y','A','B','C','D','E','F','G','H'];const grid=Array.from({length:5},()=>Array.from({length:4},()=>symbols[Math.floor(Math.random()*symbols.length)]));
-  const win=Math.random()<0.22?bet*(2+Math.floor(Math.random()*8)):0;u.coins+=win;
-  DB.tx=DB.tx||[];DB.tx.unshift({user:me,type:'cleopatra-demo',amount:bet,direction:'debit',createdAt:Date.now(),metadata:{gameName:'ذهب كليوباترا - تجريبي'}});if(win)DB.tx.unshift({user:me,type:'cleopatra-demo-win',amount:win,direction:'credit',createdAt:Date.now(),metadata:{gameName:'ذهب كليوباترا - تجريبي'}});
-  save();SERVER_WALLET_BALANCE=u.coins;e.source.postMessage({t:'cleopatra-round',requestId,data:{success:true,grid,hit:[],balance:u.coins,win,freeSpins:0,multiplier:1,freeSpinWinnings:0,betIndex:bi,freeSpin:false}},'*');
+  const states=DB.cleopatraStates||(DB.cleopatraStates={}),st=states[me]||(states[me]={freeSpins:0,multiplier:1,freeSpinWinnings:0,freeSpinBetIndex:null});
+  const freeSpin=st.freeSpins>0,effectiveBetIndex=freeSpin&&Number.isInteger(st.freeSpinBetIndex)?st.freeSpinBetIndex:bi,bet=bets[effectiveBetIndex];
+  if(!freeSpin&&(Number(u.coins)||0)<bet){e.source.postMessage({t:'cleopatra-round',requestId,error:'Insufficient balance'},'*');return}
+  if(!freeSpin)u.coins-=bet;else st.freeSpins--;
+  const SY=[['W',4],['S',4],['P',5],['O',5],['C',5],['D',8],['F',8],['H',8],['A',12],['E',13],['N',14],['Y',14]],REG=['P','O','C','D','F','H','A','E','N','Y'];
+  const PAY={P:{3:10,4:50,5:250},O:{3:10,4:50,5:250},C:{3:10,4:50,5:250},D:{3:6,4:24,5:120},F:{3:6,4:24,5:120},H:{3:6,4:24,5:120},A:{3:3,4:10,5:45},E:{3:3,4:10,5:45},N:{3:3,4:10,5:45},Y:{3:3,4:10,5:45}};
+  const grid=Array.from({length:5},(_,reel)=>{const a=SY.filter(x=>!(x[0]==='W'&&freeSpin&&(reel===0||reel===4)));return Array.from({length:4},()=>{let n=Math.random()*a.reduce((s,x)=>s+x[1],0);for(const x of a){n-=x[1];if(n<0)return x[0]}return 'Y'})});
+  let win=0,scatterCount=0;const hit=new Set(),scatterCells=[];
+  for(let r=0;r<5;r++)for(let c=0;c<4;c++)if(grid[r][c]==='S'){scatterCount++;scatterCells.push(r+','+c)}
+  for(const symbol of REG){let ways=1,count=0;for(let r=0;r<5;r++){const rows=[];for(let c=0;c<4;c++)if(grid[r][c]===symbol||grid[r][c]==='W')rows.push(c);if(!rows.length)break;ways*=rows.length;count++;if(count>=3)for(let c=0;c<4;c++)if(grid[r][c]===symbol||grid[r][c]==='W')hit.add(r+','+c)}if(count>=3)win+=PAY[symbol][count]*ways*(bet/100)}
+  const scatterPay=[0,0,0,2,10,50],freeAward=[0,0,0,10,15,20];if(scatterCount>=3){const n=Math.min(scatterCount,5);win+=bet*scatterPay[n];scatterCells.forEach(x=>hit.add(x))}
+  win=Math.round(win*(freeSpin?(st.multiplier||1):1));if(freeSpin&&win>0)st.multiplier=Math.min((st.multiplier||1)+1,10);
+  if(freeSpin)st.freeSpinWinnings=(st.freeSpinWinnings||0)+win;
+  const awarded=scatterCount>=3?freeAward[Math.min(scatterCount,5)]:0;st.freeSpins=Math.min(1000,(st.freeSpins||0)+awarded);
+  if(awarded&&!freeSpin)st.freeSpinBetIndex=effectiveBetIndex;
+  const freeSpinWinningsTotal=st.freeSpinWinnings||0,freeSpinEnded=freeSpin&&st.freeSpins===0;
+  if(st.freeSpins===0){st.multiplier=1;st.freeSpinWinnings=0;st.freeSpinBetIndex=null}
+  if(win>0)u.coins+=win;
+  DB.tx=DB.tx||[];if(!freeSpin)DB.tx.unshift({user:me,type:'game_debit',amount:bet,direction:'debit',createdAt:Date.now(),metadata:{gameName:'ذهب كليوباترا',action:'spin'}});if(win)DB.tx.unshift({user:me,type:'game_credit',amount:win,direction:'credit',createdAt:Date.now(),metadata:{gameName:'ذهب كليوباترا',action:'payout'}});
+  save();SERVER_WALLET_BALANCE=u.coins;
+  e.source.postMessage({t:'cleopatra-round',requestId,data:{success:true,grid,hit:[...hit],balance:u.coins,win,freeSpins:st.freeSpins,multiplier:st.multiplier,freeSpinWinnings:st.freeSpinWinnings||0,freeSpinWinningsTotal,freeSpinEnded,freeSpinsAwarded:awarded,betIndex:effectiveBetIndex,freeSpin}},'*');
  }
  else if(d.t==='set'){console.warn('Ignored test-game balance message')}
  else if(d.t==='wallet'){closeGame();tab='wallet';try{history.replaceState(null,'','#wallet')}catch(e){}render()}
