@@ -5,7 +5,6 @@ const root = path.resolve(__dirname, "..");
 const output = path.join(root, "public");
 const files = [
   "index.html",
-  "api-config.js",
   "slot-777.html",
   "slot-ocean-storm.html",
   "wheel-animals.html"
@@ -43,4 +42,4 @@ if (!fs.existsSync(path.join(output, "index.html"))) {
   throw new Error("index.html was not copied to the Cloudflare public directory");
 }
 
-console.log("Cloudflare assets prepared in ./public for Cloudflare Workers deployment");
+console.log("Offline Android assets prepared in ./public; no server or network API is required.");
