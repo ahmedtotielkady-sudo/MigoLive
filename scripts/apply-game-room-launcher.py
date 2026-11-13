@@ -6,6 +6,18 @@ p = Path("index.html")
 if not p.exists():
     raise SystemExit("index.html is missing")
 html = p.read_text(encoding="utf-8")
+# Expose the signed-in user's actual profile data to local game iframes.
+profile_anchor = "function U(){return DB.users[me]}"
+profile_getter = """function U(){return DB.users[me]}
+window.__migoGetGameProfile=function(){
+ try{const u=U();return {name:u&&u.name?u.name:"",avatar:u&&typeof okAv==="function"&&okAv(u)?u.avatar:"",coins:u&&Number.isFinite(Number(u.coins))?Number(u.coins):0}}
+ catch(_){return {name:"",avatar:"",coins:0}}
+};"""
+if profile_anchor in html and "window.__migoGetGameProfile" not in html:
+    html = html.replace(profile_anchor, profile_getter, 1)
+elif "window.__migoGetGameProfile" not in html:
+    raise SystemExit("Could not expose profile bridge: user function not found")
+
 
 style_id = "migo-game-room-launcher-style-v1"
 script_id = "migo-game-room-launcher-script-v1"
@@ -91,6 +103,13 @@ js = r"""
  function openGame(g,source="room"){
   ensureUI();picker.hidden=true;
   const frame=overlay.querySelector("iframe");
+  frame.onload=()=>{
+   try{
+    const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{name:"",avatar:"",coins:0};
+    frame.contentWindow.postMessage({t:"me",name:profile.name||"",avatar:profile.avatar||""},"*");
+    frame.contentWindow.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
+   }catch(err){console.warn("Migo game profile delivery:",err)}
+  };
   frame.src=g.url;overlay.querySelector("b").textContent=g.name;
   overlay.classList.remove("room-origin");
   const head=overlay.querySelector(".migo-game-head");
@@ -114,9 +133,9 @@ js = r"""
   const d=e.data||{};
   try{
    if(d.t==="get"){
-    const u=typeof U==="function"?U():null;
-    e.source.postMessage({t:"bal",v:u&&Number.isFinite(Number(u.coins))?Number(u.coins):0},"*");
-    e.source.postMessage({t:"me",name:u&&u.name?u.name:"",avatar:u&&typeof okAv==="function"&&okAv(u)?u.avatar:""},"*");
+    const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{name:"",avatar:"",coins:0};
+    e.source.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
+    e.source.postMessage({t:"me",name:profile.name||"",avatar:profile.avatar||""},"*");
    }else if(d.t==="set"&&Number.isFinite(d.v)&&d.v>=0){
     const u=typeof U==="function"?U():null;
     if(!u)return;
