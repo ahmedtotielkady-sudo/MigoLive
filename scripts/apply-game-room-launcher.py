@@ -57,7 +57,8 @@ js = r"""
  const games=[
   {name:"عجلة الحيوانات",url:"wheel-animals.html"},
   {name:"عاصفة المحيط",url:"slot-ocean-storm.html"},
-  {name:"سلوت 777",url:"slot-777.html"}
+  {name:"سلوت 777",url:"slot-777.html"},
+  {name:"ذهب كليوباترا",url:"games/cleopatra-gold.html"}
  ];
  const cleanText=()=>{
   const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
@@ -74,7 +75,7 @@ js = r"""
    picker=document.createElement("div");picker.id="migo-game-picker";picker.hidden=true;
    picker.innerHTML='<div class="migo-picker-card"><div class="migo-picker-title">الألعاب</div><div class="migo-picker-grid"></div><button class="migo-picker-close" type="button">إغلاق</button></div>';
    const grid=picker.querySelector(".migo-picker-grid");
-   const visuals={"عجلة الحيوانات":["🐯","اختر حيوانك"],"عاصفة المحيط":["🌊","سلوت 5×6"],"سلوت 777":["🎰","سلوت 3×5"]};
+   const visuals={"عجلة الحيوانات":["🐯","اختر حيوانك"],"عاصفة المحيط":["🌊","سلوت 5×6"],"سلوت 777":["🎰","سلوت 3×5"],"ذهب كليوباترا":["👑","سلوت 5×4 · رصيد المحفظة"]};
    games.forEach(g=>{const v=visuals[g.name]||["🎮",""];const b=document.createElement("button");b.type="button";b.className="migo-game-card";b.innerHTML='<span class="migo-game-icon">'+v[0]+'</span><span class="migo-game-name"></span><span class="migo-game-desc"></span>';b.querySelector(".migo-game-name").textContent=g.name;b.querySelector(".migo-game-desc").textContent=v[1];b.addEventListener("click",()=>openGame(g));grid.appendChild(b)});
    picker.querySelector(".migo-picker-close").onclick=()=>picker.hidden=true;
    document.body.appendChild(picker);
@@ -115,6 +116,7 @@ js = r"""
    if(d.t==="get"){
     const u=typeof U==="function"?U():null;
     e.source.postMessage({t:"bal",v:u&&Number.isFinite(Number(u.coins))?Number(u.coins):0},"*");
+    e.source.postMessage({t:"me",name:u&&u.name?u.name:"",avatar:u&&typeof okAv==="function"&&okAv(u)?u.avatar:""},"*");
    }else if(d.t==="set"&&Number.isFinite(d.v)&&d.v>=0){
     const u=typeof U==="function"?U():null;
     if(!u)return;
