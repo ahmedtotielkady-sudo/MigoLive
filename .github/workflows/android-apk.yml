@@ -3,7 +3,7 @@ name: Build MigoLive Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [codex/wallet-security-audit, feature/cleopatra-gold-shared-wallet]
+    branches: [codex/wallet-security-audit, feature/cleopatra-gold-shared-wallet, feature/migolive-fully-local-demo]
     paths:
       - "index.html"
       - "api-config.js"
