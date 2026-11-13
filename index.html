@@ -514,23 +514,45 @@ async function claimServerOwner(code){
 }
 async function apiRequest(path,options={}){
   const body=(()=>{try{return options.body?JSON.parse(options.body):{}}catch(_){return {}}})();
-  const user=()=>me&&DB.users[me]?DB.users[me]:null;
-  const balance=()=>Math.max(0,Number(user()?.coins)||0);
-  if(path==='/wallet')return {balance:balance(),pendingTopups:[],transactions:[]};
+  const current=()=>me&&DB.users[me]?DB.users[me]:null;
+  const balance=()=>Math.max(0,Number(current()?.coins)||0);
+  DB.demoTopups=Array.isArray(DB.demoTopups)?DB.demoTopups:[];
+  DB.demoTransactions=Array.isArray(DB.demoTransactions)?DB.demoTransactions:[];
+  if(path==='/wallet')return {balance:balance(),pendingTopups:DB.demoTopups.filter(x=>x.userId===me&&x.status==='pending'),transactions:DB.demoTransactions.filter(x=>x.userId===me)};
   if(path==='/config')return {paymentWallet:''};
-  if(path==='/auth/me'||path==='/auth/profile')return {id:String(user()?.uid||''),role:user()?.role||'user',user};
+  if(path==='/auth/me'||path==='/auth/profile')return {id:String(current()?.uid||''),role:current()?.role||'user',user:current()};
   if(path==='/auth/claim-owner')return claimServerOwner(body.code);
-  if(path==='/wallet/topups')return {success:true,reference:'LOCAL-'+Date.now(),status:'pending',demo:true};
-  if(path==='/wallet/gift')return {success:true,balance:balance(),demo:true};
-  if(path==='/admin/topups/pending')return {items:[]};
-  if(path==='/admin/overview')return {users:Object.keys(DB.users||{}).length,games:[],transactions:0,topups:0};
-  if(path.startsWith('/admin/users'))return {items:Object.entries(DB.users||{}).map(([id,u])=>({id,username:u.name,coins:u.coins,role:u.role}))};
-  if(path.startsWith('/admin/transactions'))return {items:[]};
-  if(path.startsWith('/admin/topups/'))return {success:true,demo:true};
+  if(path==='/wallet/topups'){
+    const amount=Math.floor(Number(body.amount)||0);if(!(amount>0))throw new Error('أدخل مبلغاً صحيحاً');
+    const item={reference:'DEMO-'+Date.now(),userId:me,amount,status:'pending',createdAt:Date.now(),metadata:{paymentReference:String(body.paymentReference||'')}};
+    DB.demoTopups.unshift(item);save();return {success:true,reference:item.reference,status:'pending',demo:true};
+  }
+  if(path==='/wallet/gift'){
+    const target=Object.keys(DB.users||{}).find(k=>String(DB.users[k].uid)===String(body.recipientLegacyUid));
+    const error=transfer(me,target,body.amount);if(error)throw new Error(error);
+    const tx={userId:me,type:'gift',amount:Number(body.amount),createdAt:Date.now(),direction:'debit'};
+    DB.demoTransactions.unshift(tx);save();return {success:true,balance:balance(),demo:true};
+  }
+  if(path==='/admin/topups/pending')return {items:DB.demoTopups.filter(x=>x.status==='pending').map(x=>({...x,userId:{username:DB.users[x.userId]?.name||x.userId,legacyUid:DB.users[x.userId]?.uid}}))};
+  if(path==='/admin/overview')return {users:Object.keys(DB.users||{}).length,totalWalletCoins:Object.values(DB.users||{}).reduce((n,u)=>n+(Number(u.coins)||0),0),games:[],transactions:DB.demoTransactions.length,topups:DB.demoTopups.length};
+  if(path.startsWith('/admin/users'))return {items:Object.entries(DB.users||{}).map(([id,u])=>({id,_id:id,username:u.name,legacyUid:u.uid,balance:u.coins,coins:u.coins,role:u.role,status:u.banned?'banned':'active'}))};
+  if(path.startsWith('/admin/transactions'))return {items:DB.demoTransactions};
+  if(path.startsWith('/admin/topups/')){
+    const match=path.match(/\/admin\/topups\/([^/]+)\/(approve|reject)/);
+    const item=match&&DB.demoTopups.find(x=>x.reference===decodeURIComponent(match[1]));
+    if(!item)throw new Error('طلب الشحن التجريبي غير موجود');
+    if(item.status!=='pending')throw new Error('تمت معالجة الطلب مسبقاً');
+    if(match[2]==='approve'){const target=DB.users[item.userId];if(target){target.coins=(Number(target.coins)||0)+item.amount;addCharge(item.userId,item.amount)}item.status='approved'}
+    else item.status='rejected';
+    DB.demoTransactions.unshift({userId:item.userId,type:'demo_topup_'+item.status,amount:item.amount,createdAt:Date.now(),direction:'credit'});
+    save();return {success:true,demo:true};
+  }
   if(path==='/admin/wallet/adjust'){
-    const target=DB.users[body.userId]||Object.values(DB.users).find(x=>String(x.uid)===String(body.userId));
-    if(target)target.coins=Math.max(0,(Number(target.coins)||0)+(Number(body.amount)||0));
-    save();return {success:!!target,balance:Number(target?.coins)||0,demo:true};
+    const target=DB.users[body.userId]||Object.values(DB.users||{}).find(x=>String(x.uid)===String(body.userId));
+    if(!target)throw new Error('الحساب التجريبي غير موجود');
+    const amount=Math.floor(Number(body.amount)||0),delta=body.direction==='debit'?-amount:amount;
+    if(!(amount>0)||Number(target.coins||0)+delta<0)throw new Error('رصيد غير كافٍ أو مبلغ غير صحيح');
+    target.coins=(Number(target.coins)||0)+delta;save();return {success:true,balance:target.coins,demo:true};
   }
   return {success:true,demo:true,items:[],balance:balance()};
 }
