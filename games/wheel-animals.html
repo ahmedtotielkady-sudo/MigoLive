@@ -24,7 +24,7 @@ body{margin:0;background:radial-gradient(circle at 50% 35%,#8a1fa8 0,#4a0f6e 40%
 #chips{direction:ltr;width:84%;margin:0 auto}
 .ctl .row:last-child{justify-content:center;gap:10px}
 .top{justify-content:flex-start;gap:8px;direction:ltr;align-items:center}.top .cn{margin:0 8px 0 0}
-.av{width:44px;height:44px;border-radius:50%;border:2px solid #ffd35a;background:radial-gradient(#5a2a7a,#2a0a40);flex:none}
+.av{width:44px;height:44px;border-radius:50%;border:2px solid #ffd35a;background:none;display:none;flex:none;overflow:hidden}
 .row{display:flex;gap:8px;justify-content:space-between;align-items:center}
 .box{flex:1;background:#0006;border:2px solid #ffd35a88;border-radius:12px;padding:6px 10px;text-align:center;font-size:12px}
 .box b{display:block;font-size:18px;color:#ffd35a}
@@ -35,7 +35,7 @@ button.b.go{flex:2;background:linear-gradient(#ffd35a,#e08a00);color:#4a1200;box
 button:disabled{opacity:.5}
 .hs{flex:none;display:flex;gap:6px;background:#0005;border:2px solid #ffd35a88;border-radius:14px;padding:4px 6px;direction:ltr}
 .hs i{flex:none;width:30px;aspect-ratio:1;border-radius:50%;background-color:#0004;background-repeat:no-repeat;background-size:625% 625%}
-</style><style>#uav,.top .av{display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;color:#fff;overflow:hidden}#uav{position:absolute;left:10px;top:calc(env(safe-area-inset-top,0px) + 10px);width:44px;height:44px;border-radius:50%;border:2px solid #ffd35a;background:radial-gradient(#5a2a7a,#2a0a40);z-index:5}</style><script>(function(){var last=null;function ap(){var a=document.querySelector('#uav,.top .av');if(!a)return;if(last&&last.avatar){a.style.display='flex';a.style.backgroundImage='url("'+last.avatar+'")';a.style.backgroundSize='cover';a.style.backgroundPosition='center';a.textContent='';a.setAttribute('aria-label','صورة المستخدم')}else{a.style.backgroundImage='none';a.textContent='';a.style.display='none'}}addEventListener('message',function(e){var d=e.data;if(d&&d.t==='me'){last=d;ap()}});addEventListener('DOMContentLoaded',ap)})();</script></head><body>
+</style><style>#uav,.top .av{display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;color:#fff;overflow:hidden}#uav{position:absolute;left:10px;top:calc(env(safe-area-inset-top,0px) + 10px);width:44px;height:44px;border-radius:50%;border:2px solid #ffd35a;background:radial-gradient(#5a2a7a,#2a0a40);z-index:5}</style><script>(function(){var avatar='';function valid(v){return typeof v==='string'&&(/^(data:image\/(png|jpeg|jpg|webp|gif);base64,|https?:\/\/)/i).test(v)}function apply(){var a=document.querySelector('.top .av');if(!a)return;if(valid(avatar)){a.style.backgroundImage='url("'+avatar.replace(/["\\)]/g,'')+'")';a.style.backgroundSize='cover';a.style.backgroundPosition='center';a.style.display='flex';a.setAttribute('aria-label','صورة المستخدم');a.textContent=''}else{a.style.backgroundImage='none';a.style.display='none';a.removeAttribute('aria-label');a.textContent=''}}addEventListener('message',function(e){var d=e.data;if(d&&d.t==='me'){avatar=valid(d.avatar)?d.avatar:'';apply()}});addEventListener('DOMContentLoaded',apply)})();</script></head><body>
 <div class="top"><div class="av"></div><div class="pill"><span class="cn"></span><b id="bal">0</b></div><b id="tot" style="display:none">0</b></div>
 <div class="stage" id="st"><div class="needle" id="nd"><i></i></div><div class="ov" id="ov"></div><div class="cd" id="cd">25</div></div>
 <div class="ctl">
