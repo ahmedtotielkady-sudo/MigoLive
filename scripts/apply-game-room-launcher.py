@@ -219,4 +219,41 @@ if script_id not in html:
     if "</body>" not in html: raise SystemExit("Missing </body>")
     html = html.replace("</body>", js + "\n</body>", 1)
 p.write_text(html, encoding="utf-8")
-print("Installed MigoLive display cleanup and in-room game launcher")
+
+# Slightly compact the warrior game's controls and fighter cards without changing artwork.
+warrior = Path("games/big-warrior.html")
+if not warrior.exists():
+    raise SystemExit("games/big-warrior.html is missing")
+warrior_html = warrior.read_text(encoding="utf-8")
+warrior_style_id = "migo-big-warrior-compact-v1"
+warrior_css = r"""
+<style id="migo-big-warrior-compact-v1">
+/* Mild 8–10% size reduction; preserve the original game artwork and layout. */
+#app{padding:8px 12px 11px}
+.prize{margin:7px auto 4px;padding:3px 22px}
+.prize b{font-size:23px}
+.arena{gap:8px}
+.card{height:82%;border-width:2px}
+.card .fighter{font-size:84px}
+.card .name{font-size:16px;padding:3px 0}
+.drawbtn{margin-top:4px;padding:3px 19px;font-size:14px}
+.status{margin:6px auto;padding:3px 18px;font-size:13px}
+.bet{gap:7px}
+.step{width:48px;font-size:27px}
+.go{font-size:18px;padding:5px 0}
+.go small{font-size:15px}
+.note{font-size:10px;margin-top:4px}
+@media(max-height:640px){
+ .card{height:80%}
+ .card .fighter{font-size:58px}
+ .prize b{font-size:20px}
+ .status{margin:4px auto}
+}
+</style>
+"""
+if warrior_style_id not in warrior_html:
+    if "</head>" not in warrior_html:
+        raise SystemExit("Missing </head> in big-warrior.html")
+    warrior_html = warrior_html.replace("</head>", warrior_css + "\\n</head>", 1)
+    warrior.write_text(warrior_html, encoding="utf-8")
+print("Installed MigoLive display cleanup, game launcher, and compact warrior layout")
