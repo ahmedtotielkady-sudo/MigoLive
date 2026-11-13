@@ -130,7 +130,7 @@ jobs:
           <style id="migo-cleopatra-safe-layout-v1">
           html,body{width:100%;height:100%;height:100dvh;overflow:hidden!important}
           body{margin:0!important;padding:0!important}
-          .app{box-sizing:border-box!important;height:100dvh!important;min-height:0!important;padding-top:calc(env(safe-area-inset-top,0px) + 5px)!important;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 5px)!important;gap:4px!important}
+          .app{box-sizing:border-box!important;height:100dvh!important;min-height:0!important;padding-top:calc(env(safe-area-inset-top,0px) + 23px)!important;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 5px)!important;gap:4px!important}
           .hero{margin-top:0!important;flex-shrink:0!important}
           .top{flex-shrink:0!important}
           .stage{min-height:0!important;overflow:hidden!important}
