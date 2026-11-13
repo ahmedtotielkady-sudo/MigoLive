@@ -19,14 +19,14 @@ elif "window.__migoGetGameProfile" not in html:
     raise SystemExit("Could not expose profile bridge: user function not found")
 
 # Register Big Warrior in the app's real Games tab and load it as a local HTML game.
-gm_anchor = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'}};"
+gm_replacement = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'},rocket:{n:'صاروخ الفضاء',i:'🚀',d:'لعبة الصاروخ · عملات المحفظة'}};"
 gm_replacement = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'},warrior:{n:'المحارب الكبير',i:'🦁',d:'الأسد ضد النمر · عملات المحفظة'}};"
 if gm_anchor in html:
     html = html.replace(gm_anchor, gm_replacement, 1)
-elif "warrior:{n:'المحارب الكبير'" not in html:
-    raise SystemExit("Could not register Big Warrior in the Games list")
+elif "rocket:{n:'صاروخ الفضاء'" not in html:
+    raise SystemExit("Could not register Rocket Space in the Games list")
 
-open_anchor = "let gameSource;if(k==='cleopatra'){const response=await fetch('games/cleopatra-gold.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
+open_anchor = "let gameSource;if(k==='cleopatra'){const response=await fetch('games/cleopatra-gold.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else if(k==='rocket'){const response=await fetch('games/rocket-crash.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
 open_replacement = "let gameSource;if(k==='cleopatra'||k==='warrior'){const file=k==='cleopatra'?'cleopatra-gold.html':'big-warrior.html';const response=await fetch('games/'+file);if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
 if open_anchor in html:
     html = html.replace(open_anchor, open_replacement, 1)
@@ -86,7 +86,8 @@ js = r"""
   {name:"عاصفة المحيط",url:"slot-ocean-storm.html"},
   {name:"سلوت 777",url:"slot-777.html"},
   {name:"ذهب كليوباترا",url:"games/cleopatra-gold.html"},
-  {name:"المحارب الكبير",url:"games/big-warrior.html"}
+  {name:"المحارب الكبير",url:"games/big-warrior.html"},
+  {name:"صاروخ الفضاء",url:"games/rocket-crash.html"}
  ];
  const cleanText=()=>{
   const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
@@ -103,7 +104,7 @@ js = r"""
    picker=document.createElement("div");picker.id="migo-game-picker";picker.hidden=true;
    picker.innerHTML='<div class="migo-picker-card"><div class="migo-picker-title">الألعاب</div><div class="migo-picker-grid"></div><button class="migo-picker-close" type="button">إغلاق</button></div>';
    const grid=picker.querySelector(".migo-picker-grid");
-   const visuals={"عجلة الحيوانات":["🐯","اختر حيوانك"],"عاصفة المحيط":["🌊","سلوت 5×6"],"سلوت 777":["🎰","سلوت 3×5"],"ذهب كليوباترا":["👑","سلوت 5×4 · رصيد المحفظة"]};
+   const visuals={"عجلة الحيوانات":["🐯","اختر حيوانك"],"عاصفة المحيط":["🌊","سلوت 5×6"],"سلوت 777":["🎰","سلوت 3×5"],"ذهب كليوباترا":["👑","سلوت 5×4 · رصيد المحفظة"],"صاروخ الفضاء":["🚀","لعبة الصاروخ · رصيد المحفظة"]};
    games.forEach(g=>{const v=visuals[g.name]||["🎮",""];const b=document.createElement("button");b.type="button";b.className="migo-game-card";b.innerHTML='<span class="migo-game-icon">'+v[0]+'</span><span class="migo-game-name"></span><span class="migo-game-desc"></span>';b.querySelector(".migo-game-name").textContent=g.name;b.querySelector(".migo-game-desc").textContent=v[1];b.addEventListener("click",()=>openGame(g));grid.appendChild(b)});
    picker.querySelector(".migo-picker-close").onclick=()=>picker.hidden=true;
    document.body.appendChild(picker);
