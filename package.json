@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "node --watch backend/server.js",
-    "build:cloudflare": "node scripts/build-cloudflare-assets.js"
+    "build:cloudflare": "node scripts/repair-demo-runtime.js && node scripts/build-cloudflare-assets.js"
   },
   "engines": {
     "node": ">=20"
