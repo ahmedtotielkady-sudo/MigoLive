@@ -39,7 +39,7 @@ function makeGrid(freeSpin) {
     Array.from({ length: 4 }, () => randomSymbol(reel, freeSpin))
   );
 }
-function evaluate(grid, bet, multiplier) {
+function evaluate(grid, bet) {
   let win = 0, scatterCount = 0;
   const hit = new Set(), scatterCells = [];
   for (let reel = 0; reel < 5; reel += 1) {
@@ -73,7 +73,7 @@ function evaluate(grid, bet, multiplier) {
     win += bet * SCATTER_PAYOUT[n];
     scatterCells.forEach((cell) => hit.add(cell));
   }
-  win = Math.round(win * multiplier);
+  win = Math.round(win);
   if (!Number.isSafeInteger(win) || win < 0) throw new Error("Invalid Cleopatra payout");
   return { win, scatterCount, hit: [...hit], freeSpinsAwarded: scatterCount >= 3 ? FREE_SPINS[Math.min(scatterCount, 5)] : 0 };
 }
@@ -137,11 +137,16 @@ async function playCleopatraGold({ userId, betIndex, reference }) {
         }], { session });
       }
       const grid = makeGrid(freeSpin);
-      const outcome = evaluate(grid, bet, freeSpin ? state.multiplier : 1);
+      const appliedMultiplier = freeSpin ? state.multiplier : 1;
+      const outcome = evaluate(grid, bet);
+      outcome.win *= appliedMultiplier;
+      if (!Number.isSafeInteger(outcome.win) || outcome.win < 0) throw new Error("Invalid Cleopatra payout");
       if (freeSpin && outcome.win > 0) state.multiplier = Math.min(state.multiplier + 1, 10);
       state.freeSpinWinnings += freeSpin ? outcome.win : 0;
+      const freeSpinWinningsTotal = state.freeSpinWinnings;
       state.freeSpins = Math.min(1000, state.freeSpins + outcome.freeSpinsAwarded);
       if (outcome.freeSpinsAwarded > 0 && !freeSpin) state.freeSpinBetIndex = effectiveBetIndex;
+      const freeSpinEnded = freeSpin && state.freeSpins === 0;
       if (state.freeSpins === 0) {
         state.multiplier = 1;
         state.freeSpinWinnings = 0;
@@ -162,7 +167,7 @@ async function playCleopatraGold({ userId, betIndex, reference }) {
         userId, reference, betIndex: effectiveBetIndex, freeSpin, grid,
         win: outcome.win, scatterCount: outcome.scatterCount,
         freeSpinsAwarded: outcome.freeSpinsAwarded, freeSpinsRemaining: state.freeSpins,
-        multiplier: freeSpin ? Math.min(10, state.multiplier + (outcome.win > 0 ? 0 : 0)) : 1,
+        multiplier: appliedMultiplier,
         balance: wallet.balance, hit: outcome.hit, freeSpinWinnings: state.freeSpinWinnings
       };
       await CleopatraGoldRound.create([round], { session });
@@ -171,7 +176,8 @@ async function playCleopatraGold({ userId, betIndex, reference }) {
         win: outcome.win, scatterCount: outcome.scatterCount, hit: outcome.hit,
         freeSpin, freeSpinsAwarded: outcome.freeSpinsAwarded, freeSpins: state.freeSpins,
         multiplier: state.multiplier, freeSpinWinnings: state.freeSpinWinnings,
-        balance: wallet.balance, bet: freeSpin ? 0 : bet
+        freeSpinWinningsTotal, freeSpinEnded,
+        betIndex: effectiveBetIndex, balance: wallet.balance, bet: freeSpin ? 0 : bet
       };
     });
     return response;
