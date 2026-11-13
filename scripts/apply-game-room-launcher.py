@@ -254,6 +254,6 @@ warrior_css = r"""
 if warrior_style_id not in warrior_html:
     if "</head>" not in warrior_html:
         raise SystemExit("Missing </head> in big-warrior.html")
-    warrior_html = warrior_html.replace("</head>", warrior_css + "\\n</head>", 1)
+    warrior_html = warrior_html.replace("</head>", warrior_css + "\n</head>", 1)
     warrior.write_text(warrior_html, encoding="utf-8")
 print("Installed MigoLive display cleanup, game launcher, and compact warrior layout")
