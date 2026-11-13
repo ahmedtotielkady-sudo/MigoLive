@@ -636,12 +636,12 @@ addEventListener('message',e=>{
   const bet=bets[bi],u=U();let bal=Math.max(0,Number(u.coins)||0);
   if(bal<bet){send({t:'cleopatra-round',requestId,error:'Insufficient balance'});return}
   bal-=bet;
-  const symbols=['A','K','Q','J','10','W','S'];
+  const symbols=['W','S','N','E','A','Y','H','P','C','O','D','F'];
   const grid=Array.from({length:5},()=>Array.from({length:4},()=>symbols[Math.floor(Math.random()*symbols.length)]));
   const win=Math.random()<.27?bet*(1+Math.floor(Math.random()*8)):0;bal+=win;u.coins=bal;SERVER_WALLET_BALANCE=bal;save();
   send({t:'cleopatra-round',requestId,data:{success:true,grid,hit:[],balance:bal,win,freeSpins:0,multiplier:1,freeSpinWinnings:0,betIndex:bi}});
  }
- else if(d.t==='wallet'){closeGame();tab='wallet';render()}
+ else if(d.t==='set'){const v=Number(d.v);if(Number.isFinite(v)){U().coins=Math.max(0,Math.floor(v));SERVER_WALLET_BALANCE=U().coins;save();send({t:'bal',v:U().coins})}}\n else if(d.t==='wallet'){closeGame();tab='wallet';render()}
 });
 function rImg(f,mx,cb){if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,mx/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.8))};im.onerror=()=>toast('الملف ليس صورة');im.src=rd.result};rd.readAsDataURL(f)}
 const TABS=['rooms','games','msgs','wallet','me','owner','agent','agency','vip','friends','notes','invite','security'];
