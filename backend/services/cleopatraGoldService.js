@@ -114,7 +114,9 @@ async function playCleopatraGold({ userId, betIndex, reference }) {
           win: existing.win, scatterCount: existing.scatterCount, hit: existing.hit,
           freeSpin: existing.freeSpin, freeSpinsAwarded: existing.freeSpinsAwarded,
           freeSpins: existing.freeSpinsRemaining, multiplier: existing.multiplier,
-          freeSpinWinnings: existing.freeSpinWinnings, balance: wallet?.balance || 0,
+          freeSpinWinnings: existing.freeSpinEnded ? 0 : existing.freeSpinWinnings,
+          freeSpinWinningsTotal: existing.freeSpinWinnings, freeSpinEnded: existing.freeSpinEnded,
+          betIndex: existing.betIndex, balance: wallet?.balance || 0,
           bet: existing.freeSpin ? 0 : BETS[existing.betIndex]
         };
         return;
@@ -168,7 +170,8 @@ async function playCleopatraGold({ userId, betIndex, reference }) {
         win: outcome.win, scatterCount: outcome.scatterCount,
         freeSpinsAwarded: outcome.freeSpinsAwarded, freeSpinsRemaining: state.freeSpins,
         multiplier: appliedMultiplier,
-        balance: wallet.balance, hit: outcome.hit, freeSpinWinnings: state.freeSpinWinnings
+        balance: wallet.balance, hit: outcome.hit, freeSpinWinnings: freeSpinWinningsTotal,
+        freeSpinEnded
       };
       await CleopatraGoldRound.create([round], { session });
       response = {
