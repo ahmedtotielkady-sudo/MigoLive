@@ -504,14 +504,41 @@ async function refreshServerWallet(){const u=me&&DB.users[me];SERVER_WALLET_BALA
 async function establishServerSession(account,password,isNewAccount=false){return {user:{id:String(account.uid),role:account.role||'user'},wallet:{balance:account.coins||0}}}
 async function claimServerOwner(code){if(!me||!DB.users[me])throw new Error('سجّل الدخول أولاً');DB.users[me].role='owner';DB.ownerUid=DB.users[me].uid;save();return {user:{role:'owner'}}}
 async function apiRequest(path,options={}){
+ // Offline-only adapter: every operation reads/writes this device's localStorage.
  const u=me&&DB.users[me],body=(()=>{try{return JSON.parse(options.body||'{}')}catch(_){return {}}})();
- if(path==='/wallet')return {balance:Number(u&&u.coins)||0,pendingTopups:(DB.topups||[]).filter(x=>x.user===me),transactions:(DB.tx||[]).filter(x=>x.user===me)};
+ const record=(type,amount,metadata={})=>{DB.tx=DB.tx||[];DB.tx.unshift({user:me,type,amount:Number(amount)||0,createdAt:Date.now(),metadata});save()};
+ if(path==='/wallet')return {balance:Number(u&&u.coins)||0,pendingTopups:(DB.topups||[]).filter(x=>x.user===me&&x.status==='pending'),transactions:(DB.tx||[]).filter(x=>x.user===me)};
  if(path==='/config')return {paymentWallet:''};
  if(path==='/auth/me')return {id:String(u&&u.uid||''),role:u&&u.role||'user'};
+ if(path==='/auth/profile'&&options.method==='POST'){if(!u)throw new Error('سجّل الدخول أولاً');if(body.displayName)u.name=String(body.displayName).slice(0,24);save();return {ok:true,user:u}}
  if(path==='/auth/profile')return {user:u||{}};
- if(path==='/wallet/topups'){if(!u)throw new Error('سجّل الدخول');DB.topups=DB.topups||[];DB.topups.unshift({user:me,amount:Number(body.amount)||0,reference:'DEMO-'+Date.now(),createdAt:Date.now(),status:'تجريبي'});save();return {ok:true,success:true}}
- if(path==='/wallet/gift'){const target=Object.keys(DB.users).find(k=>String(DB.users[k].uid)===String(body.recipientLegacyUid));const amount=Math.floor(Number(body.amount)||0);if(!u||!target||target===me||amount<1||Number(u.coins||0)<amount)throw new Error('بيانات التحويل أو الرصيد غير صحيح');u.coins-=amount;DB.users[target].coins=(Number(DB.users[target].coins)||0)+amount;save();return {ok:true}}
- if(path.startsWith('/admin/')){if(path.includes('/users'))return {items:Object.values(DB.users).map(x=>({user:x,username:x.name,legacyUid:x.uid,role:x.role,coins:x.coins})),users:Object.values(DB.users),total:Object.keys(DB.users).length};if(path.includes('/transactions'))return {items:DB.tx||[],transactions:DB.tx||[],total:(DB.tx||[]).length};if(path.includes('/topups'))return {items:DB.topups||[]};if(path.includes('/overview'))return {users:Object.keys(DB.users).length,games:[],transactions:(DB.tx||[]).length,balance:Object.values(DB.users).reduce((a,x)=>a+(Number(x.coins)||0),0)};return {ok:true,success:true}}
+ if(path==='/wallet/topups'&&options.method==='POST'){
+  if(!u)throw new Error('سجّل الدخول');const amount=Math.floor(Number(body.amount)||0);if(amount<1||amount>1000000)throw new Error('قيمة الطلب غير صحيحة');
+  DB.topups=DB.topups||[];const reference='LOCAL-'+Date.now();DB.topups.unshift({user:me,userId:{username:u.name,legacyUid:u.uid},amount,reference,createdAt:Date.now(),status:'pending',metadata:{paymentReference:String(body.paymentReference||''),receiptData:body.receiptData||''}});save();return {ok:true,success:true,reference}
+ }
+ if(path==='/wallet/gift'&&options.method==='POST'){
+  const target=Object.keys(DB.users).find(k=>String(DB.users[k].uid)===String(body.recipientLegacyUid));const amount=Math.floor(Number(body.amount)||0);
+  if(!u||!target||target===me||amount<1||Number(u.coins||0)<amount)throw new Error('بيانات التحويل أو الرصيد غير صحيح');
+  u.coins-=amount;DB.users[target].coins=(Number(DB.users[target].coins)||0)+amount;record('gift-transfer',amount,{to:DB.users[target].uid});return {ok:true}
+ }
+ if(path.startsWith('/admin/')){
+  if(!u||u.role!=='owner')throw new Error('هذه العملية متاحة للمالك فقط');
+  if(path.includes('/users')){const users=Object.values(DB.users);return {items:users.map(x=>({user:x,username:x.name,legacyUid:x.uid,role:x.role,coins:x.coins,_id:String(x.uid)})),users:users.map(x=>({_id:String(x.uid),username:x.name,legacyUid:x.uid,role:x.role,coins:x.coins})),total:users.length}}
+  if(path.includes('/transactions'))return {items:DB.tx||[],transactions:DB.tx||[],total:(DB.tx||[]).length};
+  if(path.includes('/topups')){
+   const match=path.match(/\/topups\/([^/]+)\/(approve|reject)/);
+   if(match){const ref=decodeURIComponent(match[1]),item=(DB.topups||[]).find(x=>x.reference===ref);if(!item)throw new Error('طلب الشحن غير موجود');if(item.status!=='pending')throw new Error('تمت مراجعة هذا الطلب مسبقاً');
+    if(match[2]==='approve'){const target=DB.users[item.user];if(!target)throw new Error('الحساب غير موجود');target.coins=(Number(target.coins)||0)+Number(item.amount||0);item.status='approved';record('local-topup-approved',item.amount,{reference:ref,user:item.user})}else item.status='rejected';item.reviewedAt=Date.now();save();return {ok:true,success:true}}
+   return {items:(DB.topups||[]).filter(x=>x.status==='pending').map(x=>({...x,userId:{username:DB.users[x.user]?.name||x.user,legacyUid:DB.users[x.user]?.uid},metadata:x.metadata||{}}))}
+  }
+  if(path.includes('/wallet/adjust')){
+   const target=Object.values(DB.users).find(x=>String(x.uid)===String(body.userId)||String(x.name).toLowerCase()===String(body.userId).toLowerCase());if(!target)throw new Error('الحساب غير موجود');
+   const amount=Math.floor(Number(body.amount)||0),delta=body.direction==='debit'?-amount:amount;if(amount<1||!Number.isSafeInteger(amount)||Number(target.coins||0)+delta<0)throw new Error('قيمة تعديل الرصيد غير صحيحة');
+   target.coins=(Number(target.coins)||0)+delta;DB.tx=DB.tx||[];DB.tx.unshift({user:Object.keys(DB.users).find(k=>DB.users[k]===target),type:'owner-adjustment',amount:delta,createdAt:Date.now(),metadata:{reason:body.reason||'تعديل محلي'}});save();return {ok:true,success:true}
+  }
+  if(path.includes('/overview'))return {users:Object.keys(DB.users).length,games:[],transactions:(DB.tx||[]).length,totalWalletCoins:Object.values(DB.users).reduce((a,x)=>a+(Number(x.coins)||0),0)};
+  return {ok:true,success:true}
+ }
  return {ok:true,success:true,balance:Number(u&&u.coins)||0,items:[],transactions:[]};
 }
 </script>
