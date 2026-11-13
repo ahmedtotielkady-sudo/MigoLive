@@ -30,7 +30,7 @@ open_anchor = "let gameSource;if(k==='cleopatra'){const response=await fetch('ga
 open_replacement = "let gameSource;if(k==='cleopatra'||k==='warrior'){const file=k==='cleopatra'?'cleopatra-gold.html':'big-warrior.html';const response=await fetch('games/'+file);if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
 if open_anchor in html:
     html = html.replace(open_anchor, open_replacement, 1)
-elif "k==='warrior'?" not in html:
+elif "k==='cleopatra'||k==='warrior'" not in html and "k==='warrior'?" not in html:
     raise SystemExit("Could not route Big Warrior to its local HTML file")
 
 
