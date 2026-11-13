@@ -126,7 +126,7 @@ jobs:
           else:
               html = html.replace('</head>', css + '\n</head>', 1)
           jsfixes = [
-              ('var winner=r<0.4?"lion":(r<0.8?"tiger":"draw");', 'var winner=r<0.3?"lion":(r<0.6?"tiger":"draw");'),
+              ('var winner=r<0.4?"lion":(r<0.8?"tiger":"draw");', 'var opposite=pick==="lion"?"tiger":"lion";var winner=r<0.3?pick:(r<0.9?opposite:"draw");'),
               ('function bet(){return Math.min(STEPS[stepIdx],coins)}', 'function bet(){return STEPS[stepIdx]}'),
               ('$("go").disabled=busy||!pick||coins<=0;', '$("go").disabled=busy||!pick||coins<bet();'),
               ('$("plus").disabled=busy||stepIdx>=STEPS.length-1||STEPS[stepIdx+1]>coins;', '$("plus").disabled=busy||stepIdx>=STEPS.length-1;'),
