@@ -535,8 +535,8 @@ async function apiRequest(path,options={}){
   }
   if(path==='/admin/topups/pending')return {items:DB.demoTopups.filter(x=>x.status==='pending').map(x=>({...x,userId:{username:DB.users[x.userId]?.name||x.userId,legacyUid:DB.users[x.userId]?.uid}}))};
   if(path==='/admin/overview')return {users:Object.keys(DB.users||{}).length,totalWalletCoins:Object.values(DB.users||{}).reduce((n,u)=>n+(Number(u.coins)||0),0),games:[],transactions:DB.demoTransactions.length,topups:DB.demoTopups.length};
-  if(path.startsWith('/admin/users'))return {items:Object.entries(DB.users||{}).map(([id,u])=>({id,_id:id,username:u.name,legacyUid:u.uid,balance:u.coins,coins:u.coins,role:u.role,status:u.banned?'banned':'active'}))};
-  if(path.startsWith('/admin/transactions'))return {items:DB.demoTransactions};
+  if(path.startsWith('/admin/users')){const users=Object.entries(DB.users||{}).map(([id,u])=>({id,_id:id,username:u.name,legacyUid:u.uid,balance:u.coins,coins:u.coins,role:u.role,status:u.banned?'banned':'active'}));return {users,items:users,total:users.length};}
+  if(path.startsWith('/admin/transactions')){const items=DB.demoTransactions.map(x=>({...x,userId:{username:DB.users[x.userId]?.name||x.userId,legacyUid:DB.users[x.userId]?.uid}}));return {items,total:items.length};}
   if(path.startsWith('/admin/topups/')){
     const match=path.match(/\/admin\/topups\/([^/]+)\/(approve|reject)/);
     const item=match&&DB.demoTopups.find(x=>x.reference===decodeURIComponent(match[1]));
@@ -614,7 +614,7 @@ const dec=b=>new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0)
 const gicon=k=>DB.gIcons&&DB.gIcons[k]?`<img src="${esc(DB.gIcons[k])}" alt="">`:GM[k].i;
 const gamesGrid=()=>`<b>🎮 ألعاب العملات</b><p class="mu">تلعب بنفس رصيد حسابك، ولا يوجد رصيد تلقائي.</p><div class="gg">${Object.entries(GM).map(([k,g])=>`<button class="gt" data-g="${k}"><span class="gi">${gicon(k)}</span><b>${g.n}</b><small class="mu">${g.d}</small></button>`).join('')}</div><div class="sp"></div>`;
 function openGame(k){
-if(k!=='wheel'&&k!=='cleopatra'){toast('هذه اللعبة متوقفة حتى اكتمال ربط نتائجها بالخادم');return;}
+if(!GM[k]){toast('اللعبة غير متاحة في هذه النسخة');return;}
 gameScrollY=window.scrollY||window.pageYOffset||0;
 document.documentElement.style.overflow='hidden';
 document.body.style.position='fixed';
@@ -625,7 +625,7 @@ $('#app').style.overflow='hidden';
 gameOn=k;
 document.body.classList.add('game-active');
 try{window.MyGoNative.enterFullscreen()}catch(e){}
-if(k==='wheel'){$('#gf').src='./games/wheel-animals.html'}else if(k==='cleopatra'){$('#gf').src='./games/cleopatra-gold.html'}else{$('#gf').srcdoc=dec(GB[k])}
+if(k==='wheel'){$('#gf').src='./games/wheel-animals.html'}else if(k==='cleopatra'){$('#gf').src='./games/cleopatra-gold.html'}else if(GB[k]){$('#gf').srcdoc=dec(GB[k])}else{closeGame();toast('ملف اللعبة غير موجود');return}
 $('#gm').classList.remove('hide');
 try{history.pushState({mygoGame:true},'','#game-'+k)}catch(e){}
 }
@@ -1373,10 +1373,10 @@ function loadServerAdminPanel(container){
     const tx=(transactions.items||[]).map(x=>{
       const u=x.userId||{};
       return '<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)"><div class="grow"><b>'+esc(u.username||'حساب')+'</b><div class="mu">'+esc(x.type)+' · '+esc(x.direction)+'</div></div><b>'+fmt(x.amount)+'</b><small class="mu">'+new Date(x.createdAt).toLocaleString('ar-EG')+'</small></div>';
-    }).join('')||'<p class="mu">لا توجد معاملات بعد.</p>';
+    }).join('')||'<p class="mu">لا توجد معاملات تجريبية بعد.</p>';
     const userRows=(users.users||[]).map(u=>'<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)"><div class="grow"><b>'+esc(u.username)+'</b><div class="mu">ID: '+esc(u.legacyUid||u._id)+' · '+esc(u.role)+' · '+esc(u.status)+'</div></div><b>🪙 '+fmt(u.balance||0)+'</b></div>').join('')||'<p class="mu">لا يوجد مستخدمون.</p>';
     const adjust=U().role==='owner'?'<div class="card"><b>تعديل رصيد عضو (المالك الأساسي فقط)</b><div class="sp"></div><input class="in" id="srv-adjust-user" placeholder="رقم ID أو معرف الحساب"><input class="in" id="srv-adjust-amount" type="number" min="1" max="1000000" placeholder="عدد العملات"><select class="in" id="srv-adjust-direction"><option value="credit">إضافة رصيد</option><option value="debit">خصم رصيد</option></select><input class="in" id="srv-adjust-reason" maxlength="300" placeholder="سبب العملية — مطلوب"><div class="err" id="srv-adjust-error"></div><button class="btn g w" id="srv-adjust-submit">تنفيذ وتسجيل العملية</button></div>':'';
-    area.innerHTML='<div class="card"><b>📊 بيانات حقيقية من الخادم</b><div class="sp"></div><div class="row"><div class="grow"><div class="mu">الحسابات</div><b>'+fmt(overview.users||0)+'</b></div><div class="grow"><div class="mu">إجمالي أرصدة المحافظ</div><b>🪙 '+fmt(overview.totalWalletCoins||0)+'</b></div><div class="grow"><div class="mu">آخر المعاملات</div><b>'+fmt(transactions.total||0)+'</b></div></div></div><div class="card"><b>🎮 نشاط الألعاب المسجل بالخادم</b><div class="sp"></div>'+games+'</div>'+adjust+'<div class="card"><b>👥 المستخدمون (أول 30)</b><div class="sp"></div>'+userRows+'</div><div class="card"><b>📒 آخر المعاملات</b><div class="sp"></div>'+tx+'</div>';
+    area.innerHTML='<div class="card"><b>📊 بيانات تجريبية محلية</b><div class="sp"></div><div class="row"><div class="grow"><div class="mu">الحسابات</div><b>'+fmt(overview.users||0)+'</b></div><div class="grow"><div class="mu">إجمالي أرصدة المحافظ</div><b>🪙 '+fmt(overview.totalWalletCoins||0)+'</b></div><div class="grow"><div class="mu">آخر المعاملات</div><b>'+fmt(transactions.total||0)+'</b></div></div></div><div class="card"><b>🎮 نشاط الألعاب المسجل بالخادم</b><div class="sp"></div>'+games+'</div>'+adjust+'<div class="card"><b>👥 المستخدمون (أول 30)</b><div class="sp"></div>'+userRows+'</div><div class="card"><b>📒 آخر المعاملات</b><div class="sp"></div>'+tx+'</div>';
     const submit=area.querySelector('#srv-adjust-submit');
     if(submit)submit.onclick=async()=>{
       const err=area.querySelector('#srv-adjust-error');
