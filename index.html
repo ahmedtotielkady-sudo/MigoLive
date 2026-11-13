@@ -700,7 +700,7 @@ const banTxt=x=>x.banUntil?'محظور حتى '+fmtD(x.banUntil):'محظور ن�
 let banFor=null;
 function goBack(fb){if(history.length>1)history.back();else nav(fb)}
 function forceOut(msg){leaveRoom(true);me=null;API_TOKEN='';SERVER_WALLET_READY=false;try{localStorage.removeItem('mygo_api_token');localStorage.removeItem('mygo_session');localStorage.removeItem('mygo_remember_login')}catch(_){}document.body.classList.add('auth-screen');$('#app').classList.add('hide');$('#auth').classList.remove('hide');$('#p').value='';$('#aerr').textContent=msg||''}
-function start(){if(U()){U().last=Date.now();act('تسجيل دخول');save()}document.body.classList.remove('auth-screen');$('#auth').classList.add('hide');$('#app').classList.remove('hide');tab='rooms';room=null;lastKey='';try{history.replaceState(null,'','#rooms')}catch(e){}route();SERVER_WALLET_READY=true;SERVER_WALLET_BALANCE=Number(U()?.coins)||0;render()}
+function start(){if(U()){U().last=Date.now();act('تسجيل دخول');save()}document.body.classList.remove('auth-screen');$('#auth').classList.add('hide');$('#app').classList.remove('hide');tab='rooms';room=null;lastKey='';try{history.replaceState(null,'','#rooms')}catch(e){}route();SERVER_WALLET_READY=true;SERVER_WALLET_BALANCE=Number(U()?.coins)||0;render();toast('الوضع التجريبي المحلي — البيانات محفوظة على هذا الجهاز فقط')}
 function render(){
   const u=U();
   if(isBanned(u)){forceOut('هذا الحساب '+banTxt(u));return}
@@ -741,7 +741,7 @@ function showOwnerCodeDialog(){
     if(!value||value.length>256){$('#owner-code-error').textContent='أدخل كود التفعيل الصحيح';input.focus();return;}
     if(me&&API_TOKEN){
       $('#owner-code-submit').disabled=true;
-      try{await claimServerOwner(value);close();tab='owner';room=null;render();toast('تم تفعيل المالك من الخادم')}
+      try{await claimServerOwner(value);close();tab='owner';room=null;render();toast('تم تفعيل المالك التجريبي محلياً')}
       catch(err){$('#owner-code-error').textContent=err.message;$('#owner-code-submit').disabled=false;input.value='';input.focus()}
     }else{
       try{sessionStorage.setItem('mygo_owner_code_pending',value)}catch(_){}
@@ -1216,8 +1216,7 @@ function agentStats(k){const mine=DB.tx.filter(x=>x.k==='tr'&&x.from===k),td=new
   return{ops:mine.length,total:mine.reduce((p,x)=>p+x.amt,0),fee:mine.reduce((p,x)=>p+(x.fee||0),0),day:mine.filter(x=>new Date(x.t).toDateString()===td).reduce((p,x)=>p+x.amt,0)}}
 function findUser(q){q=String(q||'').trim().toLowerCase();if(/^\d{5,9}$/.test(q)){const e=Object.entries(DB.users).find(([,x])=>String(x.uid)===q);return e?e[0]:null}return DB.users[q]?q:null}
 function transfer(from,to,amt){
-  return 'تحويل العملات عبر النظام المحلي متوقف؛ يجب تنفيذ التحويل من خلال الخادم.';
-  const t=DB.users[to];if(!t)return'المستخدم غير موجود';amt=Math.floor(+amt);if(!(amt>0))return'مبلغ غير صحيح';let fee=0;
+    const t=DB.users[to];if(!t)return'المستخدم غير موجود';amt=Math.floor(+amt);if(!(amt>0))return'مبلغ غير صحيح';let fee=0;
   if(from){const f=DB.users[from];if(from===to)return'لا يمكن التحويل لنفسك';if(f.coins<amt)return'رصيدك غير كافٍ';
     if(f.limit>0){const used=agentStats(from).day;if(used+amt>f.limit)return`تجاوزت الحد اليومي (${f.limit}) · المتبقي ${Math.max(0,f.limit-used)}`}
     f.coins-=amt;f.sent=(f.sent||0)+amt;fee=Math.floor(amt*agentRate(f)/100);if(fee>0){f.coins+=fee;f.earn=(f.earn||0)+fee}
@@ -1337,7 +1336,7 @@ async function loadServerTopups(container){
       try{await apiRequest('/admin/topups/'+encodeURIComponent(ref)+'/reject',{method:'POST',body:JSON.stringify({note:'تم رفض الطلب بعد المراجعة'})});toast('تم رفض طلب الشحن');await loadServerTopups(container)}
       catch(err){toast('تعذر رفض الطلب: '+err.message);button.disabled=false}
     }});
-  }catch(error){box.innerHTML='<p class="err">تعذر تحميل طلبات الخادم: '+esc(error.message)+'</p>'}
+  }catch(error){box.innerHTML='<p class="err">تعذر تحميل الطلبات التجريبية: '+esc(error.message)+'</p>'}
 }
 function loadServerAdminPanel(container){
   const area=container.querySelector('#server-admin-data');
@@ -1462,7 +1461,7 @@ function rOwner(m){
       try{
         const found=await apiRequest('/admin/users?q='+encodeURIComponent(lookup)+'&page=1&limit=100');
         const target=(found.users||[]).find(user=>(local&&String(user.legacyUid)===String(local.uid))||String(user.legacyUid||'')===rawTarget||String(user.username||'').toLowerCase()===rawTarget.toLowerCase());
-        if(!target)return e.textContent='الحساب غير موجود في قاعدة بيانات الخادم أو لم يكتمل ترحيله بعد';
+        if(!target)return e.textContent='الحساب غير موجود في بيانات هذا الجهاز';
         const key=crypto.randomUUID?crypto.randomUUID():('owner-adjust-'+Date.now()+'-'+Math.random().toString(36).slice(2));
         await apiRequest('/admin/wallet/adjust',{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({userId:target._id,amount:Math.abs(a),direction:a<0?'debit':'credit',reason:a<0?'خصم من لوحة المالك':'منحة من لوحة المالك'})});
         e.textContent='';toast(a<0?'تم الخصم من محفظة الخادم':'تمت إضافة العملات إلى محفظة الخادم');
@@ -1559,11 +1558,11 @@ async function rWallet(m){
     const history=(data.transactions||[]).map(x=>`<div class="card"><div class="row"><b class="grow">${esc(x.type)}</b><span class="badge">${x.direction==='debit'?'خصم':'إضافة'}</span></div><div class="mu">${fmt(x.amount)} عملة · ${new Date(x.createdAt).toLocaleString('ar-EG')}</div><div class="mu">${esc(x.metadata?.gameName||x.metadata?.reason||x.reference||'')}</div></div>`).join('');
     m.innerHTML=`<div class="card" style="text-align:center"><div class="mu">رصيدك التجريبي المحلي</div><div style="font-size:36px;font-weight:900;color:var(--gd)">🪙 ${fmt(data.balance||0)}</div></div>
       <div class="card"><b>💳 طلب شحن</b><div class="mu">بعد إتمام الدفع بالطريقة المتفق عليها مع الإدارة، أدخل مرجع العملية. لن تُضاف العملات إلا بعد التحقق والموافقة.</div><input class="in" id="srv-topup-amount" type="number" min="1" max="1000000" placeholder="عدد العملات"><input class="in" id="srv-topup-ref" maxlength="100" placeholder="مرجع الدفع (اختياري)"><div class="err" id="srv-topup-error"></div><button class="btn g w" id="srv-topup-send">إرسال طلب الشحن</button></div>
-      <div class="card"><b>🔁 تحويل عملات إلى مستخدم</b><div class="mu">التحويل يتم بين المحافظ المركزية ويظهر في سجل الطرفين.</div><input class="in" id="srv-gift-id" inputmode="numeric" placeholder="رقم ID المستلم"><input class="in" id="srv-gift-amount" type="number" min="1" max="1000000" placeholder="عدد العملات"><div class="err" id="srv-gift-error"></div><button class="btn o w" id="srv-gift-send">تحويل العملات</button></div>
+      <div class="card"><b>🔁 تحويل عملات إلى مستخدم</b><div class="mu">تحويل تجريبي محلي بين حسابات هذا الجهاز فقط.</div><input class="in" id="srv-gift-id" inputmode="numeric" placeholder="رقم ID المستلم"><input class="in" id="srv-gift-amount" type="number" min="1" max="1000000" placeholder="عدد العملات"><div class="err" id="srv-gift-error"></div><button class="btn o w" id="srv-gift-send">تحويل العملات</button></div>
       <h4>طلبات الشحن الحالية</h4>${pending||'<p class="mu">لا توجد طلبات معلقة.</p>'}<h4>سجل المحفظة</h4>${history||'<p class="mu">لا توجد عمليات مسجلة.</p>'}`;
     $('#srv-topup-send').onclick=async()=>{const error=$('#srv-topup-error'),amount=Math.floor(+$('#srv-topup-amount').value),paymentReference=$('#srv-topup-ref').value.trim();if(!(amount>0)){error.textContent='أدخل كمية صحيحة';return}try{await apiRequest('/wallet/topups',{method:'POST',body:JSON.stringify({amount,paymentReference})});toast('تم إرسال طلب الشحن للمراجعة');rWallet(m)}catch(e){error.textContent=e.message}};
     $('#srv-gift-send').onclick=async()=>{const error=$('#srv-gift-error'),recipientLegacyUid=$('#srv-gift-id').value.trim(),amount=Math.floor(+$('#srv-gift-amount').value);if(!/^\d{5,10}$/.test(recipientLegacyUid)||!(amount>0)){error.textContent='أدخل ID صحيحاً وكمية موجبة';return}try{await apiRequest('/wallet/gift',{method:'POST',headers:{'Idempotency-Key':'gift-'+crypto.randomUUID()},body:JSON.stringify({recipientLegacyUid,amount})});toast('تم التحويل بنجاح');rWallet(m)}catch(e){error.textContent=e.message}};
-  }catch(error){m.innerHTML=`<div class="card"><b>تعذر تحميل المحفظة المركزية</b><div class="mu">${esc(error.message)}</div><button class="btn o w" id="srv-wallet-retry">إعادة المحاولة</button></div>`;$('#srv-wallet-retry').onclick=()=>rWallet(m)}
+  }catch(error){m.innerHTML=`<div class="card"><b>تعذر تحميل المحفظة التجريبية</b><div class="mu">${esc(error.message)}</div><button class="btn o w" id="srv-wallet-retry">إعادة المحاولة</button></div>`;$('#srv-wallet-retry').onclick=()=>rWallet(m)}
 }
 
 
