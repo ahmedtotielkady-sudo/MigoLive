@@ -169,7 +169,7 @@ async function playCleopatraGold({ userId, betIndex, reference }) {
         userId, reference, betIndex: effectiveBetIndex, freeSpin, grid,
         win: outcome.win, scatterCount: outcome.scatterCount,
         freeSpinsAwarded: outcome.freeSpinsAwarded, freeSpinsRemaining: state.freeSpins,
-        multiplier: appliedMultiplier,
+        multiplier: state.multiplier,
         balance: wallet.balance, hit: outcome.hit, freeSpinWinnings: freeSpinWinningsTotal,
         freeSpinEnded
       };
