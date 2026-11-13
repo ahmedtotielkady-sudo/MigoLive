@@ -104,6 +104,28 @@ js = r"""
   // Keep the voice room mounted and visible underneath the game layer.
   if(!fromHistory&&location.hash==="#migo-game"){try{history.back()}catch(_){}}
  }
+ // Bridge the game iframe to the app's actual user wallet. The legacy wallet
+ // listener only trusts #gf, so this separate overlay iframe needs its own bridge.
+ window.addEventListener("message",e=>{
+  if(!overlay||e.source!==overlay.querySelector("iframe").contentWindow)return;
+  const d=e.data||{};
+  try{
+   if(d.t==="get"){
+    const u=typeof U==="function"?U():null;
+    e.source.postMessage({t:"bal",v:u&&Number.isFinite(Number(u.coins))?Number(u.coins):0},"*");
+   }else if(d.t==="set"&&Number.isFinite(d.v)&&d.v>=0){
+    const u=typeof U==="function"?U():null;
+    if(!u)return;
+    u.coins=Math.floor(d.v);
+    if(typeof save==="function")save();
+    const coinNode=document.querySelector("#mycoins");
+    if(coinNode)coinNode.textContent=u.coins;
+    window.dispatchEvent(new CustomEvent("migo:wallet-updated",{detail:{coins:u.coins}}));
+   }else if(d.t==="wallet"){
+    window.dispatchEvent(new CustomEvent("migo:open-wallet"));
+   }
+  }catch(err){console.warn("Migo game wallet bridge:",err)}
+ });
  window.addEventListener("popstate",()=>{if(overlay&&!overlay.hidden)closeGame(true)});
  function isRoomGameButton(button){
   if(!button||!button.closest("#room-float-panel"))return false;
