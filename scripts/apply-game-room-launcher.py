@@ -18,20 +18,28 @@ if profile_anchor in html and "window.__migoGetGameProfile" not in html:
 elif "window.__migoGetGameProfile" not in html:
     raise SystemExit("Could not expose profile bridge: user function not found")
 
-# Register Big Warrior and Rocket Space in the app's real Games tab.
-gm_anchor = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'}};"
-gm_replacement = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'},warrior:{n:'المحارب الكبير',i:'🦁',d:'الأسد ضد النمر · عملات المحفظة'},rocket:{n:'صاروخ الفضاء',i:'🚀',d:'لعبة الصاروخ · عملات المحفظة'}};"
-if gm_anchor in html:
-    html = html.replace(gm_anchor, gm_replacement, 1)
-elif "rocket:{n:'صاروخ الفضاء'" not in html or "warrior:{n:'المحارب الكبير'" not in html:
-    raise SystemExit("Could not register Rocket Space in the Games list")
+# Register Rocket Space without disturbing existing game entries.
+rocket_entry = "rocket:{n:'صاروخ الفضاء',i:'🚀',d:'لعبة الصاروخ · عملات المحفظة'}"
+cleopatra_entry = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'}"
+if rocket_entry not in html:
+    if cleopatra_entry not in html:
+        raise SystemExit("Could not find Cleopatra entry to register Rocket Space")
+    html = html.replace(cleopatra_entry, cleopatra_entry + "," + rocket_entry, 1)
 
+# Route both legacy HTML games and Rocket through the local asset loader.
 open_anchor = "let gameSource;if(k==='cleopatra'){const response=await fetch('games/cleopatra-gold.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
 open_replacement = "let gameSource;if(k==='cleopatra'||k==='warrior'||k==='rocket'){const file=k==='cleopatra'?'cleopatra-gold.html':(k==='warrior'?'big-warrior.html':'rocket-crash.html');const response=await fetch('games/'+file);if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
 if open_anchor in html:
     html = html.replace(open_anchor, open_replacement, 1)
-elif "k==='cleopatra'||k==='warrior'||k==='rocket'" not in html:
-    raise SystemExit("Could not route local games to their HTML files")
+elif "k==='rocket'" not in html:
+    if "k==='cleopatra'||k==='warrior'" not in html:
+        raise SystemExit("Could not locate the Games tab local-game loader")
+    marker = "else{gameSource=dec(GB[k])}"
+    pos = html.find(marker, html.find("let gameSource;"))
+    if pos < 0:
+        raise SystemExit("Could not locate Games tab fallback loader")
+    rocket_branch = "else if(k==='rocket'){const response=await fetch('games/rocket-crash.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}"
+    html = html[:pos] + rocket_branch + html[pos:]
 
 style_id = "migo-game-room-launcher-style-v1"
 script_id = "migo-game-room-launcher-script-v1"
