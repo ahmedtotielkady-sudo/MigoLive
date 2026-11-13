@@ -488,7 +488,7 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.min.js"></script>
 <script>
 // وضع تجريبي محلي بالكامل: لا توجد اتصالات بخادم أو مدفوعات حقيقية.
-const DEMO_MODE=true, API_BASE='', API_TOKEN='';
+const DEMO_MODE=true, API_BASE=''; let API_TOKEN='';
 let SERVER_WALLET_BALANCE=0,SERVER_WALLET_READY=true,SERVER_PAYMENT_WALLET='',SERVER_PENDING_TOPUPS=[];
 function bindServerWallet(account,balance){SERVER_WALLET_BALANCE=Math.max(0,Math.floor(Number(balance)||0));SERVER_WALLET_READY=true;if(account)account.coins=SERVER_WALLET_BALANCE;const badge=document.querySelector('#mycoins');if(badge)badge.textContent=SERVER_WALLET_BALANCE}
 async function refreshServerWallet(){const u=me&&DB.users[me];SERVER_WALLET_BALANCE=Math.max(0,Math.floor(Number(u&&u.coins)||0));SERVER_WALLET_READY=true;return {balance:SERVER_WALLET_BALANCE,pendingTopups:DB.topups||[],transactions:DB.tx||[]}}
