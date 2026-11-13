@@ -103,6 +103,42 @@ jobs:
       - name: Sync Android project
         run: npx cap sync android
 
+      # Keep one debug signing key across CI builds so Android accepts updates.
+      - name: Restore persistent Android signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: migolive-debug-signing-v1
+
+      - name: Create signing key on first build
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Set increasing Android version code
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+          p = Path('android/app/build.gradle')
+          if not p.exists():
+              raise SystemExit('Expected android/app/build.gradle after Capacitor sync')
+          s = p.read_text()
+          code = int(os.environ['GITHUB_RUN_NUMBER'])
+          if re.search(r'versionCode\\s+\\d+', s):
+              s = re.sub(r'versionCode\\s+\\d+', f'versionCode {code}', s, count=1)
+          else:
+              raise SystemExit('versionCode not found; refusing to produce a non-upgradeable APK')
+          if re.search(r'versionName\\s+"[^"]+"', s):
+              s = re.sub(r'versionName\\s+"[^"]+"', f'versionName "1.0.{code}"', s, count=1)
+          p.write_text(s)
+          print(f'Android versionCode={code}, versionName=1.0.{code}')
+          PY
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
       - name: Build debug APK
         run: |
           cd android
