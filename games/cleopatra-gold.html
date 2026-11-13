@@ -122,7 +122,7 @@ function applyRound(data){
 addEventListener('message',e=>{
  const d=e.data||{};
  if(d.t==='bal'){bal=Math.max(0,Math.floor(Number(d.v)||0));ui()}
- if(d.t==='cleopatra-state'){bal=Math.max(0,Math.floor(Number(d.balance)||bal));fs=Number(d.freeSpins)||0;mult=Number(d.multiplier)||1;fsWin=Number(d.freeSpinWinnings)||0;if(Number.isInteger(d.freeSpinBetIndex))bi=d.freeSpinBetIndex;ui()}
+ if(d.t==='cleopatra-state'){bal=Math.max(0,Math.floor(Number(d.balance)||bal));fs=Number(d.freeSpins)||0;mult=Number(d.multiplier)||1;fsWin=Number(d.freeSpinWinnings)||0;if(Number.isInteger(d.freeSpinBetIndex))bi=d.freeSpinBetIndex;ui();if(fs>0&&!busy)setTimeout(()=>{if(fs>0&&!busy)spin()},500)}
  if(d.t==='cleopatra-round'&&pending&&d.requestId===pending.requestId){pending=null;if(d.error){busy=false;msg(d.error==='Insufficient balance'?'رصيدك غير كافٍ':d.error);ui()}else applyRound(d.data)}
 });
 $('#spin').onclick=spin;$('#up').onclick=()=>{bi=Math.min(bi+1,BETS.length-1);ui()};$('#dn').onclick=()=>{bi=Math.max(bi-1,0);ui()};
