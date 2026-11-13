@@ -627,7 +627,7 @@ addEventListener('message',e=>{
   e.source.postMessage({t:'cleopatra-round',requestId,data:{success:true,grid,hit:[...hit],balance:u.coins,win,freeSpins:st.freeSpins,multiplier:st.multiplier,freeSpinWinnings:st.freeSpinWinnings||0,freeSpinWinningsTotal,freeSpinEnded,freeSpinsAwarded:awarded,betIndex:effectiveBetIndex,freeSpin}},'*');
  }
  else if(d.t==='set'){console.warn('Ignored test-game balance message')}
- else if(d.t==='wallet'){closeGame();tab='wallet';try{history.replaceState(null,'','#wallet')}catch(e){}render()}
+ else if(d.t==='insufficient'){dlg('العملة غير كافية','<p class="mu">رصيدك الحالي لا يكفي لهذا الرهان. اشحن رصيدك للمتابعة.</p>',()=>{closeGame();tab='wallet';try{history.replaceState(null,'','#wallet')}catch(e){}render()},'تعبئة رصيد')} else if(d.t==='wallet'){closeGame();tab='wallet';try{history.replaceState(null,'','#wallet')}catch(e){}render()}
 });
 function rImg(f,mx,cb){if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,mx/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.8))};im.onerror=()=>toast('الملف ليس صورة');im.src=rd.result};rd.readAsDataURL(f)}
 const TABS=['rooms','games','msgs','wallet','me','owner','agent','agency','vip','friends','notes','invite','security'];
