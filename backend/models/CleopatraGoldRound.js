@@ -13,7 +13,8 @@ const schema = new mongoose.Schema({
   multiplier: { type: Number, required: true, min: 1, max: 10 },
   balance: { type: Number, required: true, min: 0 },
   hit: { type: [String], default: [] },
-  freeSpinWinnings: { type: Number, required: true, min: 0 }
+  freeSpinWinnings: { type: Number, required: true, min: 0 },
+  freeSpinEnded: { type: Boolean, required: true, default: false }
 }, { timestamps: true, versionKey: false });
 
 module.exports = mongoose.model("CleopatraGoldRound", schema);
