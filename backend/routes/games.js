@@ -5,7 +5,8 @@ const Ledger = require("../models/Ledger");
 const GAMES = Object.freeze({
   ocean_storm: "عاصفة المحيط",
   slot777: "سلوت 777",
-  animal_wheel: "عجلة الحيوانات"
+  animal_wheel: "عجلة الحيوانات",
+  cleopatra_gold: "ذهب كليوباترا"
 });
 
 
@@ -134,6 +135,37 @@ router.post("/animal_wheel/play", auth, async (req, res) => {
     }
     console.error("Animal wheel round failed:", error);
     return res.status(500).json({ error: "Unable to settle animal wheel round" });
+  }
+});
+
+router.get("/cleopatra_gold/state", auth, async (req, res) => {
+  try {
+    const { getCleopatraGoldState } = require("../services/cleopatraGoldService");
+    return res.json(await getCleopatraGoldState({ userId: req.user._id }));
+  } catch (error) {
+    console.error("Cleopatra Gold state failed:", error);
+    return res.status(500).json({ error: "Unable to load Cleopatra Gold state" });
+  }
+});
+
+router.post("/cleopatra_gold/spin", auth, async (req, res) => {
+  const { betIndex } = req.body || {};
+  const reference = req.get("Idempotency-Key");
+  if (!Number.isInteger(betIndex) || betIndex < 0 || betIndex > 6) {
+    return res.status(400).json({ error: "Invalid Cleopatra bet" });
+  }
+  if (typeof reference !== "string" || !/^[A-Za-z0-9._:-]{8,128}$/.test(reference)) {
+    return res.status(400).json({ error: "A valid Idempotency-Key header is required" });
+  }
+  try {
+    const { playCleopatraGold } = require("../services/cleopatraGoldService");
+    return res.json(await playCleopatraGold({ userId: req.user._id, betIndex, reference }));
+  } catch (error) {
+    if (error.message === "Insufficient balance") return res.status(409).json({ error: "Insufficient balance" });
+    if (error.message.includes("Idempotency key")) return res.status(409).json({ error: "Idempotency key conflict" });
+    if (error.message.includes("Invalid")) return res.status(400).json({ error: error.message });
+    console.error("Cleopatra Gold round failed:", error);
+    return res.status(500).json({ error: "Unable to settle Cleopatra Gold round" });
   }
 });
 
