@@ -15,13 +15,21 @@ css = r"""
 /* Games open as an immersive layer; app tabs are hidden until the game closes. */
 body.migo-game-open #tabs,
 body.migo-game-open nav#tabs,
-body.migo-game-open .bottom-nav {display:none!important}
+body.migo-game-open .bottom-nav,
+body.migo-game-open #bottom-nav,
+body.migo-game-open .app-bottom-nav {display:none!important}
+body.migo-game-open #main{visibility:hidden!important}
+body.migo-game-open #room-float{visibility:hidden!important}
+body.migo-game-open #migo-game-overlay{visibility:visible!important}
+body.migo-game-open #migo-game-overlay iframe{height:100dvh!important;min-height:100dvh!important}
+body.migo-game-open #migo-game-overlay .migo-game-head{display:none!important}
+body.migo-game-open #migo-game-overlay{inset:0!important;padding:0!important}
 body.migo-game-open #main{padding-bottom:0!important}
 #migo-game-overlay{position:fixed;inset:0;z-index:2147483000;background:#10051d;display:flex;flex-direction:column}
 #migo-game-overlay[hidden]{display:none!important}
 #migo-game-overlay .migo-game-head{height:48px;min-height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:#19082c;color:#ffe18a;border-bottom:1px solid #d6a83c}
 #migo-game-overlay .migo-game-head button{background:#3a102b;color:#fff;border:1px solid #e6bd58;border-radius:12px;padding:7px 14px;font-weight:800}
-#migo-game-overlay iframe{border:0;display:block;flex:1;width:100%;height:calc(100% - 48px);background:#10051d}
+#migo-game-overlay iframe{border:0;display:block;flex:1;width:100%;height:100%;background:#10051d}
 #migo-game-picker{position:fixed;inset:0;z-index:2147482999;background:#090313d9;display:flex;align-items:center;justify-content:center;padding:22px}
 #migo-game-picker[hidden]{display:none!important}
 #migo-game-picker .migo-picker-card{width:min(420px,100%);border:1px solid #d9aa4b;border-radius:22px;padding:18px;background:linear-gradient(145deg,#38135e,#170b2c);color:#fff;text-align:center}
@@ -78,27 +86,36 @@ js = r"""
   overlay.hidden=false;document.body.classList.add("migo-game-open");
   try{history.pushState({migoGame:true},"","#migo-game")}catch(_){}
  }
- function closeGame(){
-  if(!overlay)return;
-  overlay.querySelector("iframe").src="about:blank";overlay.hidden=true;
+ function closeGame(fromHistory=false){
+  if(!overlay||overlay.hidden)return;
+  overlay.querySelector("iframe").src="about:blank";
+  overlay.hidden=true;
   document.body.classList.remove("migo-game-open");
-  if(location.hash==="#migo-game"){try{history.back()}catch(_){}}
+  // Keep the voice room mounted and visible underneath the game layer.
+  if(!fromHistory&&location.hash==="#migo-game"){try{history.back()}catch(_){}}
  }
- window.addEventListener("popstate",()=>{if(overlay&&!overlay.hidden)closeGame()});
- function bindGamesTab(){
-  const tabs=document.querySelector("#tabs");
-  if(!tabs)return;
-  const candidates=[...tabs.querySelectorAll("button,[role=button],a")];
-  const b=candidates.find(x=>/الألعاب|العاب|🎮/.test((x.innerText||x.textContent||"").trim()));
-  if(b&&b.dataset.migoGamesBound!=="1"){
-   b.dataset.migoGamesBound="1";
-   b.addEventListener("click",()=>{setTimeout(openPicker,80)});
-  }
-  // Remove the old floating room shortcut; games are opened from the main tab only.
+ window.addEventListener("popstate",()=>{if(overlay&&!overlay.hidden)closeGame(true)});
+ function isRoomGameButton(button){
+  if(!button||!button.closest("#room-float-panel"))return false;
+  const label=[button.textContent,button.getAttribute("aria-label"),button.title,
+    button.dataset.action,button.className].filter(Boolean).join(" ").toLowerCase();
+  return /🎮|gamepad|game|الألعاب|العاب|لعبة|العاب/.test(label);
+ }
+ // The gamepad action inside the room composer opens the game picker in-place.
+ // Do not hijack the global Games tab: it must continue to show the Games page.
+ function bindRoomGameAction(){
+  if(document.documentElement.dataset.migoRoomGameAction==="1")return;
+  document.documentElement.dataset.migoRoomGameAction="1";
+  document.addEventListener("click",e=>{
+   const button=e.target&&e.target.closest&&e.target.closest("button,[role=button],a");
+   if(!isRoomGameButton(button))return;
+   e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+   openPicker();
+  },true);
   document.querySelectorAll("#migo-room-game-launcher").forEach(x=>x.remove());
  }
  function sync(){
-  bindGamesTab();
+  bindRoomGameAction();
   const active=!!(overlay&&!overlay.hidden);
   document.body.classList.toggle("migo-game-open",active);
  }
