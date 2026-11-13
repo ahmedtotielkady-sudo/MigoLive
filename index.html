@@ -600,7 +600,7 @@ addEventListener('popstate',()=>{document.querySelectorAll('.dlg').forEach(x=>x.
 addEventListener('message',e=>{
  const d=e.data;if(!d||!me||e.source!==$('#gf').contentWindow)return;const u=U();
  if(d.t==='get'){e.source.postMessage({t:'bal',v:Number(u.coins)||0},'*');e.source.postMessage({t:'me',name:u.name,avatar:okAv(u)?u.avatar:''},'*')}
- else if(d.t==='cleopatra-state'){e.source.postMessage({t:'cleopatra-state',balance:Number(u.coins)||0,freeSpins:0,multiplier:1,freeSpinWinnings:0},'*')}
+ else if(d.t==='cleopatra-state'){const st=(DB.cleopatraStates||{})[me]||{};e.source.postMessage({t:'cleopatra-state',balance:Number(u.coins)||0,freeSpins:Number(st.freeSpins)||0,multiplier:Number(st.multiplier)||1,freeSpinWinnings:Number(st.freeSpinWinnings)||0,freeSpinBetIndex:Number.isInteger(st.freeSpinBetIndex)?st.freeSpinBetIndex:null},'*')}
  else if(d.t==='cleopatra-spin'){
   const bets=[10,20,50,100,200,500,1000],bi=Number(d.betIndex),requestId=String(d.requestId||'');
   if(!Number.isInteger(bi)||bi<0||bi>=bets.length){e.source.postMessage({t:'cleopatra-round',requestId,error:'اختيار الرهان غير صحيح'},'*');return}
