@@ -18,21 +18,20 @@ if profile_anchor in html and "window.__migoGetGameProfile" not in html:
 elif "window.__migoGetGameProfile" not in html:
     raise SystemExit("Could not expose profile bridge: user function not found")
 
-# Register Big Warrior in the app's real Games tab and load it as a local HTML game.
+# Register Big Warrior and Rocket Space in the app's real Games tab.
+gm_anchor = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'}};"
 gm_replacement = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'},warrior:{n:'المحارب الكبير',i:'🦁',d:'الأسد ضد النمر · عملات المحفظة'},rocket:{n:'صاروخ الفضاء',i:'🚀',d:'لعبة الصاروخ · عملات المحفظة'}};"
-gm_replacement = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'},warrior:{n:'المحارب الكبير',i:'🦁',d:'الأسد ضد النمر · عملات المحفظة'}};"
 if gm_anchor in html:
     html = html.replace(gm_anchor, gm_replacement, 1)
-elif "rocket:{n:'صاروخ الفضاء'" not in html:
+elif "rocket:{n:'صاروخ الفضاء'" not in html or "warrior:{n:'المحارب الكبير'" not in html:
     raise SystemExit("Could not register Rocket Space in the Games list")
 
-open_anchor = "let gameSource;if(k==='cleopatra'){const response=await fetch('games/cleopatra-gold.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else if(k==='rocket'){const response=await fetch('games/rocket-crash.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
+open_anchor = "let gameSource;if(k==='cleopatra'){const response=await fetch('games/cleopatra-gold.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
 open_replacement = "let gameSource;if(k==='cleopatra'||k==='warrior'||k==='rocket'){const file=k==='cleopatra'?'cleopatra-gold.html':(k==='warrior'?'big-warrior.html':'rocket-crash.html');const response=await fetch('games/'+file);if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
 if open_anchor in html:
     html = html.replace(open_anchor, open_replacement, 1)
-elif "k==='cleopatra'||k==='warrior'" not in html and "k==='warrior'?" not in html:
-    raise SystemExit("Could not route Big Warrior to its local HTML file")
-
+elif "k==='cleopatra'||k==='warrior'||k==='rocket'" not in html:
+    raise SystemExit("Could not route local games to their HTML files")
 
 style_id = "migo-game-room-launcher-style-v1"
 script_id = "migo-game-room-launcher-script-v1"
