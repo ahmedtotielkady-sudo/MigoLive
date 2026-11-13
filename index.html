@@ -638,8 +638,11 @@ addEventListener('message',e=>{
   bal-=bet;
   const symbols=['W','S','N','E','A','Y','H','P','C','O','D','F'];
   const grid=Array.from({length:5},()=>Array.from({length:4},()=>symbols[Math.floor(Math.random()*symbols.length)]));
-  const win=Math.random()<.27?bet*(1+Math.floor(Math.random()*8)):0;bal+=win;u.coins=bal;SERVER_WALLET_BALANCE=bal;save();
-  send({t:'cleopatra-round',requestId,data:{success:true,grid,hit:[],balance:bal,win,freeSpins:0,multiplier:1,freeSpinWinnings:0,betIndex:bi}});
+  const win=Math.random()<.27?bet*(1+Math.floor(Math.random()*8)):0;
+  const hit=[];
+  if(win>0){const symbol=['A','E','H','P','C'][Math.floor(Math.random()*5)];for(let col=0;col<3;col++){grid[col][1]=symbol;hit.push(col+',1')}}
+  bal+=win;u.coins=bal;SERVER_WALLET_BALANCE=bal;save();
+  send({t:'cleopatra-round',requestId,data:{success:true,grid,hit,balance:bal,win,freeSpins:0,multiplier:1,freeSpinWinnings:0,betIndex:bi}});
  }
  else if(d.t==='set'){const v=Number(d.v);if(Number.isFinite(v)){U().coins=Math.max(0,Math.floor(v));SERVER_WALLET_BALANCE=U().coins;save();send({t:'bal',v:U().coins})}}\n else if(d.t==='wallet'){closeGame();tab='wallet';render()}
 });
