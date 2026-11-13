@@ -70,7 +70,8 @@ js = r"""
   {name:"عجلة الحيوانات",url:"wheel-animals.html"},
   {name:"عاصفة المحيط",url:"slot-ocean-storm.html"},
   {name:"سلوت 777",url:"slot-777.html"},
-  {name:"ذهب كليوباترا",url:"games/cleopatra-gold.html"}
+  {name:"ذهب كليوباترا",url:"games/cleopatra-gold.html"},
+  {name:"المحارب الكبير",url:"games/big-warrior.html"}
  ];
  const cleanText=()=>{
   const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);

@@ -92,6 +92,8 @@ jobs:
           PY
           for file in /tmp/migolive-inline-*.js; do node --check "$file"; done
           cp slot-777.html slot-ocean-storm.html wheel-animals.html www/
+          mkdir -p www/games
+          cp games/big-warrior.html www/games/big-warrior.html
           if [ -d games ]; then cp -R games www/games; fi
 
       - name: Install Capacitor
