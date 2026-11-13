@@ -18,6 +18,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Inspect game section and game launch references
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('index.html').read_text(encoding='utf-8')
+          for term in ['ذهب كليوباترا','المحارب الكبير','الألعاب','العاب']:
+              print('\\n=== CONTEXT:',term,'===')
+              hits=[m.start() for m in re.finditer(re.escape(term),s)]
+              print('matches:',len(hits))
+              for p in hits[-5:]: print(s[max(0,p-650):p+900].replace('\\n',' ')[:1600])
+          for path in ['games/cleopatra-gold.html','games/big-warrior.html']:
+              t=Path(path).read_text(encoding='utf-8')
+              print('\\n=== GAME FILE:',path,'bytes:',len(t),'===')
+              print('HEAD:',t[:1200])
+              print('TAIL:',t[-1600:])
+          PY
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
