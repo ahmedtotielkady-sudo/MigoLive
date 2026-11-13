@@ -106,16 +106,19 @@ jobs:
           #app{padding:8px 12px 10px!important}
           .top{gap:7px!important}.chip{font-size:14px!important;padding:2px 10px!important}
           .prize{margin:7px auto 4px!important;padding:3px 20px!important}.prize b{font-size:23px!important}
-          .top{transform:translateY(11px)!important;position:relative;z-index:5}
-          .arena{gap:7px!important}.card{height:75%!important;max-height:calc(100dvh - 430px)!important;border-width:2px!important}
-          .card .fighter{font-size:74px!important}.card .name{font-size:15px!important;padding:2px 0!important}
-          .drawbtn{margin-top:2px!important;padding:1px 16px!important}
-          .status{margin:3px auto!important;padding:2px 14px!important;font-size:12px!important}
-          .bet{gap:6px!important}.step{width:44px!important;font-size:25px!important}
-          .go{font-size:17px!important;padding:4px 0!important}.go small{font-size:14px!important}
-          .note{margin-top:2px!important}
-          #app{padding-bottom:16px!important}
-          @media(max-height:640px){.card .fighter{font-size:54px!important}.card{height:72%!important}.prize{margin:4px auto 2px!important}.status{margin:3px auto!important}}
+          .top{transform:translateY(19px)!important;position:relative;z-index:5}
+          .prize{transform:translateY(5px)!important;position:relative;z-index:4}
+          .arena{gap:7px!important;transform:translateY(-5px)!important}
+          .card{height:66%!important;max-height:calc(100dvh - 485px)!important;min-height:0!important;border-width:2px!important}
+          .card .fighter{font-size:68px!important}.card .name{font-size:14px!important;padding:2px 0!important}
+          .drawbtn{margin-top:1px!important;padding:1px 14px!important}
+          .status{margin:2px auto!important;padding:2px 12px!important;font-size:11px!important}
+          .bet{gap:5px!important;transform:translateY(-20px)!important;position:relative;z-index:6}
+          .step{width:42px!important;font-size:23px!important}
+          .go{font-size:16px!important;padding:3px 0!important}.go small{font-size:13px!important}
+          .note{margin-top:0!important;transform:translateY(-16px)!important}
+          #app{padding-bottom:24px!important}
+          @media(max-height:640px){.card .fighter{font-size:50px!important}.card{height:62%!important;max-height:calc(100dvh - 430px)!important}.prize{margin:4px auto 2px!important}.status{margin:2px auto!important}.bet{transform:translateY(-14px)!important}}
           </style>
           """
           if 'migo-warrior-compact-v1' not in html:
