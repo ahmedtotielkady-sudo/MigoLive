@@ -518,6 +518,7 @@ async function apiRequest(path,options={}){
  return {ok:true,success:true,balance:Number(u&&u.coins)||0,items:[],transactions:[]};
 }
 </script>
+<script>
 try{if(window.Lenis){window.lenis=new Lenis();const raf=t=>{lenis.raf(t);requestAnimationFrame(raf)};requestAnimationFrame(raf)}}catch(e){}
 const $=s=>document.querySelector(s);
 addEventListener('focusin',e=>{if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)&&e.target.type!=='file')document.body.classList.add('kb')});
