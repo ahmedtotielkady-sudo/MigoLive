@@ -40,6 +40,9 @@ jobs:
       - name: Install Capacitor Android tooling
         run: npm install --no-save --no-audit --no-fund @capacitor/core@^8 @capacitor/cli@^8 @capacitor/android@^8
 
+      - name: Repair and validate demo JavaScript
+        run: node scripts/repair-demo-runtime.js
+
       - name: Prepare app assets
         run: npm run build:cloudflare
 
