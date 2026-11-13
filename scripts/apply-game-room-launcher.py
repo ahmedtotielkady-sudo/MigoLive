@@ -17,8 +17,6 @@ body.migo-game-open #tabs,
 body.migo-game-open nav#tabs,
 body.migo-game-open .bottom-nav {display:none!important}
 body.migo-game-open #main{padding-bottom:0!important}
-#migo-room-game-launcher{position:absolute;z-index:10040;left:12px;bottom:88px}
-#migo-room-game-launcher button{border:1px solid #f4c75e;border-radius:18px;background:linear-gradient(145deg,#3a155f,#160b2b);color:#ffe28a;padding:10px 14px;font-weight:900;box-shadow:0 4px 16px #0008}
 #migo-game-overlay{position:fixed;inset:0;z-index:2147483000;background:#10051d;display:flex;flex-direction:column}
 #migo-game-overlay[hidden]{display:none!important}
 #migo-game-overlay .migo-game-head{height:48px;min-height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:#19082c;color:#ffe18a;border-bottom:1px solid #d6a83c}
@@ -31,7 +29,7 @@ body.migo-game-open #main{padding-bottom:0!important}
 #migo-game-picker button{padding:13px 8px;border:1px solid #d9aa4b;border-radius:14px;background:#240d40;color:#ffe6a2;font-weight:800}
 #migo-game-picker .migo-picker-close{margin-top:12px;background:#54132e;color:#fff}
 /* Improve tap response without changing existing visual design. */
-#migo-game-overlay button,#migo-game-picker button,#migo-room-game-launcher button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px}
+#migo-game-overlay button,#migo-game-picker button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px}
 body.migo-game-open{overflow:hidden!important;overscroll-behavior:none}
 </style>
 """
@@ -87,22 +85,25 @@ js = r"""
   if(location.hash==="#migo-game"){try{history.back()}catch(_){}}
  }
  window.addEventListener("popstate",()=>{if(overlay&&!overlay.hidden)closeGame()});
- function addRoomButton(){
-  const panel=document.querySelector("#room-float-panel");
-  if(!panel||!document.body.classList.contains("inroom")||panel.querySelector("#migo-room-game-launcher"))return;
-  if(getComputedStyle(panel).position==="static")panel.style.position="relative";
-  const wrap=document.createElement("div");wrap.id="migo-room-game-launcher";
-  const b=document.createElement("button");b.type="button";b.textContent="🎮 الألعاب";
-  b.addEventListener("click",openPicker);wrap.appendChild(b);panel.appendChild(wrap);
+ function bindGamesTab(){
+  const tabs=document.querySelector("#tabs");
+  if(!tabs)return;
+  const candidates=[...tabs.querySelectorAll("button,[role=button],a")];
+  const b=candidates.find(x=>/الألعاب|العاب|🎮/.test((x.innerText||x.textContent||"").trim()));
+  if(b&&b.dataset.migoGamesBound!=="1"){
+   b.dataset.migoGamesBound="1";
+   b.addEventListener("click",()=>{setTimeout(openPicker,80)});
+  }
+  // Remove the old floating room shortcut; games are opened from the main tab only.
+  document.querySelectorAll("#migo-room-game-launcher").forEach(x=>x.remove());
  }
  function sync(){
-  addRoomButton();
+  bindGamesTab();
   const active=!!(overlay&&!overlay.hidden);
   document.body.classList.toggle("migo-game-open",active);
  }
- // Clean existing stray escape text once. Re-scanning the entire page on every
- // DOM mutation made typing, scrolling and room controls unnecessarily slow.
- const mo=new MutationObserver(()=>{addRoomButton()});
+ // Clean once, then watch only for tab replacement/navigation.
+ const mo=new MutationObserver(()=>bindGamesTab());
  function start(){ensureUI();cleanText();sync();mo.observe(document.body,{subtree:true,childList:true});}
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
  window.MigoRoomGames={openPicker,openGame,closeGame};
