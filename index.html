@@ -497,6 +497,22 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 .profile-shortcut small{font-size:11px;font-weight:800;white-space:nowrap;color:var(--tx)}
 @media(max-width:350px){.profile-shortcuts-grid{gap:6px}.profile-shortcut{min-height:82px}.profile-shortcut-icon{width:39px;height:39px}}
 </style>
+
+<style id="migo-profile-hero-polish">
+.profile-hero{padding:18px!important;overflow:hidden;position:relative;background:radial-gradient(ellipse at 100% 0%,rgba(168,85,247,.25),transparent 52%),linear-gradient(135deg,rgba(124,58,237,.2),rgba(21,13,46,.97))!important;border:1px solid rgba(168,85,247,.42)!important;box-shadow:0 12px 28px rgba(0,0,0,.2)}
+.profile-hero:after{content:"";position:absolute;width:130px;height:130px;border:1px solid rgba(255,194,74,.12);border-radius:50%;inset-inline-end:-55px;bottom:-85px;pointer-events:none}
+.profile-hero #avp{width:82px!important;height:82px!important;flex-basis:82px!important;border-width:2px!important;box-shadow:0 0 0 5px rgba(168,85,247,.12),0 0 24px rgba(168,85,247,.32)!important}
+.profile-hero #profile-edit-open{border-radius:10px;min-width:34px;min-height:32px}
+.profile-stats{margin-top:17px!important;gap:8px!important}
+.profile-stat{position:relative;text-align:center;padding:12px 4px!important;border-radius:14px!important;background:linear-gradient(155deg,rgba(168,85,247,.2),rgba(124,58,237,.08))!important;border:1px solid rgba(168,85,247,.19)}
+.profile-stat b{font-size:18px!important;text-shadow:0 2px 12px rgba(255,194,74,.18)}
+.profile-stat small{display:block;margin-top:3px;font-size:11px;font-weight:800}
+.profile-actions{gap:10px!important;margin:13px 0 14px!important}
+.profile-actions button{min-height:48px;border-radius:14px!important;font-weight:900;letter-spacing:.1px}
+.profile-vip-action{background:linear-gradient(110deg,#5b8de8,#9b79ef)!important;box-shadow:0 6px 16px rgba(91,141,232,.18)!important}
+.profile-wallet-action{background:linear-gradient(110deg,#a66b12,#f4bd45)!important;color:#211300!important;border:1px solid rgba(255,220,130,.5)!important;box-shadow:0 6px 16px rgba(245,158,11,.16)!important}
+@media(max-width:350px){.profile-hero{padding:14px!important}.profile-hero #avp{width:70px!important;height:70px!important;flex-basis:70px!important}.profile-stat{padding:9px 2px!important}.profile-stat b{font-size:16px!important}}
+</style>
 </head>
 <body class="auth-screen">
 
@@ -1188,7 +1204,7 @@ function rMe(m){
   const pendingCountry=(DB.countryRequests||[]).find(x=>x.user===me&&x.status==='pending');
   const friendsCount=(u.friends||[]).length;
   const walletCoins=Math.max(0,Math.floor(+u.coins||0));
-  m.innerHTML=\`<section class="card" style="padding:18px;background:linear-gradient(135deg,rgba(124,58,237,.22),rgba(21,13,46,.96));border:1px solid var(--line)">
+  m.innerHTML=\`<section class="card profile-hero">
     <div class="row" style="align-items:center;gap:14px">
       <div class="av" id="avp" style="width:76px;height:76px;flex:0 0 76px;font-size:29px;margin:0;border:2px solid var(--gd);box-shadow:0 0 18px #a855f755;\${okAv(u)?"background:url('"+u.avatar+"') center/cover no-repeat;color:transparent":''};\${VFRAME[vipLv(u)]||''}">\${avL(u)}</div>
       <div class="grow" style="min-width:0">
@@ -1198,8 +1214,8 @@ function rMe(m){
         <div class="mu">🌍 \${esc(u.country||'لم يتم التعيين')}</div>
       </div>
     </div>
-    <div class="row" style="margin-top:16px;gap:8px">
-      <div class="grow" style="text-align:center;padding:10px 4px;border-radius:12px;background:rgba(124,58,237,.18)"><b style="display:block;font-size:17px;color:var(--gd)">\${walletCoins.toLocaleString('en-US')}</b><small class="mu">🪙 العملات</small></div>
+    <div class="row profile-stats">
+      <div class="grow profile-stat"><b style="display:block;font-size:17px;color:var(--gd)">\${walletCoins.toLocaleString('en-US')}</b><small class="mu">🪙 العملات</small></div>
       <div class="grow" style="text-align:center;padding:10px 4px;border-radius:12px;background:rgba(124,58,237,.18)"><b style="display:block;font-size:17px;color:var(--gd)">\${u.gifts||0}</b><small class="mu">🎁 الهدايا</small></div>
       <div class="grow" style="text-align:center;padding:10px 4px;border-radius:12px;background:rgba(124,58,237,.18)"><b style="display:block;font-size:17px;color:var(--gd)">\${friendsCount}</b><small class="mu">👥 الأصدقاء</small></div>
     </div>
@@ -1211,9 +1227,9 @@ function rMe(m){
   \${pendingCountry?\`<div class="mu" style="margin-top:8px">طلب تغيير البلد إلى <b>\${esc(pendingCountry.country)}</b> قيد مراجعة المالك.</div>\`:''}
   <div class="mu" style="margin-top:8px">\${u.countrySetOnce?'تغيير البلد مرة أخرى يتطلب 100,000 عملة وموافقة المالك حصراً.':'يمكنك تعيين البلد لأول مرة مجاناً.'}</div>
   <div class="sp"></div><div class="err" id="profile-edit-error" role="alert"></div><button class="btn g w" id="profile-edit-save">حفظ التعديلات</button></div>
-  <div class="row" style="gap:9px;margin:12px 0">
-    <button class="btn w" id="gvip" style="flex:1;background:linear-gradient(110deg,#5b8de8,#9b79ef);box-shadow:none">👑 عضويات VIP</button>
-    <button class="btn g w" id="wallet-shortcut" style="flex:1">🪙 المحفظة</button>
+  <div class="row profile-actions">
+    <button class="btn w profile-vip-action" id="gvip">👑 عضويات VIP</button>
+    <button class="btn g w profile-wallet-action" id="wallet-shortcut">🪙 المحفظة</button>
   </div>
   <section class="card profile-shortcuts">
     <div class="profile-shortcuts-head"><b>اختصارات الحساب</b><span>خدماتك السريعة</span></div>
