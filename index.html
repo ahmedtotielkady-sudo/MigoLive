@@ -528,6 +528,29 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 // تفعيل المالك محلياً عبر كود المالك المضمّن في نسخة التطبيق.
 try{if(window.Lenis){window.lenis=new Lenis();const raf=t=>{lenis.raf(t);requestAnimationFrame(raf)};requestAnimationFrame(raf)}}catch(e){}
 const $=s=>document.querySelector(s);
+const API_BASE='/api';
+async function apiRequest(path, options={}) {
+  const headers=new Headers(options.headers||{});
+  headers.set('content-type','application/json');
+  const token=localStorage.getItem('migolive_token');
+  if(token) headers.set('authorization','Bearer '+token);
+  let response;
+  try { response=await fetch(API_BASE+path,{...options,headers,cache:'no-store'}); }
+  catch(_) { throw new Error('تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت وإعدادات الخادم'); }
+  let data={}; try { data=await response.json(); } catch(_) {}
+  if(!response.ok) throw new Error(data.message||'تعذر تنفيذ الطلب');
+  return data;
+}
+function applyServerUser(serverUser,passwordHash='') {
+  const key=String(serverUser.username||'').toLowerCase(), old=DB.users[key]||{};
+  DB.users[key]={...old,name:serverUser.displayName||serverUser.username,uid:serverUser.uid,
+    phone:serverUser.phone||'',coins:Number(serverUser.coins)||0,role:serverUser.role||'user',
+    pass:passwordHash||old.pass||'',serverId:serverUser.id,banned:false,locked:false,
+    avatar:serverUser.avatar||old.avatar||'',sent:Number(old.sent)||0};
+  me=key; save();
+  try { localStorage.setItem('mygo_session',key);localStorage.setItem('mygo_remember_login','1'); } catch(_) {}
+}
+
 addEventListener('focusin',e=>{if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)&&e.target.type!=='file')document.body.classList.add('kb')});
 addEventListener('focusout',()=>setTimeout(()=>{const a=document.activeElement;if(!a||!/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))document.body.classList.remove('kb')},150));
 
@@ -674,24 +697,31 @@ $('#login-mode-toggle').onclick=()=>{loginMode=loginMode==='id'?'phone':'id';$('
 $('#bsw').onclick=()=>{reg=!reg;$('#ic').classList.toggle('hide',!reg);$('#bin').textContent=reg?'إنشاء الحساب':'تسجيل الدخول';$('#bsw').textContent=reg?'لدي حساب بالفعل':'إنشاء حساب جديد';$('#aerr').textContent='';updateLoginMode()};
 updateLoginMode();
 $('#bin').onclick=async()=>{
-  const raw=$('#u').value.trim(),phoneRaw=($('#reg-phone').value||'').trim(),p=$('#p').value,e=$('#aerr');
-  if(p.length<6)return e.textContent='كلمة المرور 6 أحرف على الأقل';
-  const h=await hash(p);
-  let k=null,created=false;
+  const raw=$('#u').value.trim(),phoneRaw=($('#reg-phone').value||'').trim(),password=$('#p').value,e=$('#aerr');
+  e.textContent='';
+  if(password.length<8)return e.textContent='كلمة المرور يجب ألا تقل عن 8 أحرف';
+  const phone=phoneRaw.replace(/[\\s()-]/g,'');
   if(reg){
     if(raw.length<3)return e.textContent='اسم المستخدم 3 أحرف على الأقل';
-    const phone=phoneRaw.replace(/[\s()-]/g,'');if(phone&&(!/^\+?[0-9]{7,15}$/.test(phone)))return e.textContent='رقم الهاتف غير صحيح';if(phone&&Object.values(DB.users).some(x=>x.phone===phone))return e.textContent='رقم الهاتف مستخدم من قبل';
-    k=raw.toLowerCase();
-    if(DB.users[k])return e.textContent='اسم المستخدم مستخدم من قبل';
-    const icv=($('#ic').value||'').trim().toUpperCase();let ik=null;if(icv){ik=Object.keys(DB.users).find(x=>invCode(DB.users[x])===icv);if(!ik)return e.textContent='كود الدعوة غير صحيح'}
-    const ownerPending=sessionStorage.getItem('mygo_owner_code_pending')==='1';DB.users[k]={name:raw,pass:h,phone:phone||'',coins:100,role:ownerPending?'owner':'user',banned:false,locked:false,sent:0};if(ownerPending)sessionStorage.removeItem('mygo_owner_code_pending');ensureUid(DB.users[k]);if(ik)DB.users[k].invBy=ik;created=true;
-    logIt('حساب',`تسجيل حساب جديد: ${raw} · ID ${DB.users[k].uid}`);
-  }else{
-    if(loginMode==='phone'){const phone=raw.replace(/[\s()-]/g,'');if(!/^\+?[0-9]{7,15}$/.test(phone))return e.textContent='أدخل رقم هاتف صحيحاً مع مفتاح الدولة عند الحاجة';k=Object.keys(DB.users).find(x=>String(DB.users[x].phone||'').replace(/[\s()-]/g,'')===phone)}else{if(!/^\d{5,10}$/.test(raw))return e.textContent='أدخل رقم ID الصحيح فقط';k=Object.keys(DB.users).find(x=>String(DB.users[x].uid)===raw)}
-    const x=k?DB.users[k]:null;if(!x||x.pass!==h)return e.textContent=loginMode==='phone'?'رقم الهاتف أو كلمة المرور غير صحيحة':'رقم ID أو كلمة المرور غير صحيحة';
+    if(phone&&(!/^\\+?[0-9]{7,15}$/.test(phone)))return e.textContent='رقم الهاتف غير صحيح';
+  } else {
+    if(loginMode==='phone'&&!/^\\+?[0-9]{7,15}$/.test((phone||raw).replace(/[\\s()-]/g,'')))return e.textContent='أدخل رقم هاتف صحيحاً';
+    if(loginMode==='id'&&!/^\\d{5,10}$/.test(raw))return e.textContent='أدخل رقم ID الصحيح فقط';
   }
-  if(isBanned(DB.users[k]))return e.textContent='هذا الحساب '+banTxt(DB.users[k]);
-  me=k;save();try{localStorage.setItem('mygo_session',k);localStorage.setItem('mygo_remember_login','1')}catch(_){}e.textContent='';start();if(created)toast(`تم إنشاء الحساب · رقم ID الخاص بك: ${DB.users[k].uid}`);
+  $('#bin').disabled=true;
+  const oldLabel=$('#bin').textContent; $('#bin').textContent='جارٍ الاتصال بالخادم...';
+  try {
+    const result=reg
+      ? await apiRequest('/auth/register',{method:'POST',body:JSON.stringify({username:raw,displayName:raw,phone,password})})
+      : await apiRequest('/auth/login',{method:'POST',body:JSON.stringify({identifier:loginMode==='phone'?(phone||raw):raw,password})});
+    if(!result.token||!result.user)throw new Error('استجابة الخادم غير مكتملة');
+    localStorage.setItem('migolive_token',result.token);
+    applyServerUser(result.user,await hash(password));
+    try { sessionStorage.removeItem('mygo_owner_code_pending'); } catch(_) {}
+    e.textContent=''; start();
+    if(reg)toast('تم إنشاء حسابك على خادم MigoLive · رقم ID: '+result.user.uid);
+  } catch(error) { e.textContent=error.message||'تعذر تسجيل الدخول'; }
+  finally { $('#bin').disabled=false; $('#bin').textContent=oldLabel; }
 };
 function U(){return DB.users[me]}
 const DAY=86400000;
@@ -1488,17 +1518,18 @@ function localVipPlansBind(m){$('#vip-plan-save').onclick=()=>{DB.vipPlans.forEa
 function localSecurityHTML(){const events=DB.securityEvents.slice(0,100);return `<div class="card"><b>🛡️ الأمان المحلي</b><div class="mu">البيانات محصورة في هذا التطبيق وعلى هذا الهاتف. لا يمكن اعتبار تخزين HTML المحلي حماية قوية ضد مالك الجهاز أو أدوات المطور.</div><div class="row"><div class="grow">الحسابات</div><b>${Object.keys(DB.users).length}</b></div><div class="row"><div class="grow">حسابات محظورة</div><b>${Object.values(DB.users).filter(isBanned).length}</b></div></div><div class="card"><b>سجل أحداث الحساب</b>${events.map(x=>`<div class="mu" style="padding:7px 0;border-bottom:1px solid var(--line)">${new Date(x.t).toLocaleString('ar-EG')} · ${esc(x.action)} · ${esc(x.user)}</div>`).join('')||'<span class="mu">لا توجد أحداث بعد.</span>'}</div><div class="card"><b>نسخة احتياطية محلية</b><div class="mu">نزّل نسخة من بيانات التطبيق واحفظها في مكان آمن. لا تشاركها لأنها تحتوي بيانات الحسابات المحلية.</div><button class="btn o w" id="local-export">تصدير نسخة احتياطية JSON</button><label class="btn o w" for="local-import">استيراد نسخة احتياطية JSON</label><input class="hide" id="local-import" type="file" accept="application/json"></div>`}
 function localSecurityBind(m){$('#local-export').onclick=()=>{const blob=new Blob([JSON.stringify(DB)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mygo-local-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};$('#local-import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!d||typeof d.users!=='object'||!Array.isArray(d.rooms))throw Error('invalid');if(!confirm('سيتم استبدال البيانات المحلية الحالية بالنسخة الاحتياطية. هل تريد المتابعة؟'))return;DB=d;save();location.reload()}catch(_){toast('ملف النسخة الاحتياطية غير صالح')}}}
 
-// Restore the last signed-in account after closing/reopening the app.
-try{
-  const savedAccount=localStorage.getItem('mygo_remember_login')==='1'?localStorage.getItem('mygo_session'):null;
-  if(savedAccount && DB.users && DB.users[savedAccount] && !isBanned(DB.users[savedAccount])){
-    me=savedAccount;
-    start();
-  }else if(savedAccount){
-    localStorage.removeItem('mygo_session');
+// Restore only a session validated by the API.
+(async()=>{
+  const token=localStorage.getItem('migolive_token');
+  if(token){
+    try { const result=await apiRequest('/auth/me'); if(result.user){applyServerUser(result.user);start();return;} }
+    catch(error){localStorage.removeItem('migolive_token');console.warn('Server session restore failed:',error.message);}
   }
-}catch(e){console.warn('session restore failed',e)}
-
+  try {
+    const oldSession=localStorage.getItem('mygo_session');
+    if(oldSession&&DB.users&&DB.users[oldSession])forceOut('يلزم تسجيل الدخول بحساب الخادم لمزامنة حسابك');
+  } catch(error){console.warn('session restore failed',error);}
+})();
 </script>
 
 <style id="mygo-room-entry-notices-v1">
