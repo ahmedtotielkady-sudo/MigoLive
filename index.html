@@ -522,6 +522,12 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 .profile-wallet-action{color:#fff!important}
 .profile-shortcut{color:#fff!important}
 </style>
+
+<style id="migo-profile-white-text-games">
+.profile-shortcuts-grid{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+.profile-hero .mu,.profile-hero small,.profile-shortcuts-head b,.profile-shortcuts-head span,.profile-shortcut,.profile-shortcut small,.profile-actions button,.profile-shortcuts~.card,.profile-shortcuts~.card b,.profile-shortcuts~.card button{color:#fff!important}
+.profile-shortcuts-head span,.profile-shortcuts~.card .mu{color:rgba(255,255,255,.9)!important}
+</style>
 </head>
 <body class="auth-screen">
 
@@ -1247,6 +1253,7 @@ function rMe(m){
       <button class="profile-shortcut" id="ginv" aria-label="الدعوات"><span class="profile-shortcut-icon">🎁</span><small>الدعوات</small></button>
       <button class="profile-shortcut" id="gsec" aria-label="الأمان"><span class="profile-shortcut-icon">🔒</span><small>الأمان</small></button>
       <button class="profile-shortcut" id="th" aria-label="المظهر"><span class="profile-shortcut-icon">🎨</span><small>المظهر</small></button>
+      <button class="profile-shortcut" id="gamelink" aria-label="الألعاب"><span class="profile-shortcut-icon">🎮</span><small>الألعاب</small></button>
     </div>
   </section>
   <div class="card profile-services" style="padding:14px">
@@ -1283,7 +1290,7 @@ function rMe(m){
   if($('#go'))$('#go').onclick=()=>{tab='owner';render()};
   $('#gvip').onclick=()=>{tab='vip';render()};if($('#wallet-shortcut'))$('#wallet-shortcut').onclick=()=>{tab='wallet';render()};$('#gfr').onclick=()=>{tab='friends';render()};$('#ginv').onclick=()=>{tab='invite';render()};$('#gsec').onclick=()=>{tab='security';render()};
   if($('#ga'))$('#ga').onclick=()=>{tab='agent';render()};if($('#gship'))$('#gship').onclick=()=>{tab='shipping';render()};
-  if($('#ag'))$('#ag').onclick=()=>{tab='agency';render()};if($('#gaDash'))$('#gaDash').onclick=()=>{tab='agency';render()};if($('#gperf'))$('#gperf').onclick=()=>{tab='hostperf';render()};$('#th').onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='light'?'dark':'light'};
+  if($('#ag'))$('#ag').onclick=()=>{tab='agency';render()};if($('#gaDash'))$('#gaDash').onclick=()=>{tab='agency';render()};if($('#gperf'))$('#gperf').onclick=()=>{tab='hostperf';render()};$('#th').onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='light'?'dark':'light'};$('#gamelink').onclick=()=>{tab='games';render()};
   $('#lo').onclick=()=>{if(U())U().last=Date.now();forceOut('')};
 }
 const agentRate=f=>f.rate!=null?f.rate:(DB.settings.agentRate!=null?DB.settings.agentRate:5);
