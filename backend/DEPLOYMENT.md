@@ -35,6 +35,7 @@ Wallet transfers use a MongoDB transaction and an atomic balance check. MongoDB 
 - `POST /api/rooms`: create a room; body supports `name`, optional `description`, `isPrivate`, `password`, and `capacity`.
 - `POST /api/rooms/:roomCode/join`: join an open room; private rooms require `password`.
 - `POST /api/rooms/:roomCode/leave`: leave a room; the owner closing it closes the room.
+- `GET /api/users/:uid`: authenticated public profile lookup by numeric user ID.
 - `GET /api/messages/:uid`: load a direct conversation with a user numeric ID; supports `limit` and `before`.
 - `POST /api/messages/:uid`: send a direct message; body `{ "text": "..." }`.
 
