@@ -38,6 +38,10 @@ Wallet transfers use a MongoDB transaction and an atomic balance check. MongoDB 
 - `GET /api/messages/:uid`: load a direct conversation with a user numeric ID; supports `limit` and `before`.
 - `POST /api/messages/:uid`: send a direct message; body `{ "text": "..." }`.
 
+- `GET /api/users/:uid`: authenticated public user lookup by numeric account ID.
+
+The wallet screen and direct-message search/send/history now call the server APIs when the user is signed in. Other existing local-only features must not be treated as synchronized.
+
 ## Important rollout notes
 - Existing local-only accounts are not automatically migrated to server accounts.
 - Do not grant owner/admin roles through public registration.
