@@ -29,6 +29,8 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
+app.use("/api/wallet", rateLimit({ windowMs: 60_000, limit: 40, standardHeaders: true, legacyHeaders: false }), require("./routes/wallet"));
+
 app.use("/api/auth", rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
