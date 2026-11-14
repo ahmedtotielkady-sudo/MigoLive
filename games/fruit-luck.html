@@ -49,6 +49,42 @@ html,body{height:100%;margin:0;background:#12041f;color:var(--txt);font-family:"
 .rules{align-items:stretch;text-align:right;background:rgba(40,10,70,.97)}
 .rules h3{text-align:center;margin:0 0 14px}.rules li{margin-bottom:12px;line-height:1.7}
 .close{position:absolute;top:14px;left:14px}
+
+/* Mobile viewport/layout repair */
+html,body{width:100%;height:100%;min-height:100%;overflow:hidden}
+#app{
+  height:100dvh;min-height:0;max-width:480px;width:100%;
+  padding-top:max(env(safe-area-inset-top,0px),24px);
+  padding-bottom:max(env(safe-area-inset-bottom,0px),6px);
+  padding-left:clamp(8px,3vw,14px);padding-right:clamp(8px,3vw,14px);
+  justify-content:flex-start;gap:clamp(4px,1vh,10px);
+  overflow:hidden;
+}
+.top{flex:0 0 auto;min-height:42px;padding:4px 2px;width:100%}
+.wheelbox{
+  flex:0 0 auto;width:min(88vw, min(360px, 34dvh));
+  max-width:100%;height:auto;aspect-ratio:1;
+  margin:0 auto 0;transform:none;
+}
+.hist{flex:0 0 auto;width:100%;margin:0;min-height:42px}
+.boxes{flex:0 0 auto;width:100%;margin-top:0;gap:clamp(5px,1.4vw,9px)}
+.box{min-width:0;padding:5px 3px 7px}
+.box .row{height:clamp(42px,7vh,56px);gap:4px}
+.box .f img{height:clamp(34px,6vh,46px)}
+.box .f img.i77{height:clamp(30px,5.2vh,40px)}
+.box .x{font-size:clamp(19px,4vw,26px)}
+.box .s{margin-top:6px;font-size:clamp(16px,3.5vw,19px)}
+.status{flex:0 0 auto;min-height:16px;margin:0;font-size:12px}
+.chips{flex:0 0 auto;width:100%;margin:0 0 4px;gap:clamp(3px,.8vw,6px)}
+.chip{height:clamp(34px,5.5vh,42px);font-size:clamp(11px,2.8vw,13px);min-width:0}
+@media(max-height:700px){
+  #app{gap:3px;padding-top:max(env(safe-area-inset-top,0px),18px)}
+  .wheelbox{width:min(76vw,28dvh)}
+  .box .row{height:38px}
+  .box .s{margin-top:2px}
+  .chips{margin-top:0}
+}
+
 </style>
 </head>
 <body>
