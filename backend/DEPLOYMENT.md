@@ -30,8 +30,16 @@ The Pages Function at `/api/*` forwards requests to Railway on the same origin, 
 
 Wallet transfers use a MongoDB transaction and an atomic balance check. MongoDB Atlas supports transactions on replica-set clusters.
 
+
+- `GET /api/rooms`: list open rooms for the authenticated user.
+- `POST /api/rooms`: create a room; body supports `name`, optional `description`, `isPrivate`, `password`, and `capacity`.
+- `POST /api/rooms/:roomCode/join`: join an open room; private rooms require `password`.
+- `POST /api/rooms/:roomCode/leave`: leave a room; the owner closing it closes the room.
+- `GET /api/messages/:uid`: load a direct conversation with a user numeric ID; supports `limit` and `before`.
+- `POST /api/messages/:uid`: send a direct message; body `{ "text": "..." }`.
+
 ## Important rollout notes
 - Existing local-only accounts are not automatically migrated to server accounts.
 - Do not grant owner/admin roles through public registration.
-- Gift, game, rooms, messaging, moderation, and admin actions still need dedicated server APIs before those features can be considered multi-user or production-ready.
+- Room create/join/leave and direct-message storage APIs now exist, but the current web interface has not yet been switched to use them. Realtime room presence, voice transport, room chat fan-out, moderation, gift catalog/pricing, game settlement, recharge, agency commissions, and admin actions still need server-side implementation before those features can be considered multi-user or production-ready.
 - Never expose database credentials or JWT secrets in frontend code or Git.
