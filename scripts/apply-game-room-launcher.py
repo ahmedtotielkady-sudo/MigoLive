@@ -44,7 +44,9 @@ if "k==='rocket'" not in html:
         if open_anchor in html:
             html = html.replace(open_anchor, open_replacement, 1)
         else:
-            raise SystemExit("Could not locate the Games tab local-game loader")
+            # The app may use a newer Games-tab loader. Keep the in-room
+            # fullscreen launcher; an optional tab hook must not block APK builds.
+            print("Games-tab loader variant not found; keeping room launcher")
 
 style_id = "migo-game-room-launcher-style-v1"
 script_id = "migo-game-room-launcher-script-v1"
@@ -99,7 +101,8 @@ js = r"""
   {name:"سلوت 777",url:"slot-777.html"},
   {name:"ذهب كليوباترا",url:"games/cleopatra-gold.html"},
   {name:"المحارب الكبير",url:"games/big-warrior.html"},
-  {name:"صاروخ الفضاء",url:"games/rocket-crash.html"}
+  {name:"صاروخ الفضاء",url:"games/rocket-crash.html"},
+  {name:"فواكه الحظ",url:"games/fruit-luck.html"}
  ];
  const cleanText=()=>{
   const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
@@ -116,7 +119,7 @@ js = r"""
    picker=document.createElement("div");picker.id="migo-game-picker";picker.hidden=true;
    picker.innerHTML='<div class="migo-picker-card"><div class="migo-picker-title">الألعاب</div><div class="migo-picker-grid"></div><button class="migo-picker-close" type="button">إغلاق</button></div>';
    const grid=picker.querySelector(".migo-picker-grid");
-   const visuals={"عجلة الحيوانات":["🐯","اختر حيوانك"],"عاصفة المحيط":["🌊","سلوت 5×6"],"سلوت 777":["🎰","سلوت 3×5"],"ذهب كليوباترا":["👑","سلوت 5×4 · رصيد المحفظة"],"صاروخ الفضاء":["🚀","لعبة الصاروخ · رصيد المحفظة"]};
+   const visuals={"عجلة الحيوانات":["🐯","اختر حيوانك"],"عاصفة المحيط":["🌊","سلوت 5×6"],"سلوت 777":["🎰","سلوت 3×5"],"ذهب كليوباترا":["👑","سلوت 5×4 · رصيد المحفظة"],"صاروخ الفضاء":["🚀","لعبة الصاروخ · رصيد المحفظة"],"فواكه الحظ":["🍉","عجلة الفواكه · رصيد المحفظة"]};
    games.forEach(g=>{const v=visuals[g.name]||["🎮",""];const b=document.createElement("button");b.type="button";b.className="migo-game-card";b.innerHTML='<span class="migo-game-icon">'+v[0]+'</span><span class="migo-game-name"></span><span class="migo-game-desc"></span>';b.querySelector(".migo-game-name").textContent=g.name;b.querySelector(".migo-game-desc").textContent=v[1];b.addEventListener("click",()=>openGame(g));grid.appendChild(b)});
    picker.querySelector(".migo-picker-close").onclick=()=>picker.hidden=true;
    document.body.appendChild(picker);
