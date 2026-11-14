@@ -1,0 +1,32 @@
+name: MigoLive backend checks
+
+on:
+  push:
+    branches:
+      - feature/mongodb-primary-integration
+    paths:
+      - "backend/**"
+      - "functions/api/**"
+      - ".github/workflows/migolive-backend-checks.yml"
+  pull_request:
+    branches:
+      - feature/mongodb-primary-integration
+    paths:
+      - "backend/**"
+      - "functions/api/**"
+
+jobs:
+  backend-syntax:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - name: Check backend JavaScript syntax
+        run: |
+          find . -path "./node_modules" -prune -o -name "*.js" -type f -print0 | xargs -0 -n1 node --check
