@@ -1243,7 +1243,7 @@ function rMe(m){
     save();toast('تم حفظ تعديلات الحساب');render();
   };
   if($('#go'))$('#go').onclick=()=>{tab='owner';render()};
-  $('#gvip').onclick=()=>{tab='vip';render()};$('#gfr').onclick=()=>{tab='friends';render()};$('#ginv').onclick=()=>{tab='invite';render()};$('#gsec').onclick=()=>{tab='security';render()};
+  $('#gvip').onclick=()=>{tab='vip';render()};if($('#wallet-shortcut'))$('#wallet-shortcut').onclick=()=>{tab='wallet';render()};$('#gfr').onclick=()=>{tab='friends';render()};$('#ginv').onclick=()=>{tab='invite';render()};$('#gsec').onclick=()=>{tab='security';render()};
   if($('#ga'))$('#ga').onclick=()=>{tab='agent';render()};if($('#gship'))$('#gship').onclick=()=>{tab='shipping';render()};
   if($('#ag'))$('#ag').onclick=()=>{tab='agency';render()};if($('#gaDash'))$('#gaDash').onclick=()=>{tab='agency';render()};if($('#gperf'))$('#gperf').onclick=()=>{tab='hostperf';render()};$('#th').onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='light'?'dark':'light'};
   $('#lo').onclick=()=>{if(U())U().last=Date.now();forceOut('')};
