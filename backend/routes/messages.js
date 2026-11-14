@@ -22,7 +22,7 @@ router.get("/:uid", async (req, res, next) => {
       ]
     };
     if (before && !Number.isNaN(before.getTime())) filter.createdAt = { $lt: before };
-    const messages = await Message.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
+    const messages = await Message.find(filter).populate("from", "uid displayName").populate("to", "uid displayName").sort({ createdAt: -1 }).limit(limit).lean();
     await Message.updateMany({ from: peer._id, to: req.auth.sub, readAt: null }, { $set: { readAt: new Date() } });
     return res.json({ ok: true, peer: { uid: peer.uid, displayName: peer.displayName, avatar: peer.avatar }, messages: messages.reverse() });
   } catch (error) { return next(error); }
