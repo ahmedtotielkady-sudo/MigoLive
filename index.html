@@ -700,13 +700,13 @@ $('#bin').onclick=async()=>{
   const raw=$('#u').value.trim(),phoneRaw=($('#reg-phone').value||'').trim(),password=$('#p').value,e=$('#aerr');
   e.textContent='';
   if(password.length<8)return e.textContent='كلمة المرور يجب ألا تقل عن 8 أحرف';
-  const phone=phoneRaw.replace(/[\\s()-]/g,'');
+  const phone=phoneRaw.replace(/[\s()-]/g,'');
   if(reg){
     if(raw.length<3)return e.textContent='اسم المستخدم 3 أحرف على الأقل';
-    if(phone&&(!/^\\+?[0-9]{7,15}$/.test(phone)))return e.textContent='رقم الهاتف غير صحيح';
+    if(phone&&(!/^\+?[0-9]{7,15}$/.test(phone)))return e.textContent='رقم الهاتف غير صحيح';
   } else {
-    if(loginMode==='phone'&&!/^\\+?[0-9]{7,15}$/.test((phone||raw).replace(/[\\s()-]/g,'')))return e.textContent='أدخل رقم هاتف صحيحاً';
-    if(loginMode==='id'&&!/^\\d{5,10}$/.test(raw))return e.textContent='أدخل رقم ID الصحيح فقط';
+    if(loginMode==='phone'&&!/^\+?[0-9]{7,15}$/.test((phone||raw).replace(/[\s()-]/g,'')))return e.textContent='أدخل رقم هاتف صحيحاً';
+    if(loginMode==='id'&&!/^\d{5,10}$/.test(raw))return e.textContent='أدخل رقم ID الصحيح فقط';
   }
   $('#bin').disabled=true;
   const oldLabel=$('#bin').textContent; $('#bin').textContent='جارٍ الاتصال بالخادم...';
