@@ -14,6 +14,8 @@ export async function onRequest({ request, env }) {
   const target = new URL(origin + incoming.pathname + incoming.search);
   const headers = new Headers(request.headers);
   headers.delete("host");
+  headers.delete("origin");
+  headers.delete("referer");
   headers.set("x-forwarded-host", incoming.host);
 
   const upstream = new Request(target.toString(), {
