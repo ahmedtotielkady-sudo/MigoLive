@@ -1162,9 +1162,22 @@ function bindTopup(m){let img='';packsBind(m);
     DB.topups.unshift({id:Date.now(),user:me,amount:a,from:f,img,status:'pending',t:now(),pack:selPack?{coins:selPack.coins,bonus:selPack.bonus||0,price:selPack.price}:null});selPack=null;
     if(!save()){DB.topups.shift();return e.textContent='مساحة التخزين ممتلئة، جرّب صورة أصغر'}
     notifyOwner(`طلب شحن جديد من ${U().name} (ID ${U().uid}) بقيمة ${fmt(a)} عملة`,'request');notifyUserResult(me,`تم استلام طلب شحن ${fmt(a)} عملة وهو قيد المراجعة`);toast('تم إرسال الطلب للمراجعة');render()}}
-function rWallet(m){rWallet0(m);bindTopup(m)}
+function rWallet(m){rWallet0(m);bindTopup(m);refreshServerWallet(m)}
+async function refreshServerWallet(m){
+  const status=m.querySelector('#server-wallet-status'),balance=m.querySelector('#server-wallet-balance'),rows=m.querySelector('#server-wallet-transactions');
+  const btn=m.querySelector('#wallet-refresh');if(btn)btn.onclick=()=>refreshServerWallet(m);
+  try{
+    const data=await apiRequest('/wallet');
+    const user=U();user.coins=Number(data.coins)||0;save();
+    if(balance)balance.textContent='🪙 '+fmt(user.coins);
+    if(status)status.textContent='✓ الرصيد المؤكد من قاعدة البيانات';
+    const history=await apiRequest('/wallet/transactions?limit=20');
+    if(rows)rows.innerHTML=history.transactions&&history.transactions.length?history.transactions.map(tx=>'<div class="row" style="justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)"><span>'+esc(tx.description||tx.type||'معاملة')+'</span><b>'+(tx.direction==='in'?'+':'−')+fmt(tx.amount)+'</b></div>').join(''):'لا توجد معاملات مسجلة بعد';
+    const top=document.querySelector('#mycoins');if(top)top.textContent=fmt(user.coins);
+  }catch(error){if(status)status.textContent='تعذر التحقق من الخادم: '+error.message;if(rows)rows.textContent='سجل الخادم غير متاح؛ الرصيد المحلي غير مؤكد.'}
+}
 function rWallet0(m){
-  m.innerHTML=`<div class="card" style="text-align:center"><div class="mu">رصيدك</div><div style="font-size:36px;font-weight:900;color:var(--gd)">🪙 ${U().coins}</div></div>
+  m.innerHTML=`<div class="card" style="text-align:center"><div class="mu">رصيدك من الخادم</div><div id="server-wallet-balance" style="font-size:36px;font-weight:900;color:var(--gd)">🪙 ${U().coins}</div><div id="server-wallet-status" class="mu">جارٍ التحقق من الخادم...</div><button type="button" class="btn o s" id="wallet-refresh">↻ تحديث الرصيد</button></div><div class="card"><b>آخر معاملات المحفظة</b><div id="server-wallet-transactions" class="mu">جارٍ التحميل...</div></div>
   ${topupCard()}
   <div class="card"><b>الشحن عبر وكيل</b><p class="mu">الشحن يتم عن طريق وكيل معتمد: أعطِ الوكيل اسم المستخدم أو رقم الـ ID الخاص بك (ID: ${U().uid}) وسيُحوّل لك الرصيد.</p></div>
   <b>الوكلاء المعتمدون</b><div class="sp"></div>
