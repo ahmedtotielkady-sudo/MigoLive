@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-
 const userSchema = new mongoose.Schema({
   uid: { type: Number, required: true, unique: true, index: true },
   username: { type: String, required: true, unique: true, lowercase: true, trim: true, minlength: 3, maxlength: 24, index: true },
@@ -12,6 +11,5 @@ const userSchema = new mongoose.Schema({
   status: { type: String, enum: ["active", "banned"], default: "active" },
   lastLoginAt: { type: Date, default: null }
 }, { timestamps: true, versionKey: false });
-
 userSchema.index({ phone: 1 }, { unique: true, partialFilterExpression: { phone: { $type: "string" } } });
 module.exports = mongoose.models.User || mongoose.model("User", userSchema);
