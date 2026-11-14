@@ -112,7 +112,7 @@ function outcome(r){
   try{localStorage.setItem(key,JSON.stringify(result))}catch(e){}
   return result
 }
-function histFor(last){var a=[];for(var k=0;k<9;k++)a.push(outcome(last-k).res);return a}
+function histFor(last){var a=[];for(var k=0;k<9;k++){var v=null;try{v=JSON.parse(localStorage.getItem("fh_outcome_"+(last-k))||"null")}catch(e){}if(v&&["m","77","o"].indexOf(v.res)!==-1&&Number.isInteger(v.i)&&Number.isFinite(v.off))a.push(v.res)}return a}
 function total(){return bets.m+bets["77"]+bets.o}
 function startSpin(o,late){
   phase="spin";$("cd").textContent="\uD83C\uDF40";$("st").textContent="العجلة تدور...";
