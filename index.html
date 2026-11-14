@@ -1204,28 +1204,28 @@ function rMe(m){
   const pendingCountry=(DB.countryRequests||[]).find(x=>x.user===me&&x.status==='pending');
   const friendsCount=(u.friends||[]).length;
   const walletCoins=Math.max(0,Math.floor(+u.coins||0));
-  m.innerHTML=\`<section class="card profile-hero">
+  m.innerHTML=`<section class="card profile-hero">
     <div class="row" style="align-items:center;gap:14px">
-      <div class="av" id="avp" style="width:76px;height:76px;flex:0 0 76px;font-size:29px;margin:0;border:2px solid var(--gd);box-shadow:0 0 18px #a855f755;\${okAv(u)?"background:url('"+u.avatar+"') center/cover no-repeat;color:transparent":''};\${VFRAME[vipLv(u)]||''}">\${avL(u)}</div>
+      <div class="av" id="avp" style="width:76px;height:76px;flex:0 0 76px;font-size:29px;margin:0;border:2px solid var(--gd);box-shadow:0 0 18px #a855f755;${okAv(u)?"background:url('"+u.avatar+"') center/cover no-repeat;color:transparent":''};${VFRAME[vipLv(u)]||''}">${avL(u)}</div>
       <div class="grow" style="min-width:0">
-        <div class="row" style="justify-content:flex-start;gap:8px;align-items:center"><b style="font-size:18px;overflow-wrap:anywhere">\${uName(u)}</b><button type="button" class="btn o s" id="profile-edit-open" aria-label="تعديل الحساب" title="تعديل الحساب">✏️</button></div>
-        <div class="mu">\${vipLv(u)?VBADGE[vipLv(u)]+' '+esc(vipCfg(vipLv(u)).name)+' · ':''}\${$('#myrole').textContent}</div>
-        <div class="mu">ID: \${u.uid}</div>
-        <div class="mu">🌍 \${esc(u.country||'لم يتم التعيين')}</div>
+        <div class="row" style="justify-content:flex-start;gap:8px;align-items:center"><b style="font-size:18px;overflow-wrap:anywhere">${uName(u)}</b><button type="button" class="btn o s" id="profile-edit-open" aria-label="تعديل الحساب" title="تعديل الحساب">✏️</button></div>
+        <div class="mu">${vipLv(u)?VBADGE[vipLv(u)]+' '+esc(vipCfg(vipLv(u)).name)+' · ':''}${$('#myrole').textContent}</div>
+        <div class="mu">ID: ${u.uid}</div>
+        <div class="mu">🌍 ${esc(u.country||'لم يتم التعيين')}</div>
       </div>
     </div>
     <div class="row profile-stats">
-      <div class="grow profile-stat"><b style="display:block;font-size:17px;color:var(--gd)">\${walletCoins.toLocaleString('en-US')}</b><small class="mu">🪙 العملات</small></div>
-      <div class="grow profile-stat"><b style="display:block;font-size:17px;color:var(--gd)">\${u.gifts||0}</b><small class="mu">🎁 الهدايا</small></div>
-      <div class="grow profile-stat"><b style="display:block;font-size:17px;color:var(--gd)">\${friendsCount}</b><small class="mu">👥 الأصدقاء</small></div>
+      <div class="grow profile-stat"><b style="display:block;font-size:17px;color:var(--gd)">${walletCoins.toLocaleString('en-US')}</b><small class="mu">🪙 العملات</small></div>
+      <div class="grow profile-stat"><b style="display:block;font-size:17px;color:var(--gd)">${u.gifts||0}</b><small class="mu">🎁 الهدايا</small></div>
+      <div class="grow profile-stat"><b style="display:block;font-size:17px;color:var(--gd)">${friendsCount}</b><small class="mu">👥 الأصدقاء</small></div>
     </div>
   </section>
   <div id="profile-edit-panel" class="card hide"><div class="row"><b class="grow">✏️ تعديل الحساب</b><button class="btn o s" id="profile-edit-close">إغلاق</button></div><div class="sp"></div>
-  <label class="mu" for="profile-name">اسم المستخدم</label><input class="in" id="profile-name" maxlength="24" value="\${esc(u.name||'')}" placeholder="الاسم الجديد">
-  <label class="mu" for="profile-photo">الصورة الشخصية</label><div class="row"><label class="btn o grow" for="profile-photo">📷 \${okAv(u)?'تغيير الصورة':'تعيين صورة'}</label>\${okAv(u)?'<button class="btn r s" id="profile-photo-delete">حذف الصورة</button>':''}</div><input id="profile-photo" type="file" accept="image/*" class="hide"><div class="mu" id="profile-photo-status">يمكنك تغيير الصورة أو حذفها من هنا.</div>
-  <div class="sp"></div><label class="mu" for="profile-country">البلد</label><select class="in" id="profile-country"><option value="">اختر البلد</option>\${countries.map(c=>\`<option value="\${c}" \${u.country===c?'selected':''}>\${c}</option>\`).join('')}</select>
-  \${pendingCountry?\`<div class="mu" style="margin-top:8px">طلب تغيير البلد إلى <b>\${esc(pendingCountry.country)}</b> قيد مراجعة المالك.</div>\`:''}
-  <div class="mu" style="margin-top:8px">\${u.countrySetOnce?'تغيير البلد مرة أخرى يتطلب 100,000 عملة وموافقة المالك حصراً.':'يمكنك تعيين البلد لأول مرة مجاناً.'}</div>
+  <label class="mu" for="profile-name">اسم المستخدم</label><input class="in" id="profile-name" maxlength="24" value="${esc(u.name||'')}" placeholder="الاسم الجديد">
+  <label class="mu" for="profile-photo">الصورة الشخصية</label><div class="row"><label class="btn o grow" for="profile-photo">📷 ${okAv(u)?'تغيير الصورة':'تعيين صورة'}</label>${okAv(u)?'<button class="btn r s" id="profile-photo-delete">حذف الصورة</button>':''}</div><input id="profile-photo" type="file" accept="image/*" class="hide"><div class="mu" id="profile-photo-status">يمكنك تغيير الصورة أو حذفها من هنا.</div>
+  <div class="sp"></div><label class="mu" for="profile-country">البلد</label><select class="in" id="profile-country"><option value="">اختر البلد</option>${countries.map(c=>`<option value="${c}" ${u.country===c?'selected':''}>${c}</option>`).join('')}</select>
+  ${pendingCountry?`<div class="mu" style="margin-top:8px">طلب تغيير البلد إلى <b>${esc(pendingCountry.country)}</b> قيد مراجعة المالك.</div>`:''}
+  <div class="mu" style="margin-top:8px">${u.countrySetOnce?'تغيير البلد مرة أخرى يتطلب 100,000 عملة وموافقة المالك حصراً.':'يمكنك تعيين البلد لأول مرة مجاناً.'}</div>
   <div class="sp"></div><div class="err" id="profile-edit-error" role="alert"></div><button class="btn g w" id="profile-edit-save">حفظ التعديلات</button></div>
   <div class="row profile-actions">
     <button class="btn w profile-vip-action" id="gvip">👑 عضويات VIP</button>
@@ -1242,13 +1242,13 @@ function rMe(m){
   </section>
   <div class="card" style="padding:14px">
     <div class="row"><b class="grow">حسابك وخدماتك</b><span class="mu">⚙️</span></div>
-    \${isStaff(u)?\`<button class="btn o w" id="go" style="margin-top:10px">\${u.role==='owner'?'👑 لوحة المالك':'🛠️ لوحة الإدارة'}\${u.role==='owner'?ownerTotalBadge():''}</button>\`:''}
-    \${u.role==='agent'&&!DB.agencies.some(a=>a.head===me)?'<button class="btn o w" id="ga" style="margin-top:10px">🛡️ لوحة الوكيل</button>':''}
-    \${u.shippingAgency?'<button class="btn o w" id="gship" style="margin-top:10px">🏦 لوحة وكالة الشحن</button>':''}
-    \${DB.agencies.some(a=>a.head===me)?'<button class="btn o w" id="gaDash" style="margin-top:10px">🏢 لوحة الوكالة</button>':''}
-    \${u.agency&&ag(u.agency)?'<button class="btn o w" id="gperf" style="margin-top:10px">📊 أداء المضيف</button>':(!DB.agencies.some(a=>a.head===me)&&!u.agency?'<button class="btn o w" id="ag" style="margin-top:10px">🏢 الانضمام لوكالة</button>':'')}
+    ${isStaff(u)?`<button class="btn o w" id="go" style="margin-top:10px">${u.role==='owner'?'👑 لوحة المالك':'🛠️ لوحة الإدارة'}${u.role==='owner'?ownerTotalBadge():''}</button>`:''}
+    ${u.role==='agent'&&!DB.agencies.some(a=>a.head===me)?'<button class="btn o w" id="ga" style="margin-top:10px">🛡️ لوحة الوكيل</button>':''}
+    ${u.shippingAgency?'<button class="btn o w" id="gship" style="margin-top:10px">🏦 لوحة وكالة الشحن</button>':''}
+    ${DB.agencies.some(a=>a.head===me)?'<button class="btn o w" id="gaDash" style="margin-top:10px">🏢 لوحة الوكالة</button>':''}
+    ${u.agency&&ag(u.agency)?'<button class="btn o w" id="gperf" style="margin-top:10px">📊 أداء المضيف</button>':(!DB.agencies.some(a=>a.head===me)&&!u.agency?'<button class="btn o w" id="ag" style="margin-top:10px">🏢 الانضمام لوكالة</button>':'')}
     <button class="btn o w" id="lo" style="margin-top:10px">🚪 تسجيل الخروج</button>
-  </div>\`;
+  </div>`;
   $('#profile-edit-open').onclick=()=>$('#profile-edit-panel').classList.remove('hide');$('#profile-edit-close').onclick=()=>$('#profile-edit-panel').classList.add('hide');
   let newAvatar=null,deleteAvatar=false;
   $('#profile-photo').onchange=e=>{const f=e.target.files[0];if(!f)return;rImg(f,256,d=>{newAvatar=d;deleteAvatar=false;$('#profile-photo-status').textContent='تم اختيار الصورة الجديدة، اضغط حفظ التعديلات.'});e.target.value=''};
