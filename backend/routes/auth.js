@@ -95,7 +95,7 @@ router.post("/login", async (req, res, next) => {
         { username: identifier.toLowerCase() },
         { phone: normalizedPhone }
       ]
-    });
+    }).select("+passwordHash");
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       return res.status(401).json({ ok: false, message: "بيانات الدخول غير صحيحة" });
     }
