@@ -50,6 +50,7 @@ router.post("/", async (req, res, next) => {
       passwordHash: isPrivate ? await bcrypt.hash(password, 10) : "",
       capacity: Math.min(25, Math.max(2, Number(req.body.capacity) || 25))
     });
+    await room.populate("owner", "uid displayName");
     return res.status(201).json({ ok: true, room: roomView(room, req.auth.sub) });
   } catch (error) { return next(error); }
 });
