@@ -51,8 +51,13 @@ router.post("/transfer", async (req, res, next) => {
     await session.withTransaction(async () => {
       const existing = await WalletTransaction.findOne({ idempotencyKey: key }).session(session);
       if (existing) {
-        if (String(existing.from) !== req.auth.sub) throw Object.assign(new Error("مفتاح العملية مستخدم"), { status: 409 });
+        if (String(existing.from) !== req.auth.sub ||
+            String(existing.to) !== String((await User.findOne({ uid: targetUid }).session(session).select("_id"))?._id || "") ||
+            existing.amount !== amount || existing.type !== type) {
+          throw Object.assign(new Error("مفتاح العملية مستخدم لطلب مختلف"), { status: 409 });
+        }
         const sender = await User.findById(req.auth.sub).session(session).select("coins uid");
+        if (!sender) throw Object.assign(new Error("الحساب غير موجود"), { status: 404 });
         result = { coins: sender.coins, transactionId: String(existing._id), repeated: true };
         return;
       }
