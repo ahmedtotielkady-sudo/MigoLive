@@ -1,7 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const mongoose = require("mongoose");
 const User = require("../models/User");
 const Counter = require("../models/Counter");
 const requireAuth = require("../middleware/requireAuth");
@@ -66,7 +65,7 @@ router.post("/register", async (req, res, next) => {
       uid: 100000 + counter.value,
       username: normalized,
       displayName,
-      phone,
+      phone: phone || undefined,
       passwordHash,
       coins: 100,
       role: "user"
