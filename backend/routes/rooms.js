@@ -18,13 +18,13 @@ function roomView(room, userId) {
   };
 }
 
-router.get("/", async (_req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
     const rooms = await Room.find({ status: "open" })
       .select("roomCode name description owner members capacity isPrivate status createdAt")
       .populate("owner", "uid displayName")
       .sort({ updatedAt: -1 }).limit(100).lean();
-    return res.json({ ok: true, rooms: rooms.map(r => roomView(r, "")) });
+    return res.json({ ok: true, rooms: rooms.map(r => roomView(r, req.auth.sub)) });
   } catch (error) { return next(error); }
 });
 
