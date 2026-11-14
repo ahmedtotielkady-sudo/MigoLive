@@ -513,6 +513,15 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 .profile-wallet-action{background:linear-gradient(110deg,#a66b12,#f4bd45)!important;color:#211300!important;border:1px solid rgba(255,220,130,.5)!important;box-shadow:0 6px 16px rgba(245,158,11,.16)!important}
 @media(max-width:350px){.profile-hero{padding:14px!important}.profile-hero #avp{width:70px!important;height:70px!important;flex-basis:70px!important}.profile-stat{padding:9px 2px!important}.profile-stat b{font-size:16px!important}}
 </style>
+
+<style id="migo-profile-white-labels">
+/* Keep all labels and action text in the refreshed profile readable in both themes. */
+.profile-hero,.profile-shortcuts,.profile-services,#profile-edit-panel{color:#fff!important}
+.profile-hero .mu,.profile-hero small,.profile-shortcuts-head b,.profile-shortcuts-head span,.profile-shortcut small,.profile-services .mu,.profile-services b,#profile-edit-panel label,#profile-edit-panel .mu{color:#fff!important}
+.profile-actions button,.profile-services button{color:#fff!important}
+.profile-wallet-action{color:#fff!important}
+.profile-shortcut{color:#fff!important}
+</style>
 </head>
 <body class="auth-screen">
 
@@ -1240,7 +1249,7 @@ function rMe(m){
       <button class="profile-shortcut" id="th" aria-label="المظهر"><span class="profile-shortcut-icon">🎨</span><small>المظهر</small></button>
     </div>
   </section>
-  <div class="card" style="padding:14px">
+  <div class="card profile-services" style="padding:14px">
     <div class="row"><b class="grow">حسابك وخدماتك</b><span class="mu">⚙️</span></div>
     ${isStaff(u)?`<button class="btn o w" id="go" style="margin-top:10px">${u.role==='owner'?'👑 لوحة المالك':'🛠️ لوحة الإدارة'}${u.role==='owner'?ownerTotalBadge():''}</button>`:''}
     ${u.role==='agent'&&!DB.agencies.some(a=>a.head===me)?'<button class="btn o w" id="ga" style="margin-top:10px">🛡️ لوحة الوكيل</button>':''}
