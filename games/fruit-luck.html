@@ -100,8 +100,18 @@ CHIPS.forEach(function(v,i){var c=document.createElement("button");c.className="
 function upd(){$("bal").textContent=bal;for(var k in bets)$("s_"+k).textContent=bets[k];save()}if(walletMode){window.addEventListener("message",function(e){var d=e.data;if(d&&d.t==="bal"&&Number.isFinite(d.v)&&d.v>=0){bal=Math.floor(d.v);walletReady=true;upd();$("st").textContent="رصيد محفظتك متصل"}});window.parent.postMessage({t:"get"},"*")}
 // round (time-based: rounds run continuously on the clock)
 var CYC=30000,BET=20000,SPE=26000,RSE=29000,rid=0,lastPh="",settled=-1,lastInfo=null;
-function rng(seed){var a=seed>>>0;return function(){a=(a+0x6D2B79F5)>>>0;var t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
-function outcome(r){var g=rng(r*7919+13);g();g();var x=g(),res=x<.25?"77":x<.625?"o":"m",idx=[];SEG.forEach(function(s,i){if(s===res)idx.push(i)});return{res:res,i:idx[Math.floor(g()*idx.length)],off:(g()-.5)*16}}
+function outcome(r){
+  var key="fh_outcome_"+r,cached=null;
+  try{cached=JSON.parse(localStorage.getItem(key)||"null")}catch(e){}
+  if(cached&&cached.res&&Number.isInteger(cached.i)&&Number.isFinite(cached.off))return cached;
+  if(!window.crypto||!crypto.getRandomValues)throw new Error("المتصفح لا يدعم مولد أرقام عشوائية آمن");
+  var q=new Uint32Array(3);crypto.getRandomValues(q);
+  var x=q[0]/4294967296,res=x<.25?"77":x<.625?"o":"m",idx=[];
+  SEG.forEach(function(s,i){if(s===res)idx.push(i)});
+  var result={res:res,i:idx[q[1]%idx.length],off:(q[2]/4294967296-.5)*16};
+  try{localStorage.setItem(key,JSON.stringify(result))}catch(e){}
+  return result
+}
 function histFor(last){var a=[];for(var k=0;k<9;k++)a.push(outcome(last-k).res);return a}
 function total(){return bets.m+bets["77"]+bets.o}
 function startSpin(o,late){
