@@ -132,7 +132,7 @@ $("qb").onclick=function(){$("rules").classList.add("show")};
 $("xr").onclick=function(){$("rules").classList.remove("show")};
 $("rb").onclick=function(){if(phase==="bet"){bal+=bets.m+bets["77"]+bets.o;bets={m:0,"77":0,o:0};upd()}};
 rid=Math.floor(Date.now()/CYC);
-try{var sb=JSON.parse(localStorage.getItem("fh_bets")||"null");if(sb&&sb.b){if(sb.r===rid)bets=sb.b;else if(sb.r<rid){var o2=outcome(sb.r);bal+=(sb.b[o2.res]||0)*MULT[o2.res]}}}catch(e){}
+if(!walletMode)try{var sb=JSON.parse(localStorage.getItem("fh_bets")||"null");if(sb&&sb.b){if(sb.r===rid)bets=sb.b;else if(sb.r<rid){var o2=outcome(sb.r);bal+=(sb.b[o2.res]||0)*MULT[o2.res]}}}catch(e){}
 upd();setInterval(tick,250);document.addEventListener("visibilitychange",tick);tick();
 })();
 </script>
