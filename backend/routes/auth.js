@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const Counter = require("../models/Counter");
+const requireAuth = require("../middleware/requireAuth");
 
 const router = express.Router();
 const TOKEN_TTL = "7d";
@@ -110,7 +111,7 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
-router.get("/me", async (req, res, next) => {
+router.get("/me", requireAuth, async (req, res, next) => {
   try {
     const user = await User.findById(req.auth.sub);
     if (!user) return res.status(404).json({ ok: false, message: "الحساب غير موجود" });
