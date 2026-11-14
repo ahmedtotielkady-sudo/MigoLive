@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - android-preview
+      - profile-icons-refresh-2026-11-14
       - feature/agency-owner-approval
   workflow_dispatch:
 
