@@ -484,6 +484,19 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 </style>
 
 <style id="mygo-owner-pending-badges-v1">.owner-menu-pending{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;margin-inline-start:6px;border-radius:999px;background:#dc2626;color:#fff;font-size:11px;font-weight:900;line-height:1;box-shadow:0 0 0 2px #dc262633;animation:migoPendingPulse 1.8s ease-in-out infinite}.owner-pending-summary{border:1px solid #dc262655!important;border-radius:10px;padding:8px;background:#dc262610}.owner-pending-summary b{color:#ef4444!important}@keyframes migoPendingPulse{0%,100%{box-shadow:0 0 0 2px #dc262622}50%{box-shadow:0 0 0 5px #dc262622}}@media(prefers-reduced-motion:reduce){.owner-menu-pending{animation:none}}</style>
+
+<style id="migo-profile-shortcuts-refresh">
+.profile-shortcuts{padding:16px!important;border:1px solid rgba(168,85,247,.28)!important;background:linear-gradient(145deg,rgba(124,58,237,.13),rgba(21,13,46,.94))!important}
+.profile-shortcuts-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.profile-shortcuts-head b{font-size:15px;color:var(--tx)}
+.profile-shortcuts-head span{font-size:11px;color:var(--mu)}
+.profile-shortcuts-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:15px}
+.profile-shortcut{min-width:0;min-height:88px;padding:10px 3px 9px;border:1px solid rgba(168,85,247,.24);border-radius:15px;background:linear-gradient(160deg,rgba(124,58,237,.2),rgba(12,7,29,.65));color:var(--tx);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;font:inherit;cursor:pointer;transition:transform .16s,border-color .16s,background .16s}
+.profile-shortcut:active{transform:scale(.96);border-color:var(--gd);background:rgba(124,58,237,.3)}
+.profile-shortcut-icon{width:43px;height:43px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(145deg,rgba(168,85,247,.32),rgba(124,58,237,.12));border:1px solid rgba(192,132,252,.3);font-size:23px;box-shadow:0 5px 15px rgba(0,0,0,.18)}
+.profile-shortcut small{font-size:11px;font-weight:800;white-space:nowrap;color:var(--tx)}
+@media(max-width:350px){.profile-shortcuts-grid{gap:6px}.profile-shortcut{min-height:82px}.profile-shortcut-icon{width:39px;height:39px}}
+</style>
 </head>
 <body class="auth-screen">
 
@@ -1202,15 +1215,15 @@ function rMe(m){
     <button class="btn w" id="gvip" style="flex:1;background:linear-gradient(110deg,#5b8de8,#9b79ef);box-shadow:none">👑 عضويات VIP</button>
     <button class="btn g w" id="wallet-shortcut" style="flex:1">🪙 المحفظة</button>
   </div>
-  <div class="card" style="padding:14px">
-    <b>اختصارات الحساب</b>
-    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px">
-      <button class="btn o" id="gfr" style="padding:12px 3px;min-height:70px;display:flex;flex-direction:column;gap:5px;align-items:center">👥<small>الأصدقاء</small></button>
-      <button class="btn o" id="ginv" style="padding:12px 3px;min-height:70px;display:flex;flex-direction:column;gap:5px;align-items:center">🎁<small>الدعوات</small></button>
-      <button class="btn o" id="gsec" style="padding:12px 3px;min-height:70px;display:flex;flex-direction:column;gap:5px;align-items:center">🔒<small>الأمان</small></button>
-      <button class="btn o" id="th" style="padding:12px 3px;min-height:70px;display:flex;flex-direction:column;gap:5px;align-items:center">🎨<small>المظهر</small></button>
+  <section class="card profile-shortcuts">
+    <div class="profile-shortcuts-head"><b>اختصارات الحساب</b><span>خدماتك السريعة</span></div>
+    <div class="profile-shortcuts-grid">
+      <button class="profile-shortcut" id="gfr" aria-label="الأصدقاء"><span class="profile-shortcut-icon">👥</span><small>الأصدقاء</small></button>
+      <button class="profile-shortcut" id="ginv" aria-label="الدعوات"><span class="profile-shortcut-icon">🎁</span><small>الدعوات</small></button>
+      <button class="profile-shortcut" id="gsec" aria-label="الأمان"><span class="profile-shortcut-icon">🔒</span><small>الأمان</small></button>
+      <button class="profile-shortcut" id="th" aria-label="المظهر"><span class="profile-shortcut-icon">🎨</span><small>المظهر</small></button>
     </div>
-  </div>
+  </section>
   <div class="card" style="padding:14px">
     <div class="row"><b class="grow">حسابك وخدماتك</b><span class="mu">⚙️</span></div>
     \${isStaff(u)?\`<button class="btn o w" id="go" style="margin-top:10px">\${u.role==='owner'?'👑 لوحة المالك':'🛠️ لوحة الإدارة'}\${u.role==='owner'?ownerTotalBadge():''}</button>\`:''}
