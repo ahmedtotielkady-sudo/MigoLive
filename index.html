@@ -756,43 +756,13 @@ function render(){
     if(window.gsap&&!matchMedia('(prefers-reduced-motion:reduce)').matches){gsap.from(m,{opacity:0,y:16,duration:.35,ease:'power2.out',clearProps:'all'});gsap.from(m.querySelectorAll('.card'),{opacity:0,y:14,duration:.35,stagger:.04,delay:.05,clearProps:'all'})}}
 }
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>nav(b.dataset.t));
-// تفعيل نافذة كود المالك من صقر شاشة تسجيل الدخول فقط: خمس نقرات.
-let loginEagleTaps=0,loginEagleTimer=null;
-function loginEagleTap(){
-  loginEagleTaps++;
-  if(loginEagleTimer)clearTimeout(loginEagleTimer);
-  loginEagleTimer=setTimeout(()=>{loginEagleTaps=0},2500);
-  if(loginEagleTaps>=5){loginEagleTaps=0;clearTimeout(loginEagleTimer);showOwnerCodeDialog();}
-}
+// صلاحية المالك لا تُمنح من الواجهة؛ تُدار حصرياً من قاعدة البيانات والخادم.
 const loginEagle=$('#login-owner-eagle');
-if(loginEagle){loginEagle.style.cssText='display:inline-grid;place-items:center;width:120px;height:120px;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-tap-highlight-color:transparent';loginEagle.addEventListener('click',e=>{e.preventDefault();loginEagleTap()});loginEagle.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();loginEagleTap()}})}
-function showOwnerCodeDialog(){
-  if($('#owner-code-overlay'))return;
-  const overlay=document.createElement('div');overlay.id='owner-code-overlay';
-  overlay.style.cssText='position:fixed;inset:0;z-index:1000000;background:#090414d9;display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
-  overlay.innerHTML=`<div class="card" style="width:min(100%,380px);background:#24133c;border:1px solid #d5a83c;box-shadow:0 20px 70px #0009"><div style="font-size:28px;text-align:center">🦅</div><h3 style="text-align:center;margin:8px 0 14px">تفعيل صلاحية المالك</h3><p class="mu" style="text-align:center">أدخل كود المالك للمتابعة</p><input id="owner-code-input" class="in" type="password" inputmode="text" dir="ltr" autocomplete="off" placeholder="كود المالك"><div id="owner-code-error" class="err" style="min-height:22px"></div><div class="row"><button id="owner-code-cancel" class="btn o grow">إلغاء</button><button id="owner-code-submit" class="btn g grow">تأكيد</button></div></div>`;
-  document.body.appendChild(overlay);
-  const input=$('#owner-code-input');input.focus();
-  const close=()=>overlay.remove();
-  $('#owner-code-cancel').onclick=close;
-  $('#owner-code-submit').onclick=()=>{
-    const entered=input.value;
-    if(entered==='Sole App Owner: Mostafa 11111'){
-      try{sessionStorage.setItem('mygo_owner_code_pending','1')}catch(_){}
-      $('#owner-code-error').style.color='#86efac';
-      $('#owner-code-error').textContent='تم قبول الكود. أنشئ حسابك الآن لتفعيل صلاحية المالك.';
-      input.value='';
-      setTimeout(close,900);
-    }else{
-      $('#owner-code-error').style.color='#fca5a5';
-      $('#owner-code-error').textContent='كود المالك غير صحيح';
-      input.value='';input.focus();
-    }
-  };
-  input.addEventListener('keydown',e=>{if(e.key==='Enter')$('#owner-code-submit').click();if(e.key==='Escape')close()});
-  overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
+if(loginEagle){
+  loginEagle.style.cssText='display:inline-grid;place-items:center;width:120px;height:120px;cursor:default;user-select:none';
+  loginEagle.removeAttribute('role');
+  loginEagle.removeAttribute('tabindex');
 }
-
 function rRooms(m){
   const canMk=U().role==='owner'||!DB.rooms.some(r=>r.owner===me);
   const list=DB.rooms.filter(r=>filt==='all'||(filt==='active'&&r.seats.some(Boolean))||(filt==='fav'&&(U().fav||[]).includes(r.id)));
