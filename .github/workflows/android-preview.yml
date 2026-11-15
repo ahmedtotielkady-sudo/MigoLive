@@ -51,6 +51,9 @@ jobs:
       - name: Disable in-app long-press copy and text selection
         run: python3 scripts/apply-inapp-copy-protection.py
 
+      - name: Connect Slot 777 to server-authoritative wallet
+        run: python3 scripts/apply-slot777-server.py
+
       - name: Prepare web assets
         run: |
           mkdir -p www
