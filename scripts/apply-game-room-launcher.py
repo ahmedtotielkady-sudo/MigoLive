@@ -12,6 +12,11 @@ profile_getter = """function U(){return DB.users[me]}
 window.__migoGetGameProfile=function(){
  try{const u=U();return {name:u&&u.name?u.name:"",avatar:u&&typeof okAv==="function"&&okAv(u)?u.avatar:"",coins:u&&Number.isFinite(Number(u.coins))?Number(u.coins):0}}
  catch(_){return {name:"",avatar:"",coins:0}}
+};
+window.__migoRefreshGameWallet=async function(){
+ const data=await apiRequest('/wallet');const u=U();
+ if(u){u.coins=Number(data.coins)||0;save();}
+ return window.__migoGetGameProfile();
 };"""
 if profile_anchor in html and "window.__migoGetGameProfile" not in html:
     html = html.replace(profile_anchor, profile_getter, 1)
@@ -175,10 +180,8 @@ js = r"""
    }else if(d.t==="refresh"){
     // The child asks for a server refresh; it never supplies a balance value.
     (async()=>{
-     if(typeof apiRequest!=="function"||typeof U!=="function")return;
-     const data=await apiRequest("/wallet");
-     const user=U();if(user){user.coins=Number(data.coins)||0;save();}
-     const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{coins:0};
+     if(typeof window.__migoRefreshGameWallet!=="function")return;
+     const profile=await window.__migoRefreshGameWallet();
      e.source.postMessage({t:"bal",v:Number(profile.coins)||0},e.origin==="null"?"*":e.origin);
      const top=document.querySelector("#mycoins");if(top)top.textContent=String(profile.coins||0);
     })().catch(err=>console.warn("Migo wallet refresh failed:",err));
