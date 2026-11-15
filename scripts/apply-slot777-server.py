@@ -126,7 +126,7 @@ loadServerWallet().catch(error=>{modal(error.message||'تعذر تحميل ال�
 anchor2 = "try{parent.postMessage({t:'get'},'*')}catch(e){}"
 if html.count(anchor2) != 1:
     raise SystemExit("Expected one parent profile request")
-html = html.replace(anchor2, anchor2 + "\\n" + wallet_loader, 1)
+html = html.replace(anchor2, anchor2 + "\n" + wallet_loader, 1)
 
 # Remove client-generated fallback balance: a missing server response must never mint coins.
 fallback = "setTimeout(()=>{if(!ready&&bal===0){bal=5000;upd()}},1500);"
