@@ -110,6 +110,35 @@ jobs:
           PY
           for file in /tmp/migolive-inline-*.js; do node --check "$file"; done
           cp slot-777.html slot-ocean-storm.html wheel-animals.html www/
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.active = False
+                  self.current = []
+                  self.parts = []
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower() == 'script':
+                      self.active = 'src' not in dict(attrs)
+                      self.current = []
+              def handle_data(self, data):
+                  if self.active:
+                      self.current.append(data)
+              def handle_endtag(self, tag):
+                  if tag.lower() == 'script' and self.active:
+                      self.parts.append(''.join(self.current))
+                      self.active = False
+          for page in ['www/slot-777.html']:
+              parser = Scripts()
+              parser.feed(Path(page).read_text(encoding='utf-8'))
+              if not parser.parts:
+                  raise SystemExit(f'No inline JavaScript in {page}')
+              for i, source in enumerate(parser.parts):
+                  Path(f'/tmp/migo-slot777-{i}.js').write_text(source, encoding='utf-8')
+          PY
+          for file in /tmp/migo-slot777-*.js; do node --check "$file"; done
           mkdir -p www/games
           if [ -d games ]; then cp -R games/. www/games/; fi
           test -s www/games/cleopatra-gold.html
