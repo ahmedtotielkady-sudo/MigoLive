@@ -189,6 +189,7 @@
         send.disabled = true;
         try {
           await api('/messages/' + encodeURIComponent(peer.uid), { method: 'POST', body: JSON.stringify({ text }) });
+          DB.msgs.push({ from: me, to: dmTo, m: text, t: new Date().toISOString(), serverConversation: String(peer.uid), serverBacked: true });
           $id('tx').value = '';
           toast('تم إرسال الرسالة');
           render();
