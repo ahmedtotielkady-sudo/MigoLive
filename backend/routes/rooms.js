@@ -34,6 +34,10 @@ router.post("/", async (req, res, next) => {
     const description = String(req.body.description || "").trim().slice(0, 240);
     const isPrivate = req.body.isPrivate === true;
     const password = String(req.body.password || "");
+    const requestedCapacity = Number(req.body.capacity);
+    const capacity = Number.isInteger(requestedCapacity)
+      ? Math.min(25, Math.max(2, requestedCapacity))
+      : 25;
     if (name.length < 2 || name.length > 50) {
       return res.status(400).json({ ok: false, message: "اسم الغرفة يجب أن يكون من حرفين إلى 50 حرفاً" });
     }
@@ -48,7 +52,7 @@ router.post("/", async (req, res, next) => {
       roomCode: 200000 + counter.value, name, description,
       owner: req.auth.sub, members: [req.auth.sub], isPrivate,
       passwordHash: isPrivate ? await bcrypt.hash(password, 10) : "",
-      capacity: Math.min(25, Math.max(2, Number(req.body.capacity) || 25))
+      capacity
     });
     await room.populate("owner", "uid displayName");
     return res.status(201).json({ ok: true, room: roomView(room, req.auth.sub) });
