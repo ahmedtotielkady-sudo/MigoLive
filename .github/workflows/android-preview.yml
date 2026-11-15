@@ -36,6 +36,9 @@ jobs:
       - name: Apply in-room game launcher and display cleanup
         run: python3 scripts/apply-game-room-launcher.py
 
+      - name: Secure game wallet bridge
+        run: python3 scripts/apply-secure-game-wallet.py
+
       - name: Apply local notification center
         run: python3 scripts/apply-notification-center.py
 
