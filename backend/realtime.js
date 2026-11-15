@@ -220,15 +220,27 @@ function attachRealtime(httpServer, allowedOrigins) {
       } catch (_error) { ack({ ok: false, error: "SERVER_ERROR" }); }
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
       const roomCode = socketRooms.get(socket.id);
       if (roomCode) {
         emitRoom(roomCode, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
         emitRoom(roomCode, "mic:state", { uid: socket.auth.uid, enabled: false });
         emitRoom(roomCode, "hand:state", { uid: socket.auth.uid, raised: false });
+        try {
+          const user = await User.findById(socket.auth.sub).select("_id").lean();
+          if (user) {
+            const room = await Room.findOneAndUpdate(
+              { roomCode, status: "open" },
+              { $pull: { speakerSeats: { userId: user._id } } },
+              { new: true }
+            ).select("speakerSeats").lean();
+            if (room) emitRoom(roomCode, "seats:state", {
+              seats: room.speakerSeats.map(s => ({ seat: s.seat, uid: String(s.userId) }))
+            });
+          }
+        } catch (_error) { /* disconnect cleanup is best-effort */ }
       }
       socketRooms.delete(socket.id);
-      // Remove per-socket transient state so reconnects cannot inherit stale flags.
       socket.data.roomCode = null;
     });
   });
