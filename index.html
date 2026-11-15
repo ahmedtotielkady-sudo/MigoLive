@@ -684,7 +684,9 @@ const TABS=['rooms','games','msgs','wallet','me','owner','agent','agency','hostp
 function nav(h){if(room){tab=h;render();return}if(location.hash.slice(1)!==h)location.hash=h}
 function route(){if(!me)return;if(gameOn)return;const h=location.hash.slice(1),r=h.startsWith('room-')&&DB.rooms.find(x=>x.id==h.slice(5));
   if(r){roomMinimized=false;normRoom(r);const g=gate(r);if(g){toast(({kicked:'تم طردك من هذه الغرفة',vip:`غرفة VIP تتطلب مستوى ${r.vipMin} أو أعلى`,pass:'الغرفة مقفلة بكلمة مرور'})[g]);if(room)leaveRoom(true);tab='rooms';try{history.replaceState(null,'','#rooms')}catch(e){}return render()}
-    if(room&&room!==r)leaveRoom(true);room=r;if(!r.members.includes(me)&&r.members.length<650){r.members.push(me);save()}roomEnter(r);vipEnter(r)}else{if(room&&!roomMinimized)leaveRoom(true);tab=TABS.includes(h)?h:'rooms'}render()}
+    if(room&&room!==r)leaveRoom(true);room=r;if(!r.members.includes(me)&&r.members.length<650){r.members.push(me);save()}roomEnter(r);vipEnter(r);
+    if(r.serverRoom&&window.MigoRoomAudio){window.MigoRoomAudio.setUid(U().uid);window.MigoRoomAudio.join(r.id).catch(e=>toast('الصوت: '+e.message))}
+  }else{if(room&&!roomMinimized)leaveRoom(true);tab=TABS.includes(h)?h:'rooms'}render()}
 addEventListener('hashchange',route);
 const now=()=>new Date().toLocaleString('ar-EG',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'});
 const logIt=(type,txt)=>{DB.log.unshift({t:now(),type,txt});DB.log=DB.log.slice(0,200);save()};
@@ -763,28 +765,63 @@ if(loginEagle){
   loginEagle.removeAttribute('role');
   loginEagle.removeAttribute('tabindex');
 }
+function serverRoomToLocal(x){
+  const id=Number(x.id),old=DB.rooms.find(r=>Number(r.id)===id)||{};
+  const owner=Number(x.ownerUid)===Number(U().uid)?me:(old.owner||'');
+  return normRoom({...old,id,name:x.name,owner,serverRoom:true,serverMembersCount:Number(x.membersCount)||0,
+    serverCapacity:Number(x.capacity)||25,serverPrivate:!!x.isPrivate,serverIsMember:!!x.isMember,
+    seats:Array.isArray(old.seats)?old.seats:Array(SEATMAX).fill(null),v2:1});
+}
+async function refreshServerRooms(){
+  try{
+    const data=await apiRequest('/rooms');
+    const serverRows=(data.rooms||[]).map(serverRoomToLocal);
+    const keep=DB.rooms.filter(r=>!r.serverRoom&&r.id>999999);
+    DB.rooms=[...serverRows,...keep];
+    save();
+    const q=$('#q')?.value||'';
+    const rows=DB.rooms.filter(r=>(filt==='all'||(filt==='active'&&r.serverMembersCount>1)||(filt==='fav'&&(U().fav||[]).includes(r.id)))&&(!q||r.name.includes(q)||String(r.id).includes(q)));
+    const list=$('#rl');if(list){list.innerHTML=roomListHTML(rows);bindRooms()}
+  }catch(e){const list=$('#rl');if(list)list.innerHTML='<p class="mu">تعذر تحميل الغرف من الخادم: '+esc(e.message)+'</p>'}
+}
+async function createServerRoom(){
+  const n=$('#nr')?.value.trim();if(!n)return toast('اكتب اسم الغرفة');
+  const b=$('#mk');if(b)b.disabled=true;
+  try{
+    const data=await apiRequest('/rooms',{method:'POST',body:JSON.stringify({name:n,capacity:25})});
+    const r=serverRoomToLocal(data.room);r.serverIsMember=true;DB.rooms.unshift(r);save();nav('room-'+r.id);
+  }catch(e){toast(e.message||'تعذر إنشاء الغرفة')}
+  finally{if(b)b.disabled=false}
+}
+async function joinServerRoom(r,password=''){
+  if(!r.serverRoom)return true;
+  try{const data=await apiRequest('/rooms/'+encodeURIComponent(r.id)+'/join',{method:'POST',body:JSON.stringify({password})});r.serverIsMember=true;r.serverMembersCount=data.room?.membersCount||r.serverMembersCount;save();return true}
+  catch(e){toast(e.message||'تعذر دخول الغرفة');return false}
+}
 function rRooms(m){
-  const canMk=U().role==='owner'||!DB.rooms.some(r=>r.owner===me);
-  const list=DB.rooms.filter(r=>filt==='all'||(filt==='active'&&r.seats.some(Boolean))||(filt==='fav'&&(U().fav||[]).includes(r.id)));
+  const canMk=U().role==='owner'||!DB.rooms.some(r=>r.serverRoom&&r.owner===me);
+  const list=DB.rooms.filter(r=>r.serverRoom&&(filt==='all'||(filt==='active'&&r.serverMembersCount>1)||(filt==='fav'&&(U().fav||[]).includes(r.id))));
   m.innerHTML=`<div class="hero"><b>مايجو لايف</b></div>
   ${canMk?`<div class="row"><input class="in grow" id="nr" placeholder="اسم غرفة جديدة" maxlength="40" style="margin:0"><button class="btn g s" id="mk">➕ إنشاء غرفة</button></div><div class="sp"></div>`:''}
   <input class="in" id="q" placeholder="🔍 ابحث عن غرفة..." aria-label="بحث">
   <div style="margin-bottom:12px">${[['all','جميع الغرف'],['active','الأكثر نشاطاً'],['fav','المفضلة']].map(([k,l])=>`<button class="pill ${filt===k?'on':''}" data-f="${k}">${l}</button>`).join('')}</div>
   <div id="rl">${roomListHTML(list)}</div>`;
-  if($('#mk'))$('#mk').onclick=()=>{if(!canMk)return;const n=$('#nr').value.trim();if(!n)return toast('اكتب اسم الغرفة');const r=normRoom({id:Date.now()%1000000,name:n,owner:me,seats:Array(SEATMAX).fill(null),v2:1,chat:[]});DB.rooms.unshift(r);save();nav('room-'+r.id)};
+  if($('#mk'))$('#mk').onclick=createServerRoom;
   m.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{filt=b.dataset.f;render()});
-  $('#q').oninput=e=>{const v=e.target.value.trim();$('#rl').innerHTML=roomListHTML(DB.rooms.filter(r=>r.name.includes(v)||String(r.id).includes(v)));bindRooms()};
+  $('#q').oninput=e=>{const v=e.target.value.trim();$('#rl').innerHTML=roomListHTML(DB.rooms.filter(r=>r.serverRoom&&(r.name.includes(v)||String(r.id).includes(v))));bindRooms()};
   bindRooms();
+  if(!window.__migoRoomsLoaded){window.__migoRoomsLoaded=true;refreshServerRooms()}
 }
 function roomListHTML(rows){const active=DB.events.filter(e=>e.active!==false&&(!e.until||e.until>Date.now())&&(!e.from||e.from<=Date.now()));const out=rows.map(rcard);if(active.length){const ribbon=`<div class=\"card\" style=\"border:1px solid #f6b52b;background:linear-gradient(110deg,#fff3c4,#f4ddff);color:#34204e\"><b>🎉 الفعاليات الجديدة</b><div class=\"sp\"></div>${active.map(e=>`<div style=\"padding:7px 0;border-top:1px solid #ead8a8\"><b>${esc(e.icon||'🎊')} ${esc(e.title)}</b><div style=\"font-size:12px\">${esc(e.desc||'')}</div>${e.until?`<small>حتى ${new Date(e.until).toLocaleDateString('ar-EG')}</small>`:''}</div>`).join('')}</div>`;out.splice(Math.min(2,out.length),0,ribbon)}return out.join('')||'<p class=\"mu\" style=\"text-align:center;padding:30px\">لا توجد غرف هنا بعد</p>'}
 const grad=id=>`linear-gradient(135deg,hsl(${id*47%360} 70% 38%),#2a1160)`;
 function rcard(r){normRoom(r);const n=r.seats.filter(Boolean).length,f=(U().fav||[]).includes(r.id);
   return `<div class="card row" data-r="${r.id}" style="cursor:pointer"><div class="rth" style="${rImgS(r)}">${rEmo(r)}</div><div class="grow"><b>${esc(r.name)}</b>${r.pass?' 🔒':''}${r.vipMin?' 👑':''}<div class="mu">ID: ${r.id} · 👥 ${n}/${r.seats.length}</div></div><button class="btn o s" data-fav="${r.id}" aria-label="مفضلة">${f?'★':'☆'}</button></div>`}
 function bindRooms(){
-  document.querySelectorAll('[data-r]').forEach(c=>c.onclick=e=>{if(e.target.dataset.fav)return;const id=+c.dataset.r,r=DB.rooms.find(x=>x.id===id);if(!r)return;normRoom(r);const g=gate(r);
+  document.querySelectorAll('[data-r]').forEach(c=>c.onclick=async e=>{if(e.target.dataset.fav)return;const id=+c.dataset.r,r=DB.rooms.find(x=>x.id===id);if(!r)return;normRoom(r);const g=gate(r);
     if(g==='kicked')return toast('تم طردك من هذه الغرفة');
     if(g==='vip')return toast(`غرفة VIP تتطلب مستوى ${r.vipMin} أو أعلى`);
-    if(g==='pass')return dlg('غرفة مقفلة','<input class="in" id="pw" type="password" placeholder="كلمة مرور الغرفة" autocomplete="off">',async d=>{const v=d.querySelector('#pw').value;if(!v){d.querySelector('#dle').textContent='اكتب كلمة المرور';return false}if(await hash(v)!==r.pass){d.querySelector('#dle').textContent='كلمة المرور غير صحيحة';return false}r.ok.push(me);save();nav('room-'+id)},'دخول');
+    if(r.serverPrivate)return dlg('غرفة مقفلة','<input class="in" id="pw" type="password" placeholder="كلمة مرور الغرفة" autocomplete="off">',async d=>{const v=d.querySelector('#pw').value;if(!v){d.querySelector('#dle').textContent='اكتب كلمة المرور';return false}if(!await joinServerRoom(r,v))return false;nav('room-'+id)},'دخول');
+    if(!await joinServerRoom(r))return;
     nav('room-'+id)});
   document.querySelectorAll('[data-fav]').forEach(b=>b.onclick=()=>{const u=U(),id=+b.dataset.fav;u.fav=u.fav||[];u.fav=u.fav.includes(id)?u.fav.filter(x=>x!==id):[...u.fav,id];save();render()});
 }
@@ -1068,12 +1105,14 @@ function renderRoom(m){
   $('#shareRoom').onclick=async()=>{const shareText='انضم إلى غرفة '+r.name+' في ميجو لايف · ID: '+r.id;try{if(navigator.share)await navigator.share({title:r.name,text:shareText});else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(shareText);toast('تم نسخ بيانات الغرفة للمشاركة')}else toast(shareText)}catch(e){if(e?.name!=='AbortError')toast('تعذر فتح المشاركة')}};
   $('#inviteRoom').onclick=()=>$('#shareRoom').click();
   $('#onl').onclick=()=>showOnline(r);
-  $('#hostMic').onclick=()=>{
+  $('#hostMic').onclick=async()=>{
     if(r.hostUser&&r.hostUser!==me)return toast('مايك المضيف مشغول');
     if(!r.hostUser){
       if(r.seats.includes(me))return toast('غادر مقعدك العادي أولاً قبل الصعود على مايك المضيف');
+      if(!window.MigoRoomAudio)return toast('خدمة الصوت غير محمّلة');
+      try{await window.MigoRoomAudio.startMic()}catch(e){return toast('تعذر تشغيل الميكروفون: '+e.message)}
       r.hostUser=me;r.hostTalk=true;openHost();toast('تم تفعيل مايك المضيف');
-    }else{r.hostTalk=!r.hostTalk;toast(r.hostTalk?'مايك المضيف يعمل':'تم كتم مايك المضيف')}
+    }else{r.hostTalk=!r.hostTalk;if(r.hostTalk){try{await window.MigoRoomAudio.startMic()}catch(e){r.hostTalk=false;return toast('تعذر تشغيل الميكروفون: '+e.message)}}else await window.MigoRoomAudio.stopMic();toast(r.hostTalk?'مايك المضيف يعمل':'تم كتم مايك المضيف')}
     save();render();
   };
   if(adm){$('#adm').onclick=()=>rsOpen('main');
@@ -1099,7 +1138,7 @@ function renderRoom(m){
   $('#sd').onclick=send;$('#mi').onkeydown=e=>{if(e.key==='Enter')send()};
   $('#emo').onclick=()=>{const e=['😊','❤️','👍','🔥','😂'];$('#mi').value+=e[Math.random()*5|0];$('#mi').focus()};
   if($('#dice'))$('#dice').onclick=()=>{r.chat.push({n:'🎲',u:me,m:`${U().name} رقم الحظ: ${Math.floor(Math.random()*10)}`});r.chat=r.chat.slice(-60);save();render()};
-  $('#mic').onclick=()=>{if(!r.seats.includes(me))return toast('اجلس على مقعد أولاً');if(r.muted.includes(me)||r.smute.includes(r.seats.indexOf(me)))return toast('تم كتمك من مالك الغرفة');talk=!talk;render()};
+  $('#mic').onclick=async()=>{if(!r.seats.includes(me))return toast('اجلس على مقعد أولاً');if(r.muted.includes(me)||r.smute.includes(r.seats.indexOf(me)))return toast('تم كتمك من مالك الغرفة');if(!window.MigoRoomAudio)return toast('خدمة الصوت غير محمّلة');try{if(!talk){await window.MigoRoomAudio.startMic();talk=true;toast('الميكروفون يعمل الآن')}else{await window.MigoRoomAudio.stopMic();talk=false}render()}catch(e){toast('تعذر تشغيل الميكروفون: '+e.message)}};
   $('#gift').onclick=()=>{const u=U();if(!DB.giftCat.length)return toast('لا توجد هدايا متاحة بعد');
     const memberIds=[...new Set([...(r.online||[]),...r.seats.filter(Boolean),me])].filter(k=>DB.users[k]);
     if(!memberIds.length)return toast('لا يوجد مستخدمون متاحون للاختيار');
@@ -1128,7 +1167,7 @@ function minimizeRoom(){if(!room)return;roomMinimized=true;const o=$('#room-floa
 function restoreRoom(){if(!room)return;roomMinimized=false;const o=$('#room-float');if(o)o.classList.remove('minimized');if(location.hash!=='#room-'+room.id){try{history.pushState({migoRoom:true},'','#room-'+room.id)}catch(e){}}renderRoom($('#room-float-panel'));}
 function exitRoomNow(){if(!room)return;roomMinimized=false;leaveRoom(true);const o=$('#room-float');if(o)o.remove();document.body.classList.remove('inroom');try{history.replaceState(null,'','#'+tab)}catch(e){}render();}
 function showRoomCloseChoice(){if(!room||document.querySelector('.room-exit-choice'))return;const d=document.createElement('div');d.className='room-exit-choice';d.innerHTML='<div class="room-exit-card" role="dialog" aria-modal="true"><b>ماذا تريد أن تفعل؟</b><p>يمكنك تصغير الغرفة والعودة إليها لاحقًا، أو الخروج منها نهائيًا.</p><div class="room-exit-actions"><button type="button" class="btn g" id="room-minimize">تصغير</button><button type="button" class="btn r" id="room-exit">خروج</button></div></div>';document.body.appendChild(d);d.querySelector('#room-minimize').onclick=()=>{d.remove();minimizeRoom()};d.querySelector('#room-exit').onclick=()=>{d.remove();exitRoomNow()};d.addEventListener('click',e=>{if(e.target===d)d.remove()});}
-function leaveRoom(silent){if(!room)return;roomMinimized=false;const leavingRoom=room,leavingUser=U();if(leavingUser){leavingRoom.chat=leavingRoom.chat||[];leavingRoom.chat.push({n:'النظام',m:`خرج ${leavingUser.name} من الغرفة`,system:true,t:Date.now()});leavingRoom.chat=leavingRoom.chat.slice(-60)}room.online=(room.online||[]).filter(x=>x!==me);const i=room.seats.indexOf(me);if(i>-1){room.seats[i]=null;if(i===0)closeHost()}if(room.hostUser===me){room.hostUser=null;room.hostTalk=false;closeHost()}talk=false;sel=null;showAdm=false;rsReset();room=null;save();if(!silent)render()}
+function leaveRoom(silent){if(!room)return;const leaving=room;if(leaving.serverRoom){if(window.MigoRoomAudio)window.MigoRoomAudio.leave().catch(()=>{});apiRequest('/rooms/'+encodeURIComponent(leaving.id)+'/leave',{method:'POST',body:JSON.stringify({})}).catch(e=>toast('تنبيه مغادرة الغرفة: '+e.message))}roomMinimized=false;const leavingRoom=room,leavingUser=U();if(leavingUser){leavingRoom.chat=leavingRoom.chat||[];leavingRoom.chat.push({n:'النظام',m:`خرج ${leavingUser.name} من الغرفة`,system:true,t:Date.now()});leavingRoom.chat=leavingRoom.chat.slice(-60)}room.online=(room.online||[]).filter(x=>x!==me);const i=room.seats.indexOf(me);if(i>-1){room.seats[i]=null;if(i===0)closeHost()}if(room.hostUser===me){room.hostUser=null;room.hostTalk=false;closeHost()}talk=false;sel=null;showAdm=false;rsReset();room=null;save();if(!silent)render()}
 
 function rGames(m){
   // تم حذف لعبة عجلة الحظ من صفحة الألعاب؛ تبقى الألعاب المسجلة في GM فقط.
