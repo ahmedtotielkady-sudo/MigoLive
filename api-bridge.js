@@ -159,6 +159,25 @@
           const key = 'server-' + peer.uid;
           DB.users[key] = Object.assign(DB.users[key] || {}, { uid: peer.uid, name: peer.displayName || ('عضو ' + peer.uid), username: peer.username || '', avatar: peer.avatar || '', serverBacked: true, serverId: peer.id });
           dmTo = key;
+          const historyData = await api('/messages/' + encodeURIComponent(peer.uid));
+          DB.msgs = DB.msgs.filter(x => !(x.serverConversation === String(peer.uid)));
+          (historyData.messages || []).forEach((item) => {
+            const fromUid = Number(item.from && item.from.uid);
+            const toUid = Number(item.to && item.to.uid);
+            const fromKey = 'server-' + fromUid;
+            const toKey = 'server-' + toUid;
+            [item.from, item.to].forEach((person) => {
+              if (!person || !person.uid) return;
+              const personKey = 'server-' + person.uid;
+              DB.users[personKey] = Object.assign(DB.users[personKey] || {}, {
+                uid: person.uid, name: person.displayName || ('عضو ' + person.uid), serverBacked: true
+              });
+            });
+            DB.msgs.push({
+              from: fromKey, to: toKey, m: item.text || '', t: item.createdAt || '',
+              serverConversation: String(peer.uid), serverBacked: true
+            });
+          });
           render();
         } catch (e) { toast(e.message || 'لم يتم العثور على المستخدم'); }
       };
