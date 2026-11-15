@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const User = require("../models/User");
+const Wallet = require("../models/Wallet");
 const WalletTransaction = require("../models/WalletTransaction");
 const requireAuth = require("../middleware/requireAuth");
 
@@ -70,7 +71,9 @@ router.post("/transfer", async (req, res, next) => {
         { new: true, session, projection: { coins: 1, uid: 1 } }
       );
       if (!sender) throw Object.assign(new Error("رصيدك غير كافٍ أو الحساب غير نشط"), { status: 409 });
-      await User.updateOne({ _id: recipient._id }, { $inc: { coins: amount } }, { session });
+      const recipientAfter = await User.findOneAndUpdate({ _id: recipient._id }, { $inc: { coins: amount } }, { new: true, session, projection: { coins: 1 } });
+      await Wallet.updateOne({ userId: sender._id }, { $set: { balance: sender.coins } }, { upsert: true, session });
+      await Wallet.updateOne({ userId: recipient._id }, { $set: { balance: recipientAfter.coins } }, { upsert: true, session });
       const [tx] = await WalletTransaction.create([{
         from: sender._id, to: recipient._id, amount, type, description, idempotencyKey: key
       }], { session });
