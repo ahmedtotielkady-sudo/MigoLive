@@ -173,8 +173,14 @@ function attachRealtime(httpServer, allowedOrigins) {
 
     socket.on("disconnect", () => {
       const roomCode = socketRooms.get(socket.id);
-      if (roomCode) emitRoom(roomCode, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
+      if (roomCode) {
+        emitRoom(roomCode, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
+        emitRoom(roomCode, "mic:state", { uid: socket.auth.uid, enabled: false });
+        emitRoom(roomCode, "hand:state", { uid: socket.auth.uid, raised: false });
+      }
       socketRooms.delete(socket.id);
+      // Remove per-socket transient state so reconnects cannot inherit stale flags.
+      socket.data.roomCode = null;
     });
   });
 
