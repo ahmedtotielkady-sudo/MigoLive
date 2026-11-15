@@ -105,13 +105,62 @@ function attachRealtime(httpServer, allowedOrigins) {
       });
     }
 
+    socket.on("seat:take", async (payload = {}, ack = () => {}) => {
+      try {
+        const roomCode = socket.data.roomCode;
+        const seat = Number(payload.seat);
+        if (!roomCode || !Number.isInteger(seat) || seat < 1 || seat > 8) {
+          return ack({ ok: false, error: "INVALID_SEAT" });
+        }
+        const ctx = await memberContext(socket, roomCode);
+        if (!ctx) return ack({ ok: false, error: "NOT_ROOM_MEMBER" });
+        const room = await Room.findOne({ roomCode, status: "open" });
+        if (!room) return ack({ ok: false, error: "ROOM_NOT_FOUND" });
+        const existing = room.speakerSeats.find(s => String(s.userId) === String(ctx.user._id));
+        const occupied = room.speakerSeats.find(s => s.seat === seat && String(s.userId) !== String(ctx.user._id));
+        if (occupied) return ack({ ok: false, error: "SEAT_OCCUPIED" });
+        if (!existing && room.speakerSeats.length >= 8) return ack({ ok: false, error: "SEATS_FULL" });
+        room.speakerSeats = room.speakerSeats.filter(s => String(s.userId) !== String(ctx.user._id));
+        room.speakerSeats.push({ seat, userId: ctx.user._id });
+        await room.save();
+        const seats = room.speakerSeats.map(s => ({ seat: s.seat, uid: s.userId.toString() }));
+        emitRoom(roomCode, "seats:state", { seats });
+        return ack({ ok: true, seats });
+      } catch (_error) { return ack({ ok: false, error: "SERVER_ERROR" }); }
+    });
+
+    socket.on("seat:leave", async (_payload = {}, ack = () => {}) => {
+      try {
+        const roomCode = socket.data.roomCode;
+        const ctx = roomCode && await memberContext(socket, roomCode);
+        if (!ctx) return ack({ ok: false, error: "NOT_ROOM_MEMBER" });
+        const room = await Room.findOneAndUpdate(
+          { roomCode, status: "open" },
+          { $pull: { speakerSeats: { userId: ctx.user._id } } },
+          { new: true }
+        );
+        if (!room) return ack({ ok: false, error: "ROOM_NOT_FOUND" });
+        const seats = room.speakerSeats.map(s => ({ seat: s.seat, uid: s.userId.toString() }));
+        emitRoom(roomCode, "seats:state", { seats });
+        emitRoom(roomCode, "mic:state", { uid: ctx.user.uid, enabled: false });
+        return ack({ ok: true, seats });
+      } catch (_error) { return ack({ ok: false, error: "SERVER_ERROR" }); }
+    });
+
     socket.on("mic:state", async (payload = {}, ack = () => {}) => {
       try {
         const roomCode = socket.data.roomCode;
         if (!roomCode) return ack({ ok: false, error: "NOT_IN_ROOM" });
         const ctx = await memberContext(socket, roomCode);
         if (!ctx) return ack({ ok: false, error: "NOT_ROOM_MEMBER" });
+        const room = await Room.findOne({ roomCode, status: "open" }).select("owner speakerSeats").lean();
+        if (!room) return ack({ ok: false, error: "ROOM_NOT_FOUND" });
+        const isOwner = String(room.owner) === String(ctx.user._id);
+        const hasSeat = (room.speakerSeats || []).some(s => String(s.userId) === String(ctx.user._id));
         const muted = mutedUsers.get(String(roomCode) + ":" + socket.auth.sub) === true;
+        if (payload.enabled === true && !isOwner && !hasSeat) {
+          return ack({ ok: false, error: "SPEAKER_SEAT_REQUIRED" });
+        }
         const enabled = payload.enabled === true && !muted;
         emitRoom(roomCode, "mic:state", { uid: ctx.user.uid, enabled });
         ack({ ok: true, enabled, forcedMuted: muted });
