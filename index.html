@@ -528,7 +528,7 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 // تفعيل المالك محلياً عبر كود المالك المضمّن في نسخة التطبيق.
 try{if(window.Lenis){window.lenis=new Lenis();const raf=t=>{lenis.raf(t);requestAnimationFrame(raf)};requestAnimationFrame(raf)}}catch(e){}
 const $=s=>document.querySelector(s);
-const API_BASE='/api';
+const API_BASE='https://migolive-api-production.up.railway.app/api';
 async function apiRequest(path, options={}) {
   const headers=new Headers(options.headers||{});
   headers.set('content-type','application/json');
