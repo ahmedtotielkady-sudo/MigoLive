@@ -41,7 +41,14 @@ function attachRealtime(httpServer, allowedOrigins) {
     return { room, user, isOwner: String(room.owner) === socket.auth.sub, isAdmin: user.role === "admin" || user.role === "owner" };
   }
 
-  function emitRoom(roomCode, event, payload, exceptSocket) {
+async function seatSnapshot(room) {
+    const ids = (room.speakerSeats || []).map(s => s.userId);
+    const users = await User.find({ _id: { $in: ids } }).select("_id uid").lean();
+    const uidById = new Map(users.map(u => [String(u._id), u.uid]));
+    return (room.speakerSeats || []).map(s => ({ seat: s.seat, uid: uidById.get(String(s.userId)) })).filter(s => Number.isSafeInteger(Number(s.uid)));
+  }
+
+    function emitRoom(roomCode, event, payload, exceptSocket) {
     const target = io.to("room:" + roomCode);
     if (exceptSocket) target.except(exceptSocket).emit(event, payload);
     else target.emit(event, payload);
@@ -109,7 +116,7 @@ function attachRealtime(httpServer, allowedOrigins) {
       try {
         const roomCode = socket.data.roomCode;
         const seat = Number(payload.seat);
-        if (!roomCode || !Number.isInteger(seat) || seat < 1 || seat > 8) {
+        if (!roomCode || !Number.isInteger(seat) || seat < 1 || seat > 25) {
           return ack({ ok: false, error: "INVALID_SEAT" });
         }
         const ctx = await memberContext(socket, roomCode);
@@ -119,11 +126,11 @@ function attachRealtime(httpServer, allowedOrigins) {
         const existing = room.speakerSeats.find(s => String(s.userId) === String(ctx.user._id));
         const occupied = room.speakerSeats.find(s => s.seat === seat && String(s.userId) !== String(ctx.user._id));
         if (occupied) return ack({ ok: false, error: "SEAT_OCCUPIED" });
-        if (!existing && room.speakerSeats.length >= 8) return ack({ ok: false, error: "SEATS_FULL" });
+        if (!existing && room.speakerSeats.length >= 25) return ack({ ok: false, error: "SEATS_FULL" });
         room.speakerSeats = room.speakerSeats.filter(s => String(s.userId) !== String(ctx.user._id));
         room.speakerSeats.push({ seat, userId: ctx.user._id });
         await room.save();
-        const seats = room.speakerSeats.map(s => ({ seat: s.seat, uid: s.userId.toString() }));
+        const seats = await seatSnapshot(room);
         emitRoom(roomCode, "seats:state", { seats });
         return ack({ ok: true, seats });
       } catch (_error) { return ack({ ok: false, error: "SERVER_ERROR" }); }
@@ -235,7 +242,7 @@ function attachRealtime(httpServer, allowedOrigins) {
               { new: true }
             ).select("speakerSeats").lean();
             if (room) emitRoom(roomCode, "seats:state", {
-              seats: room.speakerSeats.map(s => ({ seat: s.seat, uid: String(s.userId) }))
+              seats: await seatSnapshot(room)
             });
           }
         } catch (_error) { /* disconnect cleanup is best-effort */ }
