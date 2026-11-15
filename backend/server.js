@@ -37,6 +37,7 @@ app.use("/api/gifts", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 
 app.use("/api/wallet", rateLimit({ windowMs: 60_000, limit: 40, standardHeaders: true, legacyHeaders: false }), require("./routes/wallet"));
 
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/games"));
+app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ocean-storm"));
 
 app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/rooms"));
 app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/room-details"));
