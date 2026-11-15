@@ -121,15 +121,40 @@ async function seatSnapshot(room) {
         }
         const ctx = await memberContext(socket, roomCode);
         if (!ctx) return ack({ ok: false, error: "NOT_ROOM_MEMBER" });
-        const room = await Room.findOne({ roomCode, status: "open" });
-        if (!room) return ack({ ok: false, error: "ROOM_NOT_FOUND" });
-        const existing = room.speakerSeats.find(s => String(s.userId) === String(ctx.user._id));
-        const occupied = room.speakerSeats.find(s => s.seat === seat && String(s.userId) !== String(ctx.user._id));
-        if (occupied) return ack({ ok: false, error: "SEAT_OCCUPIED" });
-        if (!existing && room.speakerSeats.length >= 25) return ack({ ok: false, error: "SEATS_FULL" });
-        room.speakerSeats = room.speakerSeats.filter(s => String(s.userId) !== String(ctx.user._id));
-        room.speakerSeats.push({ seat, userId: ctx.user._id });
-        await room.save();
+        const userId = ctx.user._id;
+        const room = await Room.findOneAndUpdate(
+          {
+            roomCode, status: "open",
+            speakerSeats: { $not: { $elemMatch: { seat, userId: { $ne: userId } } } },
+            $expr: { $lt: [
+              { $size: { $ifNull: ["$speakerSeats", []] } },
+              25
+            ] }
+          },
+          [{
+            $set: {
+              speakerSeats: {
+                $concatArrays: [
+                  { $filter: {
+                    input: { $ifNull: ["$speakerSeats", []] },
+                    as: "speaker",
+                    cond: { $ne: ["$speaker.userId", userId] }
+                  } },
+                  [{ seat, userId }]
+                ]
+              }
+            }
+          }],
+          { new: true }
+        );
+        if (!room) {
+          const current = await Room.findOne({ roomCode, status: "open" }).select("speakerSeats").lean();
+          if (!current) return ack({ ok: false, error: "ROOM_NOT_FOUND" });
+          if ((current.speakerSeats || []).some(s => s.seat === seat && String(s.userId) !== String(userId))) {
+            return ack({ ok: false, error: "SEAT_OCCUPIED" });
+          }
+          return ack({ ok: false, error: "SEATS_FULL" });
+        }
         const seats = await seatSnapshot(room);
         emitRoom(roomCode, "seats:state", { seats });
         return ack({ ok: true, seats });
@@ -147,7 +172,7 @@ async function seatSnapshot(room) {
           { new: true }
         );
         if (!room) return ack({ ok: false, error: "ROOM_NOT_FOUND" });
-        const seats = room.speakerSeats.map(s => ({ seat: s.seat, uid: s.userId.toString() }));
+        const seats = await seatSnapshot(room);
         emitRoom(roomCode, "seats:state", { seats });
         emitRoom(roomCode, "mic:state", { uid: ctx.user.uid, enabled: false });
         return ack({ ok: true, seats });
