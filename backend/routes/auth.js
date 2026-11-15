@@ -9,6 +9,9 @@ const rateLimit = require("express-rate-limit");
 
 const router = express.Router();
 const TOKEN_TTL = "7d";
+// Signup bonus is granted only while creating a brand-new account.
+// Login intentionally never changes the persisted User.coins value.
+const INITIAL_SIGNUP_COINS = 100;
 
 function publicUser(user) {
   return {
@@ -69,10 +72,10 @@ router.post("/register", async (req, res, next) => {
       displayName,
       phone: phone || undefined,
       passwordHash,
-      coins: 100,
+      coins: INITIAL_SIGNUP_COINS,
       role: "user"
     });
-    await Wallet.updateOne({ userId: user._id }, { $setOnInsert: { userId: user._id, balance: user.coins } }, { upsert: true });
+    await Wallet.updateOne({ userId: user._id }, { $setOnInsert: { userId: user._id, balance: INITIAL_SIGNUP_COINS } }, { upsert: true });
     const token = issueToken(user);
     return res.status(201).json({ ok: true, token, user: publicUser(user) });
   } catch (error) {
