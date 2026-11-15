@@ -66,6 +66,18 @@ async function seatSnapshot(room) {
         if (previous && previous !== key) {
           socket.leave("room:" + previous);
           emitRoom(previous, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
+          try {
+            const previousRoom = await Room.findOneAndUpdate(
+              { roomCode: Number(previous), status: "open" },
+              { $pull: { speakerSeats: { userId: ctx.user._id } } },
+              { new: true }
+            ).select("speakerSeats").lean();
+            if (previousRoom) emitRoom(previous, "seats:state", {
+              seats: await seatSnapshot(previousRoom)
+            });
+            emitRoom(previous, "mic:state", { uid: ctx.user.uid, enabled: false });
+            emitRoom(previous, "hand:state", { uid: ctx.user.uid, raised: false });
+          } catch (_cleanupError) { /* switching rooms must continue */ }
         }
         socketRooms.set(socket.id, key);
         socket.data.roomCode = roomCode;
