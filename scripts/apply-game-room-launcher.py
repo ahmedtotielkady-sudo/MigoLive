@@ -172,6 +172,16 @@ js = r"""
     // Wallet changes must be committed by the authenticated server API.
     const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{coins:0};
     e.source.postMessage({t:"bal",v:Number(profile.coins)||0},e.origin==="null"?"*":e.origin);
+   }else if(d.t==="refresh"){
+    // The child asks for a server refresh; it never supplies a balance value.
+    (async()=>{
+     if(typeof apiRequest!=="function"||typeof U!=="function")return;
+     const data=await apiRequest("/wallet");
+     const user=U();if(user){user.coins=Number(data.coins)||0;save();}
+     const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{coins:0};
+     e.source.postMessage({t:"bal",v:Number(profile.coins)||0},e.origin==="null"?"*":e.origin);
+     const top=document.querySelector("#mycoins");if(top)top.textContent=String(profile.coins||0);
+    })().catch(err=>console.warn("Migo wallet refresh failed:",err));
    }else if(d.t==="wallet"){
     window.dispatchEvent(new CustomEvent("migo:open-wallet"));
    }
