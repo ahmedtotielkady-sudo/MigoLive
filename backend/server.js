@@ -65,7 +65,8 @@ async function start() {
     throw new Error("JWT_SECRET must be configured with at least 32 characters");
   }
   await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10_000 });
-  attachRealtime(httpServer, allowedOrigins);
+  const io = attachRealtime(httpServer, allowedOrigins);
+  app.set("io", io);
   httpServer.listen(port, "0.0.0.0", () => console.log(`MigoLive API + realtime listening on port ${port}`));
 }
 start().catch((error) => {
