@@ -42,6 +42,9 @@ jobs:
       - name: Apply local notification center
         run: python3 scripts/apply-notification-center.py
 
+      - name: Sync promoted room owner in UI
+        run: python3 scripts/apply-room-host-sync.py
+
       - name: Prepare web assets
         run: |
           mkdir -p www
