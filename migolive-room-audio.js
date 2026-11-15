@@ -120,7 +120,7 @@
         catch (e) { emit('error', { message: e.message }); }
       });
       state.socket.on('host:mute-state', p => {
-        if (window.MigoLiveUser?.uid && Number(p.uid) === Number(window.MigoLiveUser.uid) && p.muted) stopMic();
+        if (state.uid && Number(p.uid) === Number(state.uid) && p.muted) stopMic();
         emit('mute-state', p);
       });
       state.socket.on('room:kicked', async p => { await leave(); emit('kicked', p); });
