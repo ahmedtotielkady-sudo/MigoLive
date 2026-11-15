@@ -9,7 +9,7 @@
 - Required variables:
   - `MONGODB_URI`: MongoDB Atlas URI for the existing `migolive` database. Keep the password private.
   - `JWT_SECRET`: generate a unique random secret with at least 32 characters.
-  - `CORS_ORIGINS`: `https://migolive.pages.dev`
+  - `CORS_ORIGINS`: include every actual browser origin, comma-separated. For the current Railway frontend and Cloudflare Pages, use `https://migolive-production.up.railway.app,https://migolive.pages.dev` (add any custom domain actually used). The Android app's native requests may omit Origin, but web builds must match exactly.
   - `NODE_ENV`: `production`
 - Health check path: `/api/health`
 
@@ -17,7 +17,7 @@
 Set this Pages project environment variable for Production (and Preview only if needed):
 - `MIGOLIVE_API_ORIGIN`: the public Railway HTTPS origin, for example `https://your-service.up.railway.app` (origin only; no trailing slash and no `/api` suffix).
 
-The Pages Function at `/api/*` forwards requests to Railway on the same origin, so the web app calls `/api/auth/*` and `/api/wallet/*`.
+The Pages Function at `/api/*` forwards requests to Railway on the same origin. The current `index.html` integration also uses `https://migolive-api-production.up.railway.app/api` directly, so its browser origin must be included in `CORS_ORIGINS`. If switching the frontend to the Pages proxy later, change `API_BASE` to `/api` in the same deployment.
 
 ## Implemented API routes
 - `GET /api/health`
@@ -46,5 +46,5 @@ The wallet screen and direct-message search/send/history now call the server API
 ## Important rollout notes
 - Existing local-only accounts are not automatically migrated to server accounts.
 - Do not grant owner/admin roles through public registration.
-- Room create/join/leave and direct-message storage APIs now exist, but the current web interface has not yet been switched to use them. Realtime room presence, voice transport, room chat fan-out, moderation, gift catalog/pricing, game settlement, recharge, agency commissions, and admin actions still need server-side implementation before those features can be considered multi-user or production-ready.
+- Room create/join/leave and direct-message lookup/history/send are connected in the current web integration branch. Realtime room presence and voice signaling are implemented but still require multi-device and network testing. Room text-chat fan-out, authoritative gift catalog/pricing alignment with the client, game settlement, recharge approval, agency commissions, and secure admin actions still need server-side implementation before those features can be considered production-ready.
 - Never expose database credentials or JWT secrets in frontend code or Git.
