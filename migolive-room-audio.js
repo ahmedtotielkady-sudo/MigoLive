@@ -98,6 +98,21 @@
     if (!state.socket) {
       state.socket = io(API_ORIGIN, { transports: ['websocket', 'polling'], auth: callback => callback({ token: token() }), reconnection: true });
       state.socket.on('connect_error', e => emit('error', { message: e.message || 'تعذر الاتصال الصوتي' }));
+      // A transport reconnect creates a fresh server-side socket with no room membership.
+      // Rejoin the persisted room and rebuild peer connections after reconnection.
+      state.socket.on('connect', async () => {
+        const roomCode = state.roomCode;
+        if (!roomCode) return;
+        try {
+          const result = await socketAck('room:join', { roomCode });
+          for (const id of [...state.peers.keys()]) removePeer(id);
+          for (const peerId of result.peers || []) await makePeer(peerId, true);
+          emit('reconnected', { roomCode, peers: result.peers || [], seats: result.seats || [] });
+          emit('seats', { seats: result.seats || [] });
+        } catch (error) {
+          emit('error', { message: 'انقطع الاتصال ولم نتمكن من إعادة دخول الغرفة: ' + error.message });
+        }
+      });
       state.socket.on('seats:state', p => emit('seats', p));
       state.socket.on('room:peer-joined', async peer => {
         try { await makePeer(peer.socketId, false); emit('peer-joined', peer); }
