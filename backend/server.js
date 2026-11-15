@@ -4,8 +4,11 @@ const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
+const http = require("http");
+const { attachRealtime } = require("./realtime");
 
 const app = express();
+const httpServer = http.createServer(app);
 const port = Number(process.env.PORT || 3000);
 const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .split(",").map((value) => value.trim()).filter(Boolean);
@@ -62,7 +65,8 @@ async function start() {
     throw new Error("JWT_SECRET must be configured with at least 32 characters");
   }
   await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10_000 });
-  app.listen(port, "0.0.0.0", () => console.log(`MigoLive API listening on port ${port}`));
+  attachRealtime(httpServer, allowedOrigins);
+  httpServer.listen(port, "0.0.0.0", () => console.log(`MigoLive API + realtime listening on port ${port}`));
 }
 start().catch((error) => {
   console.error("Backend startup failed:", error.message);
