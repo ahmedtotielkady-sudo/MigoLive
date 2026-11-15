@@ -172,6 +172,8 @@ jobs:
               Path(f'/tmp/migo-ocean-storm-{i}.js').write_text(source, encoding='utf-8')
           PY
           for file in /tmp/migo-ocean-storm-*.js; do node --check "$file"; done
+          mkdir -p www/games
+          if [ -d games ]; then cp -R games/. www/games/; fi
           python3 - <<'PY'
           from html.parser import HTMLParser
           from pathlib import Path
@@ -190,8 +192,6 @@ jobs:
               Path(f'/tmp/migo-cleopatra-{i}.js').write_text(source,encoding='utf-8')
           PY
           for file in /tmp/migo-cleopatra-*.js; do node --check "$file"; done
-          mkdir -p www/games
-          if [ -d games ]; then cp -R games/. www/games/; fi
           test -s www/games/cleopatra-gold.html
           test -s www/games/big-warrior.html
           python3 - <<'PY'
