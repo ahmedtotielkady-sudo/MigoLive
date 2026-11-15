@@ -158,7 +158,13 @@
     }
     state.muted = false;
     state.stream.getAudioTracks().forEach(t => { t.enabled = true; });
-    await socketAck('mic:state', { enabled: true });
+    const micResult = await socketAck('mic:state', { enabled: true });
+    if (micResult.forcedMuted) {
+      state.stream.getAudioTracks().forEach(t => { t.enabled = false; });
+      state.muted = true;
+      emit('mic', { enabled: false, forcedMuted: true });
+      throw new Error('مالك الغرفة كتم الميكروفون الخاص بك');
+    }
     emit('mic', { enabled: true });
     return true;
   }
