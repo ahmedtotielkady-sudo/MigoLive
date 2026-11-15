@@ -168,7 +168,18 @@ js = r"""
   if(!overlay||e.source!==overlay.querySelector("iframe").contentWindow)return;
   const d=e.data||{};
   try{
-   if(d.t==="get"){
+   if(d.t==="migo:game-request"){
+    (async()=>{
+     const allowed={"/games/cleopatra-gold/spin":true,"/games/ocean-storm/spin":true,"/games/slot-777/spin":true};
+     if(!allowed[d.path])throw new Error("طلب اللعبة غير مسموح");
+     const key=String(d.requestId||"");
+     if(!/^[a-f0-9]{36}$/.test(key))throw new Error("معرّف الجولة غير صحيح");
+     const result=await apiRequest(d.path,{method:"POST",headers:{"idempotency-key":key},body:JSON.stringify(d.body||{})});
+     e.source.postMessage({t:"migo:game-result",requestId:key,ok:true,data:result},e.origin==="null"?"*":e.origin);
+    })().catch(err=>{
+     try{e.source.postMessage({t:"migo:game-result",requestId:d.requestId,ok:false,message:err.message||"تعذر تنفيذ الجولة"},e.origin==="null"?"*":e.origin)}catch(_){}
+    });
+   }else if(d.t==="get"){
     const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{name:"",avatar:"",coins:0};
     e.source.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
     e.source.postMessage({t:"me",name:profile.name||"",avatar:profile.avatar||""},"*");
