@@ -6,7 +6,7 @@
   'use strict';
   if (window.MigoRoomAudio) return;
   const API_ORIGIN = 'https://migolive-api-production.up.railway.app';
-  const state = { socket: null, roomCode: null, stream: null, peers: new Map(), muted: false, loading: null };
+  const state = { socket: null, roomCode: null, stream: null, peers: new Map(), muted: false, loading: null, uid: null, iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
   const listeners = new Map();
   const emit = (name, detail) => {
     window.dispatchEvent(new CustomEvent('migolive:audio:' + name, { detail }));
@@ -44,9 +44,30 @@
       });
     });
   }
+  async function loadIceConfig() {
+    try {
+      const response = await fetch(API_ORIGIN + '/api/rooms/ice-config', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + token() },
+        cache: 'no-store'
+      });
+      if (!response.ok) throw new Error('تعذر تحميل إعدادات الاتصال الصوتي');
+      const data = await response.json();
+      if (data?.ok && Array.isArray(data.iceServers) && data.iceServers.length) {
+        state.iceServers = data.iceServers;
+        if (!data.turnAvailable) emit('network-warning', {
+          message: 'الصوت يعمل بإعداد STUN فقط؛ يلزم إعداد TURN لتحسين الاتصال بين شبكات الهاتف المختلفة'
+        });
+        return;
+      }
+      throw new Error('إعدادات ICE غير مكتملة');
+    } catch (error) {
+      state.iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+      emit('network-warning', { message: error.message || 'تعذر تحميل TURN، سيتم استخدام STUN فقط' });
+    }
+  }
   function iceConfig() {
-    // STUN helps discover network paths; production deployments should add TURN credentials.
-    return { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    return { iceServers: state.iceServers };
   }
   function attachAudio(peerId, stream) {
     let el = document.getElementById('migo-audio-' + peerId);
@@ -95,6 +116,7 @@
   async function join(roomCode) {
     if (!token()) throw new Error('سجّل الدخول أولاً');
     if (!Number.isSafeInteger(Number(roomCode))) throw new Error('رقم الغرفة غير صحيح');
+    await loadIceConfig();
     if (state.roomCode === Number(roomCode) && state.socket?.connected) return { ok: true, roomCode: state.roomCode, alreadyJoined: true };
     if (state.roomCode && state.roomCode !== Number(roomCode)) await leave();
     const io = await loadSocketClient();
@@ -107,7 +129,9 @@
         const roomCode = state.roomCode;
         if (!roomCode) return;
         try {
+          await loadIceConfig();
           const result = await socketAck('room:join', { roomCode });
+          state.uid = Number(result.uid) || state.uid;
           for (const id of [...state.peers.keys()]) removePeer(id);
           for (const peerId of result.peers || []) await makePeer(peerId, true);
           emit('reconnected', { roomCode, peers: result.peers || [], seats: result.seats || [] });
@@ -159,6 +183,7 @@
       });
     }
     const result = await socketAck('room:join', { roomCode: Number(roomCode) });
+    state.uid = Number(result.uid) || null;
     state.roomCode = Number(roomCode);
     for (const peerId of result.peers || []) await makePeer(peerId, true);
     emit('joined', { roomCode: state.roomCode, peers: result.peers || [], seats: result.seats || [] });
