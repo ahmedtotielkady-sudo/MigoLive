@@ -126,10 +126,13 @@ async function seatSnapshot(room) {
           {
             roomCode, status: "open",
             speakerSeats: { $not: { $elemMatch: { seat, userId: { $ne: userId } } } },
-            $expr: { $lt: [
-              { $size: { $ifNull: ["$speakerSeats", []] } },
-              25
-            ] }
+            $or: [
+              { speakerSeats: { $elemMatch: { userId } } },
+              { $expr: { $lt: [
+                { $size: { $ifNull: ["$speakerSeats", []] } },
+                25
+              ] } }
+            ]
           },
           [{
             $set: {
@@ -236,7 +239,7 @@ async function seatSnapshot(room) {
         const targetUid = Number(payload.uid);
         const target = await User.findOne({ uid: targetUid }).select("_id uid").lean();
         if (!target || String(target._id) === String(ctx.room.owner)) return ack({ ok: false, error: "INVALID_TARGET" });
-        const updated = await Room.updateOne({ _id: ctx.room._id, members: target._id }, { $pull: { members: target._id } });
+        const updated = await Room.updateOne({ _id: ctx.room._id, members: target._id }, { $pull: { members: target._id, speakerSeats: { userId: target._id } } });
         if (!updated.modifiedCount) return ack({ ok: false, error: "USER_NOT_IN_ROOM" });
         const targetSocketIds = [...(io.sockets.adapter.rooms.get("room:" + roomCode) || [])]
           .filter(id => io.sockets.sockets.get(id)?.auth?.sub === String(target._id));
