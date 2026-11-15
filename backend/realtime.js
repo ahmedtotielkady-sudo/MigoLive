@@ -265,7 +265,7 @@ async function seatSnapshot(room) {
           { new: true }
         );
         if (!room) return ack({ ok: false, error: "ROOM_NOT_FOUND" });
-        await releaseMic(roomCode, ctx.user._id);
+        await releaseMic(roomCode, ctx.user._id, socket.id);
         const seats = await seatSnapshot(room);
         emitRoom(roomCode, "seats:state", { seats });
         emitRoom(roomCode, "mic:state", { uid: ctx.user.uid, enabled: false });
