@@ -26,3 +26,20 @@ test("Ocean Storm caps the original 10,000 bet at 15x", () => {
   const result = ocean.play({ bet: 10000, random: () => 0.99 });
   assert.ok(result.payout <= 150000);
 });
+
+test("Ocean Storm resolves tumbles on the server and bounds cascade loops", () => {
+  const result = ocean.play({ bet: 10000, random: () => 0.99 });
+  assert.ok(result.steps.length > 0);
+  assert.ok(result.steps.length <= 50);
+  assert.ok(result.steps.every(step =>
+    step.grid.length === 6 && step.grid.every(column => column.length === 5)
+  ));
+  assert.ok(result.payout <= 150000);
+});
+
+test("Ocean Storm buy-feature is settled as a paid feature, not a free-spin award", () => {
+  const result = ocean.play({ bet: 500, buyFeature: true, random: () => 0 });
+  assert.equal(result.cost, 50000);
+  assert.equal(result.outcome.freeSpinsAwarded, 0);
+  assert.equal(result.freeSpinRounds.length, 0);
+});
