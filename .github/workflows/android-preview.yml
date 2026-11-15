@@ -6,6 +6,7 @@ on:
       - main
       - android-preview
       - feature/agency-owner-approval
+      - feature/mongodb-primary-integration
   workflow_dispatch:
 
 permissions:
