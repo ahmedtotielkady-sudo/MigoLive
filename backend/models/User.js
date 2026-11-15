@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   displayName: { type: String, required: true, trim: true, maxlength: 40 },
   phone: { type: String, default: undefined },
   passwordHash: { type: String, required: true, select: false },
-  coins: { type: Number, default: 100, min: 0 },
+  coins: { type: Number, default: 0, min: 0 },
   role: { type: String, enum: ["user", "admin", "owner"], default: "user" },
   avatar: { type: String, default: "" },
   status: { type: String, enum: ["active", "banned"], default: "active" },
