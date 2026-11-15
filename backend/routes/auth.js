@@ -5,6 +5,7 @@ const User = require("../models/User");
 const Wallet = require("../models/Wallet");
 const Counter = require("../models/Counter");
 const requireAuth = require("../middleware/requireAuth");
+const rateLimit = require("express-rate-limit");
 
 const router = express.Router();
 const TOKEN_TTL = "7d";
@@ -123,7 +124,7 @@ function safeSecretEqual(candidate, configured) {
 }
 
 // Owner activation is server-only. The phrase must exist only in Railway Variables.
-router.post("/owner/claim", requireAuth, async (req, res, next) => {
+router.post("/owner/claim", rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false }), requireAuth, async (req, res, next) => {
   try {
     const configuredPhrase = process.env.OWNER_CLAIM_SECRET;
     if (!configuredPhrase) {
