@@ -295,6 +295,24 @@ jobs:
       - name: Sync Android project
         run: npx cap sync android
 
+      - name: Add Android microphone and audio routing permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          s = p.read_text(encoding='utf-8')
+          permissions = [
+              'android.permission.RECORD_AUDIO',
+              'android.permission.MODIFY_AUDIO_SETTINGS'
+          ]
+          missing = [name for name in permissions if f'android:name="{name}"' not in s]
+          if missing:
+              lines = ''.join(f'    <uses-permission android:name="{name}" />\\n' for name in missing)
+              s = s.replace('<application', lines + '    <application', 1)
+              p.write_text(s, encoding='utf-8')
+          print('Microphone/audio permissions verified:', ', '.join(permissions))
+          PY
+
       # Keep one debug signing key across CI builds so Android accepts updates.
       - name: Restore persistent Android signing key
         uses: actions/cache@v4
