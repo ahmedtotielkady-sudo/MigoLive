@@ -126,6 +126,7 @@
         emit('mute-state', p);
       });
       state.socket.on('room:kicked', async p => { await leave(); emit('kicked', p); });
+      state.socket.on('room:closed', async p => { await leave(); emit('room-closed', p); });
     }
     if (!state.socket.connected) {
       await new Promise((resolve, reject) => {
