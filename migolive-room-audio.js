@@ -127,6 +127,7 @@
       });
       state.socket.on('room:kicked', async p => { await leave(); emit('kicked', p); });
       state.socket.on('room:closed', async p => { await leave(); emit('room-closed', p); });
+      state.socket.on('room:host-changed', p => { emit('host-changed', p); });
     }
     if (!state.socket.connected) {
       await new Promise((resolve, reject) => {
