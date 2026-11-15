@@ -17,7 +17,7 @@ router.use(requireAuth);
 router.post("/slot-777/spin", async (req, res) => {
   const bet = Number(req.body && req.body.bet);
   const key = String(req.get("idempotency-key") || "");
-  if (!/^[A-Za-z0-9_-]{16,100}$/.test(key)) {
+  if (!/^[A-Za-z0-9_-]{16,80}$/.test(key)) {
     return res.status(400).json({ ok: false, message: "معرّف الجولة مطلوب" });
   }
   if (!Number.isSafeInteger(bet) || !slot777.MULTIPLIERS.some(m => bet === slot777.BASE * m)) {
@@ -30,7 +30,7 @@ router.post("/slot-777/spin", async (req, res) => {
     await session.withTransaction(async () => {
       const prior = await GameRound.findOne({ idempotencyKey: key }).session(session);
       if (prior) {
-        if (String(prior.userId) !== req.auth.sub || prior.gameId !== "slot-777" || prior.bet !== bet) {
+        if (String(prior.userId) !== req.auth.sub || prior.gameId !== "slot-777" || Number(prior.outcome && prior.outcome.requestedBet) !== bet) {
           throw Object.assign(new Error("معرّف الجولة مستخدم لطلب مختلف"), { status: 409 });
         }
         const current = await User.findById(req.auth.sub).session(session).select("coins");
@@ -64,7 +64,7 @@ router.post("/slot-777/spin", async (req, res) => {
       } else {
         state.freeSpins -= 1;
       }
-      if (outcome.payout > 0) {
+      if (outcome.win > 0) {
         user.coins += outcome.win;
         await WalletTransaction.create([{
           to: user._id, amount: outcome.win, type: "game_reward",
@@ -82,7 +82,7 @@ router.post("/slot-777/spin", async (req, res) => {
         userId: user._id, gameId: "slot-777", roundId, idempotencyKey: key,
         bet: actualBet, payout: outcome.win,
         status: outcome.win > 0 ? "settled" : "lost",
-        outcome: { grid: outcome.grid, bonus: outcome.bonus, freeSpinsAwarded: outcome.freeSpins, freeSpinsRemaining: state.freeSpins, hits: outcome.hits },
+        outcome: { grid: outcome.grid, bonus: outcome.bonus, freeSpinsAwarded: outcome.freeSpins, freeSpinsRemaining: state.freeSpins, hits: outcome.hits, requestedBet: bet },
         settledAt: new Date()
       }], { session });
       result = { roundId: round.roundId, coins: user.coins, bet: actualBet, payout: outcome.win,
