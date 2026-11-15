@@ -69,7 +69,8 @@ async function start() {
   await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10_000 });
   const MicLease = require("./models/MicLease");
   const GameRound = require("./models/GameRound");
-  await Promise.all([MicLease.init(), GameRound.init()]);
+  const GameState = require("./models/GameState");
+  await Promise.all([MicLease.init(), GameRound.init(), GameState.init()]);
   const io = attachRealtime(httpServer, allowedOrigins);
   app.set("io", io);
   httpServer.listen(port, "0.0.0.0", () => console.log(`MigoLive API + realtime listening on port ${port}`));
