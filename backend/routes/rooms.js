@@ -90,6 +90,7 @@ router.post("/:roomCode/leave", async (req, res, next) => {
       room.members = [];
     } else {
       room.members.pull(req.auth.sub);
+      room.speakerSeats = (room.speakerSeats || []).filter(seat => String(seat.userId) !== req.auth.sub);
     }
     await room.save();
     return res.json({ ok: true, closed: room.status === "closed" });
