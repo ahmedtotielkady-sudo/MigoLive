@@ -48,6 +48,9 @@ jobs:
       - name: Apply secure owner activation
         run: python3 scripts/apply-owner-activation.py
 
+      - name: Disable in-app long-press copy and text selection
+        run: python3 scripts/apply-inapp-copy-protection.py
+
       - name: Prepare web assets
         run: |
           mkdir -p www
