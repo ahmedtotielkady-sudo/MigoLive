@@ -23,5 +23,31 @@ count = html.count(old)
 if count != 1:
     raise SystemExit(f"Expected exactly one unsafe wallet bridge, found {count}")
 html = html.replace(old, new, 1)
+
+# The in-room launcher injects a separate iframe bridge after this script runs.
+# Harden that bridge at its source too, so no game can write a client-supplied
+# balance through the room overlay path.
+launcher_path = Path("scripts/apply-game-room-launcher.py")
+launcher = launcher_path.read_text(encoding="utf-8")
+launcher_old = '''   }else if(d.t==="set"&&Number.isFinite(d.v)&&d.v>=0){
+    const u=typeof U==="function"?U():null;
+    if(!u)return;
+    u.coins=Math.floor(d.v);
+    if(typeof save==="function")save();
+    const coinNode=document.querySelector("#mycoins");
+    if(coinNode)coinNode.textContent=u.coins;
+    window.dispatchEvent(new CustomEvent("migo:wallet-updated",{detail:{coins:u.coins}}));
+   }else if(d.t==="wallet"){'''
+launcher_new = '''   }else if(d.t==="set"){
+    // The game iframe cannot authoritatively set a wallet balance.
+    const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{coins:0};
+    e.source.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
+   }else if(d.t==="wallet"){'''
+launcher_count = launcher.count(launcher_old)
+if launcher_count != 1:
+    raise SystemExit(f"Expected exactly one unsafe room-game wallet bridge, found {launcher_count}")
+launcher = launcher.replace(launcher_old, launcher_new, 1)
+launcher_path.write_text(launcher, encoding="utf-8")
+
 path.write_text(html, encoding="utf-8")
-print("Disabled client-side game wallet mutations; server settlement required")
+print("Disabled client-side wallet writes in both app and in-room game bridges")
