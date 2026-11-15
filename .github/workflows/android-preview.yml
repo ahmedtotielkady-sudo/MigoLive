@@ -24,6 +24,10 @@ jobs:
         with:
           node-version: 22
 
+      - name: Run backend unit tests
+        run: npm test
+        working-directory: backend
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
