@@ -98,6 +98,13 @@ router.post("/:roomCode/leave", async (req, res, next) => {
       room.speakerSeats = (room.speakerSeats || []).filter(seat => String(seat.userId) !== req.auth.sub);
     }
     await room.save();
+    if (room.status === "closed") {
+      const io = req.app.get("io");
+      if (io) {
+        io.to("room:" + room.roomCode).emit("room:closed", { roomCode: room.roomCode, reason: "owner_left" });
+        await io.in("room:" + room.roomCode).socketsLeave("room:" + room.roomCode);
+      }
+    }
     return res.json({ ok: true, closed: room.status === "closed" });
   } catch (error) { return next(error); }
 });
