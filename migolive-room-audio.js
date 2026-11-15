@@ -96,7 +96,7 @@
     if (state.roomCode && state.roomCode !== Number(roomCode)) await leave();
     const io = await loadSocketClient();
     if (!state.socket) {
-      state.socket = io(API_ORIGIN, { transports: ['websocket', 'polling'], auth: { token: token() }, reconnection: true });
+      state.socket = io(API_ORIGIN, { transports: ['websocket', 'polling'], auth: callback => callback({ token: token() }), reconnection: true });
       state.socket.on('connect_error', e => emit('error', { message: e.message || 'تعذر الاتصال الصوتي' }));
       state.socket.on('seats:state', p => emit('seats', p));
       state.socket.on('room:peer-joined', async peer => {
