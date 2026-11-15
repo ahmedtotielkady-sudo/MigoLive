@@ -45,6 +45,9 @@ jobs:
       - name: Sync promoted room owner in UI
         run: python3 scripts/apply-room-host-sync.py
 
+      - name: Apply secure owner activation
+        run: python3 scripts/apply-owner-activation.py
+
       - name: Prepare web assets
         run: |
           mkdir -p www
