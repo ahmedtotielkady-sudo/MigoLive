@@ -36,7 +36,8 @@ router.post("/slot-777/spin", async (req, res) => {
         const current = await User.findById(req.auth.sub).session(session).select("coins");
         if (!current) throw Object.assign(new Error("الحساب غير موجود"), { status: 404 });
         result = { roundId: prior.roundId, coins: current.coins, bet: prior.bet, payout: prior.payout,
-          outcome: prior.outcome, repeated: true };
+          outcome: prior.outcome, freeSpin: !!(prior.outcome && prior.outcome.freeSpin),
+          freeSpinsRemaining: Number(prior.outcome && prior.outcome.freeSpinsRemaining) || 0, repeated: true };
         return;
       }
 
@@ -82,7 +83,7 @@ router.post("/slot-777/spin", async (req, res) => {
         userId: user._id, gameId: "slot-777", roundId, idempotencyKey: key,
         bet: actualBet, payout: outcome.win,
         status: outcome.win > 0 ? "settled" : "lost",
-        outcome: { grid: outcome.grid, bonus: outcome.bonus, freeSpinsAwarded: outcome.freeSpins, freeSpinsRemaining: state.freeSpins, hits: outcome.hits, requestedBet: bet },
+        outcome: { grid: outcome.grid, bonus: outcome.bonus, freeSpinsAwarded: outcome.freeSpins, freeSpinsRemaining: state.freeSpins, hits: outcome.hits, requestedBet: bet, freeSpin },
         settledAt: new Date()
       }], { session });
       result = { roundId: round.roundId, coins: user.coins, bet: actualBet, payout: outcome.win,
