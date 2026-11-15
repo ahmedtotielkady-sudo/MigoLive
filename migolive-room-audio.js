@@ -98,7 +98,7 @@
       state.socket = io(API_ORIGIN, { transports: ['websocket', 'polling'], auth: { token: token() }, reconnection: true });
       state.socket.on('connect_error', e => emit('error', { message: e.message || 'تعذر الاتصال الصوتي' }));
       state.socket.on('room:peer-joined', async peer => {
-        try { await makePeer(peer.socketId, !!state.stream); emit('peer-joined', peer); }
+        try { await makePeer(peer.socketId, false); emit('peer-joined', peer); }
         catch (e) { emit('error', { message: e.message }); }
       });
       state.socket.on('room:peer-left', p => { if (p.socketId) removePeer(p.socketId); emit('member-left', p); });
@@ -181,5 +181,5 @@
     if (state.socket) { state.socket.disconnect(); state.socket = null; }
     emit('left', {});
   }
-  window.MigoRoomAudio = Object.freeze({ join, startMic, stopMic, leave, on, getState: () => ({ roomCode: state.roomCode, connected: !!state.socket?.connected, micEnabled: !!state.stream?.getAudioTracks().some(t => t.enabled), peerCount: state.peers.size }) });
+  window.MigoRoomAudio = Object.freeze({ join, startMic, stopMic, leave, on, setUid: uid => { state.uid = Number(uid) || null; }, getState: () => ({ roomCode: state.roomCode, connected: !!state.socket?.connected, micEnabled: !!state.stream?.getAudioTracks().some(t => t.enabled), peerCount: state.peers.size }) });
 })();
