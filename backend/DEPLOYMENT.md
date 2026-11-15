@@ -11,6 +11,8 @@
   - `JWT_SECRET`: generate a unique random secret with at least 32 characters.
   - `CORS_ORIGINS`: include every actual browser origin, comma-separated. For the current Railway frontend and Cloudflare Pages, use `https://migolive-production.up.railway.app,https://migolive.pages.dev` (add any custom domain actually used). The Android app's native requests may omit Origin, but web builds must match exactly.
   - `NODE_ENV`: `production`
+  - `TURN_URLS`: comma-separated TURN server URLs, for example `turn:turn.example.com:3478?transport=udp,turns:turn.example.com:5349?transport=tcp`.
+  - `TURN_SHARED_SECRET`: a private random secret of at least 32 characters matching the coturn REST API shared secret. Never place this secret in frontend files or Git.
 - Health check path: `/api/health`
 
 ## Cloudflare Pages
@@ -52,3 +54,10 @@ The wallet screen and direct-message search/send/history now call the server API
 - Do not grant owner/admin roles through public registration.
 - Room create/join/leave and direct-message lookup/history/send are connected in the current web integration branch. Realtime room presence and voice signaling are implemented but still require multi-device and network testing. Room text-chat fan-out, authoritative gift catalog/pricing alignment with the client, game settlement, recharge approval, agency commissions, and secure admin actions still need server-side implementation before those features can be considered production-ready.
 - Never expose database credentials or JWT secrets in frontend code or Git.
+
+## Real-time room voice
+- Room audio uses WebRTC peer connections; Socket.IO carries authenticated offer/answer/ICE signaling only.
+- Android preview builds must declare `RECORD_AUDIO` and `MODIFY_AUDIO_SETTINGS`; Capacitor's WebView permission handler requests microphone access at runtime.
+- `GET /api/rooms/ice-config` returns STUN plus short-lived TURN credentials when `TURN_URLS` and `TURN_SHARED_SECRET` are configured.
+- Without TURN, some users on mobile carrier networks, symmetric NAT, or restrictive Wi-Fi may fail to connect even though local-network calls work. Configure a reachable coturn-compatible TURN service before treating voice as production-ready.
+- Test with two physical Android devices on different networks: join one room, take separate speaker seats, start/stop each microphone, mute a speaker as host, and verify audio reconnect after switching networks.
