@@ -74,7 +74,7 @@ async function seatSnapshot(room) {
         socket.join("room:" + key);
         const peers = [...(io.sockets.adapter.rooms.get("room:" + key) || [])]
           .filter(id => id !== socket.id);
-        ack({ ok: true, roomCode, socketId: socket.id, uid: ctx.user.uid, peers });
+        ack({ ok: true, roomCode, socketId: socket.id, uid: ctx.user.uid, peers, seats: await seatSnapshot(ctx.room) });
         socket.to("room:" + key).emit("room:peer-joined", {
           socketId: socket.id, uid: ctx.user.uid, displayName: ctx.user.displayName
         });
