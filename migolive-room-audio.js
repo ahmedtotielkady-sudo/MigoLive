@@ -17,7 +17,7 @@
     listeners.get(name).add(fn);
     return () => listeners.get(name)?.delete(fn);
   };
-  function token() { return localStorage.getItem('migolive_api_token_v1') || ''; }
+  function token() { return localStorage.getItem('migolive_token') || ''; }
   function loadSocketClient() {
     if (window.io) return Promise.resolve(window.io);
     if (state.loading) return state.loading;
