@@ -252,6 +252,7 @@ async function press(buy){
     if(!response.ok||!data.ok)throw new Error(data.message||"تعذر تنفيذ الجولة");
     pendingOceanRound=null;
     bal=Number(data.coins)||0;ready=true;upd();
+    try{parent.postMessage({t:"refresh"},"*")}catch(_){};
     await showServerRound({steps:data.steps||[],grid:data.grid});
     (data.freeSpinRounds||[]).forEach(function(round){});
     for(var fs=0;fs<(data.freeSpinRounds||[]).length;fs++){
