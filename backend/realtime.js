@@ -75,16 +75,33 @@ function attachRealtime(httpServer, allowedOrigins) {
     });
 
     for (const event of ["rtc:offer", "rtc:answer", "rtc:ice"]) {
-      socket.on(event, (payload = {}, ack = () => {}) => {
-        const roomCode = socket.data.roomCode;
-        const target = String(payload.to || "");
-        const roomName = roomCode ? "room:" + roomCode : "";
-        const targetSocket = io.sockets.sockets.get(target);
-        if (!roomName || !targetSocket || targetSocket.data.roomCode !== roomCode) {
-          return ack({ ok: false, error: "PEER_NOT_IN_ROOM" });
+      socket.on(event, async (payload = {}, ack = () => {}) => {
+        try {
+          const roomCode = socket.data.roomCode;
+          const target = String(payload.to || "");
+          const targetSocket = io.sockets.sockets.get(target);
+          if (!roomCode || !targetSocket || targetSocket.data.roomCode !== roomCode) {
+            return ack({ ok: false, error: "PEER_NOT_IN_ROOM" });
+          }
+          // Re-check both memberships against MongoDB for every signaling packet.
+          // This prevents a socket removed from a room from continuing to exchange
+          // WebRTC offers, answers, or ICE candidates using stale socket state.
+          const [senderContext, targetContext] = await Promise.all([
+            memberContext(socket, roomCode),
+            memberContext(targetSocket, roomCode)
+          ]);
+          if (!senderContext || !targetContext) {
+            return ack({ ok: false, error: "NOT_ROOM_MEMBER" });
+          }
+          targetSocket.emit(event, {
+            from: socket.id,
+            description: payload.description,
+            candidate: payload.candidate
+          });
+          return ack({ ok: true });
+        } catch (_error) {
+          return ack({ ok: false, error: "SERVER_ERROR" });
         }
-        targetSocket.emit(event, { from: socket.id, description: payload.description, candidate: payload.candidate });
-        ack({ ok: true });
       });
     }
 
