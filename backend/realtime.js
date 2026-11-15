@@ -34,7 +34,7 @@ function attachRealtime(httpServer, allowedOrigins) {
 
   async function memberContext(socket, roomCode) {
     const room = await Room.findOne({ roomCode: Number(roomCode), status: "open" })
-      .select("roomCode owner members").lean();
+      .select("roomCode owner members speakerSeats").lean();
     if (!room || !room.members.some(id => String(id) === socket.auth.sub)) return null;
     const user = await User.findById(socket.auth.sub).select("uid displayName role").lean();
     if (!user) return null;
