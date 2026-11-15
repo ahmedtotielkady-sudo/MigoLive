@@ -1070,10 +1070,13 @@ function renderRoom(m){
   $('#onl').onclick=()=>showOnline(r);
   $('#hostMic').onclick=()=>{
     if(r.hostUser&&r.hostUser!==me)return toast('مايك المضيف مشغول');
-    if(!r.hostUser){
+    if(r.hostUser===me){
+      r.hostUser=null;r.hostTalk=false;talk=false;closeHost();
+      toast('نزلت من مايك المضيف');
+    }else{
       if(r.seats.includes(me))return toast('غادر مقعدك العادي أولاً قبل الصعود على مايك المضيف');
       r.hostUser=me;r.hostTalk=true;openHost();toast('تم تفعيل مايك المضيف');
-    }else{r.hostTalk=!r.hostTalk;toast(r.hostTalk?'مايك المضيف يعمل':'تم كتم مايك المضيف')}
+    }
     save();render();
   };
   if(adm){$('#adm').onclick=()=>rsOpen('main');
