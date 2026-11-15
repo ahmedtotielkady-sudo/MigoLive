@@ -93,4 +93,76 @@ router.post("/transfer", async (req, res, next) => {
   } finally { await session.endSession(); }
 });
 
+
+
+// Owner/admin credits are committed to the canonical User balance and ledger in one transaction.
+router.post("/admin/credit", async (req, res) => {
+  const amount = Number(req.body.amount);
+  const targetUid = Number(req.body.targetUid);
+  const description = String(req.body.description || "شحن من الإدارة").slice(0, 160);
+  const key = String(req.get("idempotency-key") || "");
+  if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1000000000) {
+    return res.status(400).json({ ok: false, message: "قيمة العملات غير صحيحة" });
+  }
+  if (!Number.isSafeInteger(targetUid) || targetUid < 100000) {
+    return res.status(400).json({ ok: false, message: "رقم ID المستخدم غير صحيح" });
+  }
+  if (!/^[A-Za-z0-9_-]{16,100}$/.test(key)) {
+    return res.status(400).json({ ok: false, message: "معرّف عملية الشحن مطلوب" });
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      const admin = await User.findById(req.auth.sub).session(session).select("role status");
+      if (!admin || admin.status !== "active" || !["owner", "admin"].includes(admin.role)) {
+        throw Object.assign(new Error("صلاحية الشحن للإدارة فقط"), { status: 403 });
+      }
+      const target = await User.findOne({ uid: targetUid, status: "active" }).session(session).select("_id uid coins");
+      if (!target) throw Object.assign(new Error("المستخدم غير موجود أو موقوف"), { status: 404 });
+
+      const existing = await WalletTransaction.findOne({ idempotencyKey: key }).session(session);
+      if (existing) {
+        if (String(existing.from || "") !== String(admin._id) ||
+            String(existing.to || "") !== String(target._id) ||
+            existing.amount !== amount || existing.type !== "admin_adjustment") {
+          throw Object.assign(new Error("معرّف العملية مستخدم لشحنة مختلفة"), { status: 409 });
+        }
+        result = { coins: target.coins, transactionId: String(existing._id), repeated: true };
+        return;
+      }
+
+      const updated = await User.findOneAndUpdate(
+        { _id: target._id, status: "active" },
+        { $inc: { coins: amount } },
+        { new: true, session, projection: { uid: 1, coins: 1 } }
+      );
+      if (!updated) throw Object.assign(new Error("تعذر تحديث رصيد المستخدم"), { status: 409 });
+      await Wallet.updateOne(
+        { userId: updated._id },
+        { $set: { balance: updated.coins } },
+        { upsert: true, session }
+      );
+      const [tx] = await WalletTransaction.create([{
+        from: admin._id,
+        to: updated._id,
+        amount,
+        type: "admin_adjustment",
+        description,
+        idempotencyKey: key
+      }], { session });
+      result = { uid: updated.uid, coins: updated.coins, transactionId: String(tx._id), repeated: false };
+    });
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    return res.status(error.status || 500).json({
+      ok: false,
+      message: error.status ? error.message : "تعذر تنفيذ شحن الإدارة"
+    });
+  } finally {
+    await session.endSession();
+  }
+});
+
 module.exports = router;
