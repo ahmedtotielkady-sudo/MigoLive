@@ -249,10 +249,16 @@ async function seatSnapshot(room) {
         const ctx = roomCode && await memberContext(socket, roomCode);
         if (!ctx || (!ctx.isOwner && !ctx.isAdmin)) return ack({ ok: false, error: "FORBIDDEN" });
         const targetUid = Number(payload.uid);
+        if (!Number.isSafeInteger(targetUid) || targetUid < 1) return ack({ ok: false, error: "INVALID_TARGET" });
         const target = await User.findOne({ uid: targetUid }).select("_id uid").lean();
         if (!target || String(target._id) === String(ctx.room.owner)) return ack({ ok: false, error: "INVALID_TARGET" });
         const updated = await Room.updateOne({ _id: ctx.room._id, members: target._id }, { $pull: { members: target._id, speakerSeats: { userId: target._id } } });
         if (!updated.modifiedCount) return ack({ ok: false, error: "USER_NOT_IN_ROOM" });
+        mutedUsers.delete(String(roomCode) + ":" + String(target._id));
+        const refreshedRoom = await Room.findById(ctx.room._id).select("speakerSeats").lean();
+        emitRoom(roomCode, "seats:state", { seats: await seatSnapshot(refreshedRoom || { speakerSeats: [] }) });
+        emitRoom(roomCode, "mic:state", { uid: targetUid, enabled: false });
+        emitRoom(roomCode, "hand:state", { uid: targetUid, raised: false });
         const targetSocketIds = [...(io.sockets.adapter.rooms.get("room:" + roomCode) || [])]
           .filter(id => io.sockets.sockets.get(id)?.auth?.sub === String(target._id));
         for (const id of targetSocketIds) {
