@@ -14,7 +14,7 @@ router.get("/", async (req, res, next) => {
     if (!user) return res.status(404).json({ ok: false, message: "الحساب غير موجود" });
     await Wallet.updateOne(
       { userId: user._id },
-      { $set: { balance: user.coins }, $setOnInsert: { userId: user._id } },
+      { $set: { balance: user.coins } },
       { upsert: true }
     );
     return res.json({ ok: true, uid: user.uid, coins: user.coins });
