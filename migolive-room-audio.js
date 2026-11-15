@@ -92,7 +92,7 @@
   async function join(roomCode) {
     if (!token()) throw new Error('سجّل الدخول أولاً');
     if (!Number.isSafeInteger(Number(roomCode))) throw new Error('رقم الغرفة غير صحيح');
-    if (state.roomCode && state.roomCode !== Number(roomCode)) await leave();
+    if (state.roomCode === Number(roomCode) && state.socket?.connected) return { ok: true, roomCode: state.roomCode, alreadyJoined: true };\n    if (state.roomCode && state.roomCode !== Number(roomCode)) await leave();
     const io = await loadSocketClient();
     if (!state.socket) {
       state.socket = io(API_ORIGIN, { transports: ['websocket', 'polling'], auth: { token: token() }, reconnection: true });
