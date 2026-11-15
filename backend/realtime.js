@@ -42,10 +42,28 @@ function attachRealtime(httpServer, allowedOrigins) {
   }
 
 async function seatSnapshot(room) {
-    const ids = (room.speakerSeats || []).map(s => s.userId);
+    const source = Array.isArray(room.speakerSeats) ? room.speakerSeats : [];
+    const ids = [...new Set(source.map(s => String(s.userId)))];
     const users = await User.find({ _id: { $in: ids } }).select("_id uid").lean();
     const uidById = new Map(users.map(u => [String(u._id), u.uid]));
-    return (room.speakerSeats || []).map(s => ({ seat: s.seat, uid: uidById.get(String(s.userId)) })).filter(s => Number.isSafeInteger(Number(s.uid)));
+    // A user can occupy only one speaker seat. Prefer the last valid seat
+    // if legacy data contains duplicates, and never emit duplicate UI entries.
+    const byUser = new Map();
+    const usedSeats = new Set();
+    for (const s of source) {
+      const key = String(s.userId);
+      const uid = uidById.get(key);
+      const seat = Number(s.seat);
+      if (!uid || !Number.isInteger(seat) || seat < 1 || seat > 25) continue;
+      if (byUser.has(key)) {
+        const previous = byUser.get(key);
+        usedSeats.delete(previous.seat);
+      }
+      if (usedSeats.has(seat)) continue;
+      byUser.set(key, { seat, uid });
+      usedSeats.add(seat);
+    }
+    return [...byUser.values()];
   }
 
     function emitRoom(roomCode, event, payload, exceptSocket) {
