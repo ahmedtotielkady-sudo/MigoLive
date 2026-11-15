@@ -97,6 +97,37 @@ async function spin(){
 if html.count(old) != 1:
     raise SystemExit(f"Expected one original spin() function, found {html.count(old)}")
 html = html.replace(old, new, 1)
+
+# This game is same-origin with the app. Read the authenticated server wallet
+# directly; never accept the app's locally cached profile balance as canonical.
+old_save = "function save(){if(ready)try{parent.postMessage({t:'set',v:bal+pend},'*')}catch(e){}}"
+if html.count(old_save) != 1:
+    raise SystemExit("Expected one legacy client wallet save()")
+html = html.replace(old_save, "function save(){} // wallet is server-authoritative", 1)
+
+old_listener = "addEventListener('message',e=>{const d=e.data;if(!d)return;if(d.t==='bal'&&Number.isFinite(d.v)){bal=d.v;ready=true;upd()}else if(d.t==='me'){me=d;ap()}});"
+new_listener = "addEventListener('message',e=>{const d=e.data;if(d&&d.t==='me'){me=d;ap()}});"
+if html.count(old_listener) != 1:
+    raise SystemExit("Expected one legacy profile/balance message listener")
+html = html.replace(old_listener, new_listener, 1)
+
+wallet_loader = """async function loadServerWallet(){
+  const token=localStorage.getItem('migolive_token');
+  if(!token)throw new Error('سجّل الدخول إلى حسابك أولاً');
+  const response=await fetch('https://migolive-api-production.up.railway.app/api/wallet',{
+    headers:{'authorization':'Bearer '+token},cache:'no-store'
+  });
+  let data={};try{data=await response.json()}catch(_){}
+  if(!response.ok||!data.ok)throw new Error(data.message||'تعذر تحميل محفظتك');
+  bal=Number(data.coins)||0;ready=true;upd();
+}
+loadServerWallet().catch(error=>{modal(error.message||'تعذر تحميل المحفظة',[['إعادة المحاولة',()=>location.reload(),'g']])});
+"""
+anchor2 = "try{parent.postMessage({t:'get'},'*')}catch(e){}"
+if html.count(anchor2) != 1:
+    raise SystemExit("Expected one parent profile request")
+html = html.replace(anchor2, anchor2 + "\\n" + wallet_loader, 1)
+
 # Remove client-generated fallback balance: a missing server response must never mint coins.
 fallback = "setTimeout(()=>{if(!ready&&bal===0){bal=5000;upd()}},1500);"
 if html.count(fallback) != 1:
