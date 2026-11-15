@@ -47,12 +47,14 @@ jobs:
           mkdir -p www
           cp index.html www/index.html
           cp migolive-back-navigation.js www/migolive-back-navigation.js
+          cp migolive-room-audio.js www/migolive-room-audio.js
           python3 - <<'PY'
           from pathlib import Path
           p = Path('www/index.html')
           html = p.read_text(encoding='utf-8')
           tags = [
-              '<script src="migolive-back-navigation.js"></script>'
+              '<script src="migolive-back-navigation.js"></script>',
+              '<script src="migolive-room-audio.js"></script>'
           ]
           for tag in tags:
               if tag not in html:
