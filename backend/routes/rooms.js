@@ -73,9 +73,27 @@ router.post("/:roomCode/join", async (req, res, next) => {
       return res.status(409).json({ ok: false, message: "الغرفة ممتلئة" });
     }
     if (!already) {
+      // Empty rooms remain open. The first person to return becomes the new owner.
       const updated = await Room.findOneAndUpdate(
-        { _id: room._id, status: "open", members: { $ne: req.auth.sub }, $expr: { $lt: [{ $size: "$members" }, "$capacity"] } },
-        { $addToSet: { members: req.auth.sub } }, { new: true }
+        {
+          _id: room._id, status: "open", members: { $ne: req.auth.sub },
+          $expr: { $lt: [{ $size: "$members" }, "$capacity"] }
+        },
+        [
+          {
+            $set: {
+              members: { $concatArrays: [{ $ifNull: ["$members", []] }, [new (require("mongoose").Types.ObjectId)(req.auth.sub)]] },
+              owner: {
+                $cond: [
+                  { $eq: [{ $size: { $ifNull: ["$members", []] } }, 0] },
+                  new (require("mongoose").Types.ObjectId)(req.auth.sub),
+                  "$owner"
+                ]
+              }
+            }
+          }
+        ],
+        { new: true }
       ).populate("owner", "uid displayName");
       if (!updated) return res.status(409).json({ ok: false, message: "تعذر الانضمام؛ قد تكون الغرفة امتلأت" });
       return res.json({ ok: true, room: roomView(updated, req.auth.sub) });
@@ -112,6 +130,15 @@ router.post("/:roomCode/leave", async (req, res, next) => {
         io.to("room:" + room.roomCode).emit("room:host-changed", {
           roomCode: room.roomCode, ownerUid: newOwnerUid
         });
+      }
+      // Remove every live socket belonging to the leaver from this room.
+      // Disconnect triggers the realtime cleanup path for stale peers and mic state.
+      const roomSockets = await io.in("room:" + room.roomCode).fetchSockets();
+      for (const peer of roomSockets) {
+        if (String(peer.auth?.sub) === String(req.auth.sub)) {
+          peer.leave("room:" + room.roomCode);
+          peer.disconnect(true);
+        }
       }
       const remainingSeats = await Room.findById(room._id).select("speakerSeats").lean();
       if (remainingSeats) {
