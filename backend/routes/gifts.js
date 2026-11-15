@@ -38,21 +38,23 @@ router.post("/send", async (req, res) => {
     let result;
     await session.withTransaction(async () => {
       const existing = await WalletTransaction.findOne({ idempotencyKey: key }).session(session);
+      if (existing) {
+        const recipientForReplay = await User.findOne({ uid: recipientUid }).session(session).select("_id");
+        if (String(existing.from) !== req.auth.sub || String(existing.to) !== String(recipientForReplay?._id || "") ||
+            existing.amount !== gift.coins || existing.type !== "gift" || existing.description !== gift.name) {
+          throw Object.assign(new Error("معرّف العملية مستخدم لطلب مختلف"), { status: 409 });
+        }
+        const sender = await User.findById(req.auth.sub).session(session).select("coins");
+        if (!sender) throw Object.assign(new Error("الحساب غير موجود"), { status: 404 });
+        result = { coins: sender.coins, transactionId: String(existing._id), repeated: true };
+        return;
+      }
+
       const recipient = await User.findOne({ uid: recipientUid, status: "active" }).session(session).select("_id uid displayName");
       if (!recipient) throw Object.assign(new Error("المستلم غير موجود"), { status: 404 });
       if (String(recipient._id) === req.auth.sub) throw Object.assign(new Error("لا يمكنك إهداء نفسك"), { status: 400 });
       const room = await Room.findOne({ roomCode, status: "open", members: { $all: [req.auth.sub, recipient._id] } }).session(session).select("_id");
       if (!room) throw Object.assign(new Error("يجب أن تكون أنت والمستلم داخل الغرفة"), { status: 403 });
-
-      if (existing) {
-        if (String(existing.from) !== req.auth.sub || String(existing.to) !== String(recipient._id) ||
-            existing.amount !== gift.coins || existing.type !== "gift" || existing.description !== gift.name) {
-          throw Object.assign(new Error("معرّف العملية مستخدم لطلب مختلف"), { status: 409 });
-        }
-        const sender = await User.findById(req.auth.sub).session(session).select("coins");
-        result = { coins: sender.coins, transactionId: String(existing._id), repeated: true };
-        return;
-      }
 
       const sender = await User.findOneAndUpdate(
         { _id: req.auth.sub, status: "active", coins: { $gte: gift.coins } },
