@@ -36,7 +36,10 @@
       if (!state.socket?.connected) return reject(new Error('الاتصال بالغرفة غير متاح'));
       state.socket.timeout(8000).emit(event, payload, (err, result) => {
         if (err) return reject(new Error('انتهت مهلة الاتصال بالخادم'));
-        if (!result?.ok) return reject(new Error(result?.error || 'رفض الخادم الطلب'));
+        if (!result?.ok) {
+          const messages = { MIC_ALREADY_ACTIVE: 'هذا الحساب يستخدم الميكروفون بالفعل من جهاز أو اتصال آخر', SPEAKER_SEAT_REQUIRED: 'يجب أن تصعد إلى مقعد المايك أولاً', NOT_ROOM_MEMBER: 'لم تعد عضواً في هذه الغرفة' };
+          return reject(new Error(messages[result?.error] || result?.error || 'رفض الخادم الطلب'));
+        }
         resolve(result);
       });
     });
@@ -174,28 +177,41 @@
   async function startMic() {
     if (!state.roomCode) throw new Error('ادخل الغرفة أولاً');
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('الميكروفون غير مدعوم في هذا الجهاز أو السياق');
-    if (!state.stream) {
-      state.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
-      for (const pc of state.peers.values()) state.stream.getTracks().forEach(track => pc.addTrack(track, state.stream));
-      for (const [peerId, pc] of state.peers) {
-        if (pc.signalingState === 'stable') {
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          await sendSignal('rtc:offer', peerId, { description: pc.localDescription });
-        }
-      }
-    }
-    state.muted = false;
-    state.stream.getAudioTracks().forEach(t => { t.enabled = true; });
+
+    // Ask the server to reserve this account's single active mic before opening
+    // the device or attaching audio tracks to peer connections.
     const micResult = await socketAck('mic:state', { enabled: true });
     if (micResult.forcedMuted) {
-      state.stream.getAudioTracks().forEach(t => { t.enabled = false; });
-      state.muted = true;
-      emit('mic', { enabled: false, forcedMuted: true });
+      try { await socketAck('mic:state', { enabled: false }); } catch (_) {}
       throw new Error('مالك الغرفة كتم الميكروفون الخاص بك');
     }
-    emit('mic', { enabled: true });
-    return true;
+    try {
+      if (!state.stream) {
+        state.stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: false
+        });
+        for (const pc of state.peers.values()) {
+          state.stream.getTracks().forEach(track => pc.addTrack(track, state.stream));
+        }
+        for (const [peerId, pc] of state.peers) {
+          if (pc.signalingState === 'stable') {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            await sendSignal('rtc:offer', peerId, { description: pc.localDescription });
+          }
+        }
+      }
+      state.muted = false;
+      state.stream.getAudioTracks().forEach(track => { track.enabled = true; });
+      emit('mic', { enabled: true });
+      return true;
+    } catch (error) {
+      try { await socketAck('mic:state', { enabled: false }); } catch (_) {}
+      if (state.stream) state.stream.getAudioTracks().forEach(track => { track.enabled = false; });
+      state.muted = true;
+      throw error;
+    }
   }
   async function stopMic() {
     state.muted = true;
