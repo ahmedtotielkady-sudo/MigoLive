@@ -307,7 +307,7 @@ jobs:
           ]
           missing = [name for name in permissions if f'android:name="{name}"' not in s]
           if missing:
-              lines = ''.join(f'    <uses-permission android:name="{name}" />\\n' for name in missing)
+              lines = ''.join(f'    <uses-permission android:name="{name}" />\n' for name in missing)
               s = s.replace('<application', lines + '    <application', 1)
               p.write_text(s, encoding='utf-8')
           print('Microphone/audio permissions verified:', ', '.join(permissions))
