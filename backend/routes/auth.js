@@ -71,7 +71,7 @@ router.post("/register", async (req, res, next) => {
       coins: 100,
       role: "user"
     });
-    await Wallet.create({ userId: user._id, balance: user.coins });
+    await Wallet.updateOne({ userId: user._id }, { $setOnInsert: { userId: user._id, balance: user.coins } }, { upsert: true });
     const token = issueToken(user);
     return res.status(201).json({ ok: true, token, user: publicUser(user) });
   } catch (error) {
