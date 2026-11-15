@@ -682,6 +682,32 @@ addEventListener('message',e=>{const d=e.data;if(!d||!me||e.source!==$('#gf').co
 function rImg(f,mx,cb){if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,mx/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.8))};im.onerror=()=>toast('الملف ليس صورة');im.src=rd.result};rd.readAsDataURL(f)}
 const TABS=['rooms','games','msgs','wallet','me','owner','agent','agency','hostperf','vip','friends','notes','invite','security'];
 function nav(h){if(room){tab=h;render();return}if(location.hash.slice(1)!==h)location.hash=h}
+function applyServerSeatSnapshot(r, seats){
+  const next=Array(SEATMAX).fill(null);
+  (seats||[]).forEach(item=>{
+    const index=Number(item.seat)-1, uid=Number(item.uid);
+    if(!Number.isInteger(index)||index<0||index>=SEATMAX||!Number.isSafeInteger(uid))return;
+    let key=Object.keys(DB.users).find(k=>Number(DB.users[k]?.uid)===uid);
+    if(!key){
+      key='server-uid-'+uid;
+      DB.users[key]={
+        uid, name:'مستخدم '+uid, displayName:'مستخدم '+uid,
+        role:'user', coins:0, serverShadow:true
+      };
+    }
+    next[index]=key;
+  });
+  r.seats=next;
+  if(room&&Number(room.id)===Number(r.id))render();
+}
+if(!window.__migoSeatListenerBound&&window.MigoRoomAudio){
+  window.__migoSeatListenerBound=true;
+  window.MigoRoomAudio.on('seats', payload=>{
+    const active=room;
+    if(!active||!active.serverRoom)return;
+    applyServerSeatSnapshot(active,payload?.seats||[]);
+  });
+}
 function route(){if(!me)return;if(gameOn)return;const h=location.hash.slice(1),r=h.startsWith('room-')&&DB.rooms.find(x=>x.id==h.slice(5));
   if(r){roomMinimized=false;normRoom(r);const g=gate(r);if(g){toast(({kicked:'تم طردك من هذه الغرفة',vip:`غرفة VIP تتطلب مستوى ${r.vipMin} أو أعلى`,pass:'الغرفة مقفلة بكلمة مرور'})[g]);if(room)leaveRoom(true);tab='rooms';try{history.replaceState(null,'','#rooms')}catch(e){}return render()}
     if(room&&room!==r)leaveRoom(true);room=r;if(!r.members.includes(me)&&r.members.length<650){r.members.push(me);save()}roomEnter(r);vipEnter(r);
@@ -1124,10 +1150,22 @@ function renderRoom(m){
       else if(a==='unlock')r.lock=r.lock.filter(x=>x!==sel);
       else if(a==='ban'){if(kickFromRoom(r,s))toast('تم طرد المستخدم من الغرفة')}
       sel=null;save();render()})}
-  m.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{const i=+b.dataset.s,s=r.seats[i];
+  m.querySelectorAll('[data-s]').forEach(b=>b.onclick=async()=>{const i=+b.dataset.s,s=r.seats[i];
     if(adm&&s!==me&&(s||r.lock.includes(i))){sel=i;return render()}
     if(s&&s!==me)return toast('المقعد مشغول');
     if(!s&&r.lock.includes(i))return toast('المقعد مقفل');
+    if(r.serverRoom){
+      if(!window.MigoRoomAudio)return toast('خدمة الصوت غير محمّلة');
+      try{
+        const result=s===me
+          ? await window.MigoRoomAudio.leaveSeat()
+          : await window.MigoRoomAudio.takeSeat(i+1);
+        applyServerSeatSnapshot(r,result.seats||[]);
+        if(s===me){talk=false;await window.MigoRoomAudio.stopMic();closeHost();toast('نزلت من المقعد')}
+        else toast('تم حجز المقعد الصوتي');
+      }catch(e){toast(e.message==='SEAT_OCCUPIED'?'المقعد مشغول':e.message==='SEATS_FULL'?'اكتملت المقاعد الصوتية':e.message==='SPEAKER_SEAT_REQUIRED'?'احجز مقعداً أولاً':('تعذر تحديث المقعد: '+e.message))}
+      return;
+    }
     if(s===me){r.seats[i]=null;talk=false;closeHost()}
     else{
       if(r.hostUser===me)return toast('أنت على مايك المضيف بالفعل؛ غادره أولاً قبل اختيار مقعد آخر');
