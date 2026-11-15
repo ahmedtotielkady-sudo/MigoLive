@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Wallet = require("../models/Wallet");
 const Counter = require("../models/Counter");
 const requireAuth = require("../middleware/requireAuth");
 
@@ -70,6 +71,7 @@ router.post("/register", async (req, res, next) => {
       coins: 100,
       role: "user"
     });
+    await Wallet.create({ userId: user._id, balance: user.coins });
     const token = issueToken(user);
     return res.status(201).json({ ok: true, token, user: publicUser(user) });
   } catch (error) {
