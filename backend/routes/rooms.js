@@ -89,23 +89,43 @@ router.post("/:roomCode/leave", async (req, res, next) => {
   try {
     const room = await Room.findOne({ roomCode: Number(req.params.roomCode) });
     if (!room) return res.status(404).json({ ok: false, message: "الغرفة غير موجودة" });
-    if (String(room.owner) === req.auth.sub) {
-      room.status = "closed";
-      room.members = [];
-      room.speakerSeats = [];
-    } else {
-      room.members.pull(req.auth.sub);
-      room.speakerSeats = (room.speakerSeats || []).filter(seat => String(seat.userId) !== req.auth.sub);
+    const wasOwner = String(room.owner) === req.auth.sub;
+    room.members.pull(req.auth.sub);
+    room.speakerSeats = (room.speakerSeats || []).filter(seat => String(seat.userId) !== req.auth.sub);
+
+    // A room is independent from its current host/microphone holder.
+    // If the owner leaves, promote the next remaining member instead of closing the room.
+    let newOwnerUid = null;
+    if (wasOwner && room.members.length > 0) {
+      const nextOwnerId = room.members[0];
+      room.owner = nextOwnerId;
+      const nextOwner = await User.findById(nextOwnerId).select("uid").lean();
+      newOwnerUid = nextOwner?.uid ?? null;
     }
     await room.save();
-    if (room.status === "closed") {
-      const io = req.app.get("io");
-      if (io) {
-        io.to("room:" + room.roomCode).emit("room:closed", { roomCode: room.roomCode, reason: "owner_left" });
-        await io.in("room:" + room.roomCode).socketsLeave("room:" + room.roomCode);
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to("room:" + room.roomCode).emit("room:peer-left", { uid: Number(req.auth.uid), reason: "left" });
+      io.to("room:" + room.roomCode).emit("mic:state", { uid: Number(req.auth.uid), enabled: false });
+      if (wasOwner && newOwnerUid !== null) {
+        io.to("room:" + room.roomCode).emit("room:host-changed", {
+          roomCode: room.roomCode, ownerUid: newOwnerUid
+        });
+      }
+      const remainingSeats = await Room.findById(room._id).select("speakerSeats").lean();
+      if (remainingSeats) {
+        const ids = remainingSeats.speakerSeats.map(seat => seat.userId);
+        const users = await User.find({ _id: { $in: ids } }).select("_id uid").lean();
+        const uidById = new Map(users.map(user => [String(user._id), user.uid]));
+        io.to("room:" + room.roomCode).emit("seats:state", {
+          seats: remainingSeats.speakerSeats.map(seat => ({
+            seat: seat.seat, uid: uidById.get(String(seat.userId))
+          })).filter(seat => Number.isSafeInteger(Number(seat.uid)))
+        });
       }
     }
-    return res.json({ ok: true, closed: room.status === "closed" });
+    return res.json({ ok: true, closed: false, ownerUid: newOwnerUid });
   } catch (error) { return next(error); }
 });
 
