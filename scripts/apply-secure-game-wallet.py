@@ -20,9 +20,12 @@ new = '''   }else if(d.t==="set"){
     e.source.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
    }else if(d.t==="wallet"){'''
 count = html.count(old)
-if count != 1:
-    raise SystemExit(f"Expected exactly one unsafe wallet bridge, found {count}")
-html = html.replace(old, new, 1)
+if count == 1:
+    html = html.replace(old, new, 1)
+elif count == 0 and new in html:
+    print("App wallet bridge is already hardened")
+else:
+    raise SystemExit(f"Expected one unsafe or one hardened app wallet bridge, found unsafe={count}")
 
 # The in-room launcher injects a separate iframe bridge after this script runs.
 # Harden that bridge at its source too, so no game can write a client-supplied
@@ -44,9 +47,12 @@ launcher_new = '''   }else if(d.t==="set"){
     e.source.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
    }else if(d.t==="wallet"){'''
 launcher_count = launcher.count(launcher_old)
-if launcher_count != 1:
-    raise SystemExit(f"Expected exactly one unsafe room-game wallet bridge, found {launcher_count}")
-launcher = launcher.replace(launcher_old, launcher_new, 1)
+if launcher_count == 1:
+    launcher = launcher.replace(launcher_old, launcher_new, 1)
+elif launcher_count == 0 and launcher_new in launcher:
+    print("Room-game wallet bridge is already hardened")
+else:
+    raise SystemExit(f"Expected one unsafe or one hardened room-game wallet bridge, found unsafe={launcher_count}")
 launcher_path.write_text(launcher, encoding="utf-8")
 
 path.write_text(html, encoding="utf-8")
