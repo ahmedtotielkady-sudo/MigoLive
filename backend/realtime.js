@@ -31,6 +31,17 @@ function attachRealtime(httpServer, allowedOrigins) {
 
   const socketRooms = new Map();
   const mutedUsers = new Map();
+  // One active microphone socket per account per room, including the owner.
+  const activeMicSockets = new Map();
+
+  function micKey(roomCode, userId) {
+    return String(roomCode) + ":" + String(userId);
+  }
+
+  function releaseMic(roomCode, userId, socketId) {
+    const key = micKey(roomCode, userId);
+    if (!socketId || activeMicSockets.get(key) === socketId) activeMicSockets.delete(key);
+  }
 
   async function memberContext(socket, roomCode) {
     const room = await Room.findOne({ roomCode: Number(roomCode), status: "open" })
@@ -82,6 +93,7 @@ async function seatSnapshot(room) {
         const key = String(roomCode);
         const previous = socketRooms.get(socket.id);
         if (previous && previous !== key) {
+          releaseMic(previous, socket.auth.sub, socket.id);
           socket.leave("room:" + previous);
           emitRoom(previous, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
           try {
@@ -227,6 +239,16 @@ async function seatSnapshot(room) {
           return ack({ ok: false, error: "SPEAKER_SEAT_REQUIRED" });
         }
         const enabled = payload.enabled === true && !muted;
+        const key = micKey(roomCode, ctx.user._id);
+        if (enabled) {
+          const activeSocket = activeMicSockets.get(key);
+          if (activeSocket && activeSocket !== socket.id && io.sockets.sockets.has(activeSocket)) {
+            return ack({ ok: false, error: "MIC_ALREADY_ACTIVE" });
+          }
+          activeMicSockets.set(key, socket.id);
+        } else {
+          releaseMic(roomCode, ctx.user._id, socket.id);
+        }
         emitRoom(roomCode, "mic:state", { uid: ctx.user.uid, enabled });
         ack({ ok: true, enabled, forcedMuted: muted });
       } catch (_error) { ack({ ok: false, error: "SERVER_ERROR" }); }
@@ -256,6 +278,7 @@ async function seatSnapshot(room) {
         if (String(room.owner) === String(target._id)) return ack({ ok: false, error: "CANNOT_MUTE_OWNER" });
         const mute = payload.muted === true;
         mutedUsers.set(String(roomCode) + ":" + String(target._id), mute);
+        if (mute) releaseMic(roomCode, target._id);
         emitRoom(roomCode, "host:mute-state", { uid: targetUid, muted: mute });
         ack({ ok: true });
       } catch (_error) { ack({ ok: false, error: "SERVER_ERROR" }); }
@@ -273,6 +296,7 @@ async function seatSnapshot(room) {
         const updated = await Room.updateOne({ _id: ctx.room._id, members: target._id }, { $pull: { members: target._id, speakerSeats: { userId: target._id } } });
         if (!updated.modifiedCount) return ack({ ok: false, error: "USER_NOT_IN_ROOM" });
         mutedUsers.delete(String(roomCode) + ":" + String(target._id));
+        releaseMic(roomCode, target._id);
         const refreshedRoom = await Room.findById(ctx.room._id).select("speakerSeats").lean();
         emitRoom(roomCode, "seats:state", { seats: await seatSnapshot(refreshedRoom || { speakerSeats: [] }) });
         emitRoom(roomCode, "mic:state", { uid: targetUid, enabled: false });
@@ -294,6 +318,7 @@ async function seatSnapshot(room) {
     socket.on("disconnect", async () => {
       const roomCode = socketRooms.get(socket.id);
       if (roomCode) {
+        releaseMic(roomCode, socket.auth.sub, socket.id);
         emitRoom(roomCode, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
         emitRoom(roomCode, "mic:state", { uid: socket.auth.uid, enabled: false });
         emitRoom(roomCode, "hand:state", { uid: socket.auth.uid, raised: false });
