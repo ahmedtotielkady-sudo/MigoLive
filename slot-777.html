@@ -163,6 +163,7 @@ function countUp(to){
   (function f(t){const p=Math.min(1,(t-t0)/d);$('win').textContent=fmt(to*p);if(p<1)requestAnimationFrame(f)})(t0);
 }
 
+// MIGO_SERVER_SLOT777_V1 — server-authoritative game result
 async function spin(){
   if(spinning){stopNow=true;return}
   const bet=BASE*MULT[mi];if(!ready){modal('المحفظة غير متصلة',[['حسنًا',null,'g']]);return}
