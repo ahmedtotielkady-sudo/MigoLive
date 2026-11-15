@@ -98,6 +98,7 @@
     if (!state.socket) {
       state.socket = io(API_ORIGIN, { transports: ['websocket', 'polling'], auth: { token: token() }, reconnection: true });
       state.socket.on('connect_error', e => emit('error', { message: e.message || 'تعذر الاتصال الصوتي' }));
+      state.socket.on('seats:state', p => emit('seats', p));
       state.socket.on('room:peer-joined', async peer => {
         try { await makePeer(peer.socketId, false); emit('peer-joined', peer); }
         catch (e) { emit('error', { message: e.message }); }
@@ -140,7 +141,8 @@
     const result = await socketAck('room:join', { roomCode: Number(roomCode) });
     state.roomCode = Number(roomCode);
     for (const peerId of result.peers || []) await makePeer(peerId, true);
-    emit('joined', { roomCode: state.roomCode, peers: result.peers || [] });
+    emit('joined', { roomCode: state.roomCode, peers: result.peers || [], seats: result.seats || [] });
+    emit('seats', { seats: result.seats || [] });
     return result;
   }
   async function takeSeat(seat) {
