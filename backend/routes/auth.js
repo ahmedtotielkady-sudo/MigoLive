@@ -112,6 +112,63 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
+
+const crypto = require("crypto");
+const OwnerClaim = require("../models/OwnerClaim");
+
+function safeSecretEqual(candidate, configured) {
+  const a = Buffer.from(String(candidate || ""), "utf8");
+  const b = Buffer.from(String(configured || ""), "utf8");
+  return a.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+// Owner activation is server-only. The phrase must exist only in Railway Variables.
+router.post("/owner/claim", requireAuth, async (req, res, next) => {
+  try {
+    const configuredPhrase = process.env.OWNER_CLAIM_SECRET;
+    if (!configuredPhrase) {
+      return res.status(503).json({ ok: false, message: "تفعيل المالك غير مُعدّ على الخادم" });
+    }
+    const candidate = String(req.body && req.body.phrase || "");
+    if (!safeSecretEqual(candidate, configuredPhrase)) {
+      return res.status(403).json({ ok: false, message: "عبارة التفعيل غير صحيحة" });
+    }
+
+    const user = await User.findById(req.auth.sub);
+    if (!user || user.status === "banned") {
+      return res.status(403).json({ ok: false, message: "الحساب غير مؤهل للتفعيل" });
+    }
+
+    await OwnerClaim.updateOne(
+      { _id: "primary-owner" },
+      { $setOnInsert: { claimed: false } },
+      { upsert: true }
+    );
+
+    const claim = await OwnerClaim.findOneAndUpdate(
+      { _id: "primary-owner", claimed: false },
+      { $set: { claimed: true, ownerUserId: user._id, claimedAt: new Date() } },
+      { new: true }
+    );
+
+    if (!claim) {
+      const existing = await OwnerClaim.findById("primary-owner");
+      if (existing && String(existing.ownerUserId) === String(user._id)) {
+        user.role = "owner";
+        await user.save();
+        return res.json({ ok: true, user: publicUser(user), alreadyOwner: true });
+      }
+      return res.status(409).json({ ok: false, message: "تم تفعيل مالك التطبيق بالفعل" });
+    }
+
+    user.role = "owner";
+    await user.save();
+    return res.json({ ok: true, user: publicUser(user) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get("/me", requireAuth, async (req, res, next) => {
   try {
     const user = await User.findById(req.auth.sub);
