@@ -22,9 +22,25 @@ router.get("/:uid", async (req, res, next) => {
       ]
     };
     if (before && !Number.isNaN(before.getTime())) filter.createdAt = { $lt: before };
-    const messages = await Message.find(filter).populate("from", "uid displayName").populate("to", "uid displayName").sort({ createdAt: -1 }).limit(limit).lean();
-    await Message.updateMany({ from: peer._id, to: req.auth.sub, readAt: null }, { $set: { readAt: new Date() } });
-    return res.json({ ok: true, peer: { uid: peer.uid, displayName: peer.displayName, avatar: peer.avatar }, messages: messages.reverse() });
+    const rows = await Message.find(filter).populate("from", "uid displayName").populate("to", "uid displayName").sort({ createdAt: -1 }).limit(limit + 1).lean();
+    const hasMore = rows.length > limit;
+    const messages = rows.slice(0, limit).reverse();
+    const unreadIds = messages
+      .filter(message => String(message.from?._id || message.from) === String(peer._id) && !message.readAt)
+      .map(message => message._id);
+    if (unreadIds.length) {
+      await Message.updateMany(
+        { _id: { $in: unreadIds }, to: req.auth.sub, readAt: null },
+        { $set: { readAt: new Date() } }
+      );
+    }
+    return res.json({
+      ok: true,
+      peer: { uid: peer.uid, displayName: peer.displayName, avatar: peer.avatar },
+      messages,
+      hasMore,
+      nextBefore: hasMore && messages.length ? messages[0].createdAt : null
+    });
   } catch (error) { return next(error); }
 });
 
