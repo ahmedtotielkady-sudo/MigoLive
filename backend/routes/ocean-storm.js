@@ -43,7 +43,7 @@ router.post("/ocean-storm/spin", async (req, res) => {
         const current = await User.findById(req.auth.sub).session(session).select("coins");
         if (!current) throw Object.assign(new Error("الحساب غير موجود"), { status: 404 });
         result = { roundId: prior.roundId, coins: current.coins, bet: prior.bet,
-          payout: prior.payout, grid: prior.outcome.grid, outcome: prior.outcome, repeated: true };
+          payout: prior.payout, grid: prior.outcome.grid, steps: prior.outcome.steps || [], freeSpinRounds: prior.outcome.freeSpinRounds || [], outcome: prior.outcome, repeated: true };
         return;
       }
 
@@ -69,14 +69,14 @@ router.post("/ocean-storm/spin", async (req, res) => {
       await Wallet.updateOne({ userId: user._id }, { $set: { balance: user.coins } }, { upsert: true, session });
 
       const roundId = crypto.randomUUID();
-      const outcome = { ...game.outcome, grid: game.grid, requestedBet: bet, ante, buyFeature };
+      const outcome = { ...game.outcome, grid: game.grid, steps: game.steps, freeSpinRounds: game.freeSpinRounds, requestedBet: bet, ante, buyFeature };
       const [round] = await GameRound.create([{
         userId: user._id, gameId: "ocean-storm", roundId, idempotencyKey: key,
         bet: game.cost, payout: game.payout,
         status: game.payout > 0 ? "settled" : "lost", outcome, settledAt: new Date()
       }], { session });
       result = { roundId: round.roundId, coins: user.coins, bet: game.cost,
-        payout: game.payout, grid: game.grid, outcome, repeated: false };
+        payout: game.payout, grid: game.grid, steps: game.steps, freeSpinRounds: game.freeSpinRounds, outcome, repeated: false };
     });
     return res.json({ ok: true, gameId: "ocean-storm", ...result });
   } catch (error) {
