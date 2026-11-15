@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const Room = require("./models/Room");
 const User = require("./models/User");
+const MicLease = require("./models/MicLease");
 
 function attachRealtime(httpServer, allowedOrigins) {
   const io = new Server(httpServer, {
@@ -31,17 +32,64 @@ function attachRealtime(httpServer, allowedOrigins) {
 
   const socketRooms = new Map();
   const mutedUsers = new Map();
-  // One active microphone socket per account per room, including the owner.
+  // MongoDB-backed microphone leases enforce one active mic across all API replicas.
+  // The local map is only used to renew leases owned by this process.
   const activeMicSockets = new Map();
+  const MIC_LEASE_MS = 45_000;
+  const MIC_RENEW_MS = 15_000;
 
   function micKey(roomCode, userId) {
     return String(roomCode) + ":" + String(userId);
   }
 
-  function releaseMic(roomCode, userId, socketId) {
-    const key = micKey(roomCode, userId);
-    if (!socketId || activeMicSockets.get(key) === socketId) activeMicSockets.delete(key);
+  async function acquireMic(roomCode, userId, socketId) {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + MIC_LEASE_MS);
+    try {
+      const lease = await MicLease.findOneAndUpdate(
+        {
+          roomCode: Number(roomCode),
+          userId,
+          $or: [{ socketId }, { expiresAt: { $lte: now } }]
+        },
+        { $set: { socketId, expiresAt } },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      ).lean();
+      if (!lease || lease.socketId !== socketId) return false;
+      activeMicSockets.set(micKey(roomCode, userId), { roomCode: Number(roomCode), userId: String(userId), socketId });
+      return true;
+    } catch (error) {
+      // A concurrent upsert for the unique room/account key means another socket won.
+      if (error && error.code === 11000) return false;
+      throw error;
+    }
   }
+
+  async function releaseMic(roomCode, userId, socketId) {
+    const key = micKey(roomCode, userId);
+    const local = activeMicSockets.get(key);
+    if (!socketId || (local && local.socketId === socketId)) activeMicSockets.delete(key);
+    const filter = { roomCode: Number(roomCode), userId };
+    if (socketId) filter.socketId = socketId;
+    await MicLease.deleteOne(filter);
+  }
+
+  const micLeaseRenewal = setInterval(async () => {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + MIC_LEASE_MS);
+    for (const lease of activeMicSockets.values()) {
+      try {
+        const result = await MicLease.updateOne(
+          { roomCode: lease.roomCode, userId: lease.userId, socketId: lease.socketId },
+          { $set: { expiresAt } }
+        );
+        if (!result.matchedCount) activeMicSockets.delete(micKey(lease.roomCode, lease.userId));
+      } catch (error) {
+        console.error("Mic lease renewal failed:", error.message);
+      }
+    }
+  }, MIC_RENEW_MS);
+  if (typeof micLeaseRenewal.unref === "function") micLeaseRenewal.unref();
 
   async function memberContext(socket, roomCode) {
     const room = await Room.findOne({ roomCode: Number(roomCode), status: "open" })
@@ -93,7 +141,7 @@ async function seatSnapshot(room) {
         const key = String(roomCode);
         const previous = socketRooms.get(socket.id);
         if (previous && previous !== key) {
-          releaseMic(previous, socket.auth.sub, socket.id);
+          await releaseMic(previous, socket.auth.sub, socket.id);
           socket.leave("room:" + previous);
           emitRoom(previous, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
           try {
@@ -217,6 +265,7 @@ async function seatSnapshot(room) {
           { new: true }
         );
         if (!room) return ack({ ok: false, error: "ROOM_NOT_FOUND" });
+        await releaseMic(roomCode, ctx.user._id);
         const seats = await seatSnapshot(room);
         emitRoom(roomCode, "seats:state", { seats });
         emitRoom(roomCode, "mic:state", { uid: ctx.user.uid, enabled: false });
@@ -239,15 +288,11 @@ async function seatSnapshot(room) {
           return ack({ ok: false, error: "SPEAKER_SEAT_REQUIRED" });
         }
         const enabled = payload.enabled === true && !muted;
-        const key = micKey(roomCode, ctx.user._id);
         if (enabled) {
-          const activeSocket = activeMicSockets.get(key);
-          if (activeSocket && activeSocket !== socket.id && io.sockets.sockets.has(activeSocket)) {
-            return ack({ ok: false, error: "MIC_ALREADY_ACTIVE" });
-          }
-          activeMicSockets.set(key, socket.id);
+          const acquired = await acquireMic(roomCode, ctx.user._id, socket.id);
+          if (!acquired) return ack({ ok: false, error: "MIC_ALREADY_ACTIVE" });
         } else {
-          releaseMic(roomCode, ctx.user._id, socket.id);
+          await releaseMic(roomCode, ctx.user._id, socket.id);
         }
         emitRoom(roomCode, "mic:state", { uid: ctx.user.uid, enabled });
         ack({ ok: true, enabled, forcedMuted: muted });
@@ -278,7 +323,7 @@ async function seatSnapshot(room) {
         if (String(room.owner) === String(target._id)) return ack({ ok: false, error: "CANNOT_MUTE_OWNER" });
         const mute = payload.muted === true;
         mutedUsers.set(String(roomCode) + ":" + String(target._id), mute);
-        if (mute) releaseMic(roomCode, target._id);
+        if (mute) await releaseMic(roomCode, target._id);
         emitRoom(roomCode, "host:mute-state", { uid: targetUid, muted: mute });
         ack({ ok: true });
       } catch (_error) { ack({ ok: false, error: "SERVER_ERROR" }); }
@@ -296,7 +341,7 @@ async function seatSnapshot(room) {
         const updated = await Room.updateOne({ _id: ctx.room._id, members: target._id }, { $pull: { members: target._id, speakerSeats: { userId: target._id } } });
         if (!updated.modifiedCount) return ack({ ok: false, error: "USER_NOT_IN_ROOM" });
         mutedUsers.delete(String(roomCode) + ":" + String(target._id));
-        releaseMic(roomCode, target._id);
+        await releaseMic(roomCode, target._id);
         const refreshedRoom = await Room.findById(ctx.room._id).select("speakerSeats").lean();
         emitRoom(roomCode, "seats:state", { seats: await seatSnapshot(refreshedRoom || { speakerSeats: [] }) });
         emitRoom(roomCode, "mic:state", { uid: targetUid, enabled: false });
@@ -318,7 +363,7 @@ async function seatSnapshot(room) {
     socket.on("disconnect", async () => {
       const roomCode = socketRooms.get(socket.id);
       if (roomCode) {
-        releaseMic(roomCode, socket.auth.sub, socket.id);
+        await releaseMic(roomCode, socket.auth.sub, socket.id);
         emitRoom(roomCode, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
         emitRoom(roomCode, "mic:state", { uid: socket.auth.uid, enabled: false });
         emitRoom(roomCode, "hand:state", { uid: socket.auth.uid, raised: false });
