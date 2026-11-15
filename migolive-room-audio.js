@@ -143,6 +143,15 @@
     emit('joined', { roomCode: state.roomCode, peers: result.peers || [] });
     return result;
   }
+  async function takeSeat(seat) {
+    if (!state.roomCode) throw new Error('ادخل الغرفة أولاً');
+    return socketAck('seat:take', { seat: Number(seat) });
+  }
+  async function leaveSeat() {
+    if (!state.roomCode) throw new Error('ادخل الغرفة أولاً');
+    await stopMic();
+    return socketAck('seat:leave', {});
+  }
   async function startMic() {
     if (!state.roomCode) throw new Error('ادخل الغرفة أولاً');
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('الميكروفون غير مدعوم في هذا الجهاز أو السياق');
@@ -188,5 +197,5 @@
     if (state.socket) { state.socket.disconnect(); state.socket = null; }
     emit('left', {});
   }
-  window.MigoRoomAudio = Object.freeze({ join, startMic, stopMic, leave, on, setUid: uid => { state.uid = Number(uid) || null; }, getState: () => ({ roomCode: state.roomCode, connected: !!state.socket?.connected, micEnabled: !!state.stream?.getAudioTracks().some(t => t.enabled), peerCount: state.peers.size }) });
+  window.MigoRoomAudio = Object.freeze({ join, takeSeat, leaveSeat, startMic, stopMic, leave, on, setUid: uid => { state.uid = Number(uid) || null; }, getState: () => ({ roomCode: state.roomCode, connected: !!state.socket?.connected, micEnabled: !!state.stream?.getAudioTracks().some(t => t.enabled), peerCount: state.peers.size }) });
 })();
