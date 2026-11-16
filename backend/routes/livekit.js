@@ -1,5 +1,5 @@
 const express = require("express");
-const { AccessToken } = require("livekit-server-sdk");
+const { AccessToken, TrackSource } = require("livekit-server-sdk");
 const Room = require("../models/Room");
 const User = require("../models/User");
 const requireAuth = require("../middleware/requireAuth");
@@ -42,7 +42,7 @@ router.post("/:roomCode/token", async (req, res, next) => {
       room: roomName,
       canSubscribe: true,
       canPublish,
-      canPublishSources: ["microphone"],
+      canPublishSources: [TrackSource.MICROPHONE],
       canPublishData: false
     });
 
