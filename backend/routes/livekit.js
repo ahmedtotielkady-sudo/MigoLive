@@ -29,15 +29,13 @@ router.post("/:roomCode/token", async (req, res, next) => {
       return res.status(403).json({ ok: false, message: "يجب أن تكون عضوًا في الغرفة أولاً" });
     }
 
-    const isOwner = String(room.owner) === String(user._id);
-    const hasSeat = (room.speakerSeats || []).some(seat => String(seat.userId) === String(user._id));
-    const canPublish = isOwner || hasSeat;
+    const canPublish = false; // Publish is granted only after the realtime mic lease is acquired.
     const roomName = "migo-room-" + roomCode;
     const identity = "migo-user-" + String(user._id);
 
     const accessToken = new AccessToken(apiKey, apiSecret, {
       identity,
-      ttl: "10m"
+      ttl: "1h"
     });
     accessToken.addGrant({
       roomJoin: true,
