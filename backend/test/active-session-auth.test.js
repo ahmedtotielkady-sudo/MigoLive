@@ -5,13 +5,13 @@ const jwt = require("jsonwebtoken");
 process.env.JWT_SECRET = "test-secret-with-at-least-thirty-two-characters";
 const userModulePath = require.resolve("../models/User");
 const originalUserModule = require.cache[userModulePath];
-let activeSession = true;
+let activeSessionId = "session-1";
 require.cache[userModulePath] = {
   id: userModulePath,
   filename: userModulePath,
   loaded: true,
   exports: {
-    exists: async () => activeSession
+    exists: async filter => filter.activeSessionId === activeSessionId && filter.activeSessionExpiresAt?.$gt instanceof Date
   }
 };
 
@@ -39,7 +39,7 @@ function token(sid = "session-1") {
 }
 
 test("allows the currently active account session", async () => {
-  activeSession = true;
+  activeSessionId = "session-1";
   const req = requestFor(token());
   const res = response();
   let nextCalled = false;
@@ -49,7 +49,7 @@ test("allows the currently active account session", async () => {
 });
 
 test("rejects a token after another device replaces its session", async () => {
-  activeSession = false;
+  activeSessionId = "new-session";
   const req = requestFor(token("old-session"));
   const res = response();
   let nextCalled = false;
@@ -60,7 +60,7 @@ test("rejects a token after another device replaces its session", async () => {
 });
 
 test("rejects legacy tokens without a session identifier", async () => {
-  activeSession = true;
+  activeSessionId = "session-1";
   const legacy = jwt.sign(
     { sub: "user-1", uid: 100001 },
     process.env.JWT_SECRET,
