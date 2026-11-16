@@ -20,13 +20,22 @@ function attachRealtime(httpServer, allowedOrigins) {
     pingTimeout: 20000
   });
 
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const token = String(socket.handshake.auth?.token || "");
       if (!token) return next(new Error("AUTH_REQUIRED"));
-      socket.auth = jwt.verify(token, process.env.JWT_SECRET, {
+      const claims = jwt.verify(token, process.env.JWT_SECRET, {
         issuer: "migolive-api", audience: "migolive-app"
       });
+      if (!claims.sid) return next(new Error("SESSION_REPLACED"));
+      const active = await User.exists({
+        _id: claims.sub,
+        status: { $ne: "banned" },
+        activeSessionId: claims.sid,
+        activeSessionExpiresAt: { $gt: new Date() }
+      });
+      if (!active) return next(new Error("SESSION_REPLACED"));
+      socket.auth = claims;
       next();
     } catch (_error) { next(new Error("INVALID_TOKEN")); }
   });
@@ -173,6 +182,7 @@ async function seatSnapshot(room) {
   }
 
   io.on("connection", socket => {
+    socket.join("user:" + String(socket.auth.sub));
     socket.on("room:join", async (payload = {}, ack = () => {}) => {
       try {
         const roomCode = Number(payload.roomCode);
