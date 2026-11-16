@@ -6,6 +6,8 @@ const Wallet = require("../models/Wallet");
 const Counter = require("../models/Counter");
 const requireAuth = require("../middleware/requireAuth");
 const rateLimit = require("express-rate-limit");
+const crypto = require("crypto");
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const router = express.Router();
 const TOKEN_TTL = "7d";
@@ -27,9 +29,9 @@ function publicUser(user) {
   };
 }
 
-function issueToken(user) {
+function issueToken(user, sessionId) {
   return jwt.sign(
-    { sub: String(user._id), uid: user.uid },
+    { sub: String(user._id), uid: user.uid, sid: sessionId },
     process.env.JWT_SECRET,
     { expiresIn: TOKEN_TTL, issuer: "migolive-api", audience: "migolive-app" }
   );
@@ -66,7 +68,10 @@ router.post("/register", async (req, res, next) => {
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
     const passwordHash = await bcrypt.hash(password, 12);
+    const sessionId = crypto.randomUUID();
     const user = await User.create({
+      activeSessionId: sessionId,
+      activeSessionExpiresAt: new Date(Date.now() + SESSION_TTL_MS),
       uid: 100000 + counter.value,
       username: normalized,
       displayName,
@@ -76,7 +81,7 @@ router.post("/register", async (req, res, next) => {
       role: "user"
     });
     await Wallet.updateOne({ userId: user._id }, { $setOnInsert: { userId: user._id, balance: INITIAL_SIGNUP_COINS } }, { upsert: true });
-    const token = issueToken(user);
+    const token = issueToken(user, sessionId);
     return res.status(201).json({ ok: true, token, user: publicUser(user) });
   } catch (error) {
     if (error && error.code === 11000) {
@@ -108,17 +113,55 @@ router.post("/login", async (req, res, next) => {
     if (user.status === "banned") {
       return res.status(403).json({ ok: false, message: "هذا الحساب موقوف، تواصل مع الدعم" });
     }
-    user.lastLoginAt = new Date();
-    await user.save();
-    return res.json({ ok: true, token: issueToken(user), user: publicUser(user) });
+    // Rotate the active session atomically. A later login immediately invalidates
+    // every token issued to the previous device, even if two logins race.
+    const sessionId = crypto.randomUUID();
+    const activeUser = await User.findOneAndUpdate(
+      { _id: user._id, status: { $ne: "banned" } },
+      { $set: {
+        lastLoginAt: new Date(),
+        activeSessionId: sessionId,
+        activeSessionExpiresAt: new Date(Date.now() + SESSION_TTL_MS)
+      } },
+      { new: true }
+    );
+    if (!activeUser) return res.status(403).json({ ok: false, message: "هذا الحساب غير متاح" });
+
+    const io = req.app.get("io");
+    if (io) {
+      const userRoom = "user:" + String(activeUser._id);
+      io.to(userRoom).emit("auth:session-replaced", { message: "تم تسجيل الدخول من جهاز آخر" });
+      io.in(userRoom).disconnectSockets(true);
+    }
+    return res.json({ ok: true, token: issueToken(activeUser, sessionId), user: publicUser(activeUser) });
   } catch (error) {
     return next(error);
   }
 });
 
 
-const crypto = require("crypto");
 const OwnerClaim = require("../models/OwnerClaim");
+
+router.post("/logout", requireAuth, async (req, res, next) => {
+  try {
+    await User.updateOne(
+      { _id: req.auth.sub, activeSessionId: req.auth.sid },
+      { $set: { activeSessionId: null, activeSessionExpiresAt: null } }
+    );
+    return res.json({ ok: true });
+  } catch (error) { return next(error); }
+});
+
+router.post("/session/heartbeat", requireAuth, async (req, res, next) => {
+  try {
+    const result = await User.updateOne(
+      { _id: req.auth.sub, activeSessionId: req.auth.sid, activeSessionExpiresAt: { $gt: new Date() } },
+      { $set: { activeSessionExpiresAt: new Date(Date.now() + SESSION_TTL_MS) } }
+    );
+    if (!result.matchedCount) return res.status(401).json({ ok: false, code: "SESSION_REPLACED", message: "تم تسجيل الدخول من جهاز آخر" });
+    return res.json({ ok: true });
+  } catch (error) { return next(error); }
+});
 
 function safeSecretEqual(candidate, configured) {
   const a = Buffer.from(String(candidate || ""), "utf8");

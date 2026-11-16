@@ -8,6 +8,7 @@ on:
       - "backend/**"
       - "functions/api/**"
       - "migolive-room-audio.js"
+      - "index.html"
       - ".github/workflows/migolive-backend-checks.yml"
   pull_request:
     branches:
@@ -16,6 +17,7 @@ on:
       - "backend/**"
       - "functions/api/**"
       - "migolive-room-audio.js"
+      - "index.html"
 
 jobs:
   backend-syntax:
@@ -33,3 +35,5 @@ jobs:
         run: |
           find . -path "./node_modules" -prune -o -name "*.js" -type f -print0 | xargs -0 -n1 node --check
           node --check ../migolive-room-audio.js
+      - name: Run backend tests
+        run: npm test

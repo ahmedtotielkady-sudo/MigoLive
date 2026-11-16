@@ -9,7 +9,9 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ["user", "admin", "owner"], default: "user" },
   avatar: { type: String, default: "" },
   status: { type: String, enum: ["active", "banned"], default: "active" },
-  lastLoginAt: { type: Date, default: null }
+  lastLoginAt: { type: Date, default: null },
+  activeSessionId: { type: String, default: null, select: false },
+  activeSessionExpiresAt: { type: Date, default: null, select: false }
 }, { timestamps: true, versionKey: false });
 userSchema.index({ phone: 1 }, { unique: true, partialFilterExpression: { phone: { $type: "string" } } });
 module.exports = mongoose.models.User || mongoose.model("User", userSchema);

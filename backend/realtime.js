@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const Room = require("./models/Room");
 const User = require("./models/User");
 const MicLease = require("./models/MicLease");
-const { RoomServiceClient } = require("livekit-server-sdk");
+const { RoomServiceClient, TrackSource } = require("livekit-server-sdk");
 
 function attachRealtime(httpServer, allowedOrigins) {
   const io = new Server(httpServer, {
@@ -20,13 +20,22 @@ function attachRealtime(httpServer, allowedOrigins) {
     pingTimeout: 20000
   });
 
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const token = String(socket.handshake.auth?.token || "");
       if (!token) return next(new Error("AUTH_REQUIRED"));
-      socket.auth = jwt.verify(token, process.env.JWT_SECRET, {
+      const claims = jwt.verify(token, process.env.JWT_SECRET, {
         issuer: "migolive-api", audience: "migolive-app"
       });
+      if (!claims.sid) return next(new Error("SESSION_REPLACED"));
+      const active = await User.exists({
+        _id: claims.sub,
+        status: { $ne: "banned" },
+        activeSessionId: claims.sid,
+        activeSessionExpiresAt: { $gt: new Date() }
+      });
+      if (!active) return next(new Error("SESSION_REPLACED"));
+      socket.auth = claims;
       next();
     } catch (_error) { next(new Error("INVALID_TOKEN")); }
   });
@@ -43,7 +52,7 @@ function attachRealtime(httpServer, allowedOrigins) {
   async function livekitPublish(roomCode, userId, enabled) {
     if (!livekit) return;
     await livekit.updateParticipant("migo-room-" + roomCode, "migo-user-" + String(userId), {
-      canSubscribe: true, canPublish: Boolean(enabled), canPublishSources: ["microphone"], canPublishData: false
+      canSubscribe: true, canPublish: Boolean(enabled), canPublishSources: [TrackSource.MICROPHONE], canPublishData: false
     });
   }
   async function livekitRemove(roomCode, userId) {
@@ -51,13 +60,24 @@ function attachRealtime(httpServer, allowedOrigins) {
     try {
       await livekit.removeParticipant("migo-room-" + roomCode, "migo-user-" + String(userId));
     } catch (error) {
-      console.warn("LiveKit remove participant:", error.message);
+      // A participant may already have left or may never have completed joining.
+      // Cleanup is idempotent; do not report this expected state as a server error.
+      const message = String(error && error.message || "").toLowerCase();
+      if (!message.includes("participant does not exist") && !message.includes("participant not found")) {
+        console.warn("LiveKit remove participant:", error.message);
+      }
     }
   }
   async function livekitRevoke(roomCode, userId) {
     if (!livekit) return;
     try { await livekitPublish(roomCode, userId, false); }
-    catch (error) { console.warn("LiveKit revoke publish:", error.message); }
+    catch (error) {
+      // Revoking a participant that has already disconnected is a successful no-op.
+      const message = String(error && error.message || "").toLowerCase();
+      if (!message.includes("participant does not exist") && !message.includes("participant not found")) {
+        console.warn("LiveKit revoke publish:", error.message);
+      }
+    }
   }
 
   const socketRooms = new Map();
@@ -162,6 +182,7 @@ async function seatSnapshot(room) {
   }
 
   io.on("connection", socket => {
+    socket.join("user:" + String(socket.auth.sub));
     socket.on("room:join", async (payload = {}, ack = () => {}) => {
       try {
         const roomCode = Number(payload.roomCode);
@@ -172,20 +193,28 @@ async function seatSnapshot(room) {
         const previous = socketRooms.get(socket.id);
         if (previous && previous !== key) {
           await releaseMic(previous, socket.auth.sub, socket.id);
-          await livekitRemove(previous, socket.auth.sub);
           socket.leave("room:" + previous);
-          emitRoom(previous, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
           try {
-            const previousRoom = await Room.findOneAndUpdate(
-              { roomCode: Number(previous), status: "open" },
-              { $pull: { speakerSeats: { userId: ctx.user._id } } },
-              { new: true }
-            ).select("speakerSeats").lean();
-            if (previousRoom) emitRoom(previous, "seats:state", {
-              seats: await seatSnapshot(previousRoom)
-            });
-            emitRoom(previous, "mic:state", { uid: ctx.user.uid, enabled: false });
-            emitRoom(previous, "hand:state", { uid: ctx.user.uid, raised: false });
+            // Another device/tab for this account may still be in the old room.
+            // Do not revoke its LiveKit participant or remove its shared speaker seat.
+            const remainingSockets = await io.in("room:" + previous).fetchSockets();
+            const sameUserStillPresent = remainingSockets.some(
+              peer => String(peer.auth?.sub) === String(socket.auth.sub)
+            );
+            if (!sameUserStillPresent) {
+              await livekitRemove(previous, socket.auth.sub);
+              const previousRoom = await Room.findOneAndUpdate(
+                { roomCode: Number(previous), status: "open" },
+                { $pull: { speakerSeats: { userId: ctx.user._id } } },
+                { new: true }
+              ).select("speakerSeats").lean();
+              if (previousRoom) emitRoom(previous, "seats:state", {
+                seats: await seatSnapshot(previousRoom)
+              });
+              emitRoom(previous, "mic:state", { uid: ctx.user.uid, enabled: false });
+              emitRoom(previous, "hand:state", { uid: ctx.user.uid, raised: false });
+              emitRoom(previous, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
+            }
           } catch (_cleanupError) { /* switching rooms must continue */ }
         }
         socketRooms.set(socket.id, key);
@@ -409,21 +438,29 @@ async function seatSnapshot(room) {
       const roomCode = socketRooms.get(socket.id);
       if (roomCode) {
         await releaseMic(roomCode, socket.auth.sub, socket.id);
-        await livekitRemove(roomCode, socket.auth.sub);
-        emitRoom(roomCode, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
-        emitRoom(roomCode, "mic:state", { uid: socket.auth.uid, enabled: false });
-        emitRoom(roomCode, "hand:state", { uid: socket.auth.uid, raised: false });
         try {
-          const user = await User.findById(socket.auth.sub).select("_id").lean();
-          if (user) {
-            const room = await Room.findOneAndUpdate(
-              { roomCode, status: "open" },
-              { $pull: { speakerSeats: { userId: user._id } } },
-              { new: true }
-            ).select("speakerSeats").lean();
-            if (room) emitRoom(roomCode, "seats:state", {
-              seats: await seatSnapshot(room)
-            });
+          // A socket disconnect is not the same as the account leaving the room:
+          // keep the shared LiveKit participant and seat while another socket remains.
+          const remainingSockets = await io.in("room:" + roomCode).fetchSockets();
+          const sameUserStillPresent = remainingSockets.some(
+            peer => String(peer.auth?.sub) === String(socket.auth.sub)
+          );
+          if (!sameUserStillPresent) {
+            await livekitRemove(roomCode, socket.auth.sub);
+            emitRoom(roomCode, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
+            emitRoom(roomCode, "mic:state", { uid: socket.auth.uid, enabled: false });
+            emitRoom(roomCode, "hand:state", { uid: socket.auth.uid, raised: false });
+            const user = await User.findById(socket.auth.sub).select("_id").lean();
+            if (user) {
+              const room = await Room.findOneAndUpdate(
+                { roomCode, status: "open" },
+                { $pull: { speakerSeats: { userId: user._id } } },
+                { new: true }
+              ).select("speakerSeats").lean();
+              if (room) emitRoom(roomCode, "seats:state", {
+                seats: await seatSnapshot(room)
+              });
+            }
           }
         } catch (_error) { /* disconnect cleanup is best-effort */ }
       }
