@@ -172,6 +172,7 @@ async function seatSnapshot(room) {
         const previous = socketRooms.get(socket.id);
         if (previous && previous !== key) {
           await releaseMic(previous, socket.auth.sub, socket.id);
+          await livekitRemove(previous, socket.auth.sub);
           socket.leave("room:" + previous);
           emitRoom(previous, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
           try {
