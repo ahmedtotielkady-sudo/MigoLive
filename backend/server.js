@@ -14,6 +14,8 @@ const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .split(",").map((value) => value.trim()).filter(Boolean);
 
 app.disable("x-powered-by");
+// Railway terminates the public connection at one trusted proxy hop.
+app.set("trust proxy", 1);
 app.use(helmet());
 app.use(cors({
   origin(origin, callback) {
