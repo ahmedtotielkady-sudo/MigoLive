@@ -51,13 +51,24 @@ function attachRealtime(httpServer, allowedOrigins) {
     try {
       await livekit.removeParticipant("migo-room-" + roomCode, "migo-user-" + String(userId));
     } catch (error) {
-      console.warn("LiveKit remove participant:", error.message);
+      // A participant may already have left or may never have completed joining.
+      // Cleanup is idempotent; do not report this expected state as a server error.
+      const message = String(error && error.message || "").toLowerCase();
+      if (!message.includes("participant does not exist") && !message.includes("participant not found")) {
+        console.warn("LiveKit remove participant:", error.message);
+      }
     }
   }
   async function livekitRevoke(roomCode, userId) {
     if (!livekit) return;
     try { await livekitPublish(roomCode, userId, false); }
-    catch (error) { console.warn("LiveKit revoke publish:", error.message); }
+    catch (error) {
+      // Revoking a participant that has already disconnected is a successful no-op.
+      const message = String(error && error.message || "").toLowerCase();
+      if (!message.includes("participant does not exist") && !message.includes("participant not found")) {
+        console.warn("LiveKit revoke publish:", error.message);
+      }
+    }
   }
 
   const socketRooms = new Map();
