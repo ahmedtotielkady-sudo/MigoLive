@@ -122,9 +122,8 @@
       if (track.kind === sdk.Track.Kind.Audio) attachAudio(track, participant);
     });
     room.on(sdk.RoomEvent.TrackUnsubscribed, (_track, _publication, participant) => removeAudio(participant.identity));
-    room.on(sdk.RoomEvent.ParticipantConnected, participant => emit('peer-joined', {
-      peerId: participant.identity, uid: Number(participant.identity.replace('migo-user-', '')) || null
-    }));
+    // Membership and numeric account IDs come from authenticated Socket.IO room events.
+    // LiveKit identities are MongoDB ObjectIds, not numeric account IDs.
     room.on(sdk.RoomEvent.ParticipantDisconnected, participant => removeAudio(participant.identity));
     room.on(sdk.RoomEvent.Reconnecting, () => emit('network-warning', { message: 'جارٍ إعادة الاتصال بالصوت' }));
     room.on(sdk.RoomEvent.Reconnected, () => emit('reconnected', { roomCode }));
