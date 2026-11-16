@@ -183,20 +183,28 @@ async function seatSnapshot(room) {
         const previous = socketRooms.get(socket.id);
         if (previous && previous !== key) {
           await releaseMic(previous, socket.auth.sub, socket.id);
-          await livekitRemove(previous, socket.auth.sub);
           socket.leave("room:" + previous);
-          emitRoom(previous, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
           try {
-            const previousRoom = await Room.findOneAndUpdate(
-              { roomCode: Number(previous), status: "open" },
-              { $pull: { speakerSeats: { userId: ctx.user._id } } },
-              { new: true }
-            ).select("speakerSeats").lean();
-            if (previousRoom) emitRoom(previous, "seats:state", {
-              seats: await seatSnapshot(previousRoom)
-            });
-            emitRoom(previous, "mic:state", { uid: ctx.user.uid, enabled: false });
-            emitRoom(previous, "hand:state", { uid: ctx.user.uid, raised: false });
+            // Another device/tab for this account may still be in the old room.
+            // Do not revoke its LiveKit participant or remove its shared speaker seat.
+            const remainingSockets = await io.in("room:" + previous).fetchSockets();
+            const sameUserStillPresent = remainingSockets.some(
+              peer => String(peer.auth?.sub) === String(socket.auth.sub)
+            );
+            if (!sameUserStillPresent) {
+              await livekitRemove(previous, socket.auth.sub);
+              const previousRoom = await Room.findOneAndUpdate(
+                { roomCode: Number(previous), status: "open" },
+                { $pull: { speakerSeats: { userId: ctx.user._id } } },
+                { new: true }
+              ).select("speakerSeats").lean();
+              if (previousRoom) emitRoom(previous, "seats:state", {
+                seats: await seatSnapshot(previousRoom)
+              });
+              emitRoom(previous, "mic:state", { uid: ctx.user.uid, enabled: false });
+              emitRoom(previous, "hand:state", { uid: ctx.user.uid, raised: false });
+              emitRoom(previous, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
+            }
           } catch (_cleanupError) { /* switching rooms must continue */ }
         }
         socketRooms.set(socket.id, key);
@@ -420,21 +428,29 @@ async function seatSnapshot(room) {
       const roomCode = socketRooms.get(socket.id);
       if (roomCode) {
         await releaseMic(roomCode, socket.auth.sub, socket.id);
-        await livekitRemove(roomCode, socket.auth.sub);
-        emitRoom(roomCode, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
-        emitRoom(roomCode, "mic:state", { uid: socket.auth.uid, enabled: false });
-        emitRoom(roomCode, "hand:state", { uid: socket.auth.uid, raised: false });
         try {
-          const user = await User.findById(socket.auth.sub).select("_id").lean();
-          if (user) {
-            const room = await Room.findOneAndUpdate(
-              { roomCode, status: "open" },
-              { $pull: { speakerSeats: { userId: user._id } } },
-              { new: true }
-            ).select("speakerSeats").lean();
-            if (room) emitRoom(roomCode, "seats:state", {
-              seats: await seatSnapshot(room)
-            });
+          // A socket disconnect is not the same as the account leaving the room:
+          // keep the shared LiveKit participant and seat while another socket remains.
+          const remainingSockets = await io.in("room:" + roomCode).fetchSockets();
+          const sameUserStillPresent = remainingSockets.some(
+            peer => String(peer.auth?.sub) === String(socket.auth.sub)
+          );
+          if (!sameUserStillPresent) {
+            await livekitRemove(roomCode, socket.auth.sub);
+            emitRoom(roomCode, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
+            emitRoom(roomCode, "mic:state", { uid: socket.auth.uid, enabled: false });
+            emitRoom(roomCode, "hand:state", { uid: socket.auth.uid, raised: false });
+            const user = await User.findById(socket.auth.sub).select("_id").lean();
+            if (user) {
+              const room = await Room.findOneAndUpdate(
+                { roomCode, status: "open" },
+                { $pull: { speakerSeats: { userId: user._id } } },
+                { new: true }
+              ).select("speakerSeats").lean();
+              if (room) emitRoom(roomCode, "seats:state", {
+                seats: await seatSnapshot(room)
+              });
+            }
           }
         } catch (_error) { /* disconnect cleanup is best-effort */ }
       }
