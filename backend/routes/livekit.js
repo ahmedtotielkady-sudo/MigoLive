@@ -42,6 +42,7 @@ router.post("/:roomCode/token", async (req, res, next) => {
       room: roomName,
       canSubscribe: true,
       canPublish,
+      canPublishSources: ["microphone"],
       canPublishData: false
     });
 
