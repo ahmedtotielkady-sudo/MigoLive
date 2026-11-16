@@ -43,6 +43,7 @@ app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/cleopatra-gold"));
 
 app.use("/api/rooms/ice-config", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ice-config"));
+app.use("/api/rooms/livekit", rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), require("./routes/livekit"));
 
 app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/rooms"));
 app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/room-details"));
