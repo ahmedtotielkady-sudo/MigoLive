@@ -43,7 +43,7 @@ function attachRealtime(httpServer, allowedOrigins) {
   async function livekitPublish(roomCode, userId, enabled) {
     if (!livekit) return;
     await livekit.updateParticipant("migo-room-" + roomCode, "migo-user-" + String(userId), {
-      canSubscribe: true, canPublish: Boolean(enabled), canPublishData: false
+      canSubscribe: true, canPublish: Boolean(enabled), canPublishSources: ["microphone"], canPublishData: false
     });
   }
   async function livekitRemove(roomCode, userId) {
