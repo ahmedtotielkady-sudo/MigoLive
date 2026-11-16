@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const Room = require("./models/Room");
 const User = require("./models/User");
 const MicLease = require("./models/MicLease");
+const { RoomServiceClient } = require("livekit-server-sdk");
 
 function attachRealtime(httpServer, allowedOrigins) {
   const io = new Server(httpServer, {
@@ -29,6 +30,35 @@ function attachRealtime(httpServer, allowedOrigins) {
       next();
     } catch (_error) { next(new Error("INVALID_TOKEN")); }
   });
+
+  // The LiveKit SFU carries audio; Socket.IO remains the authority for seats and mic leases.
+  const livekitReady = Boolean(process.env.LIVEKIT_URL && process.env.LIVEKIT_API_KEY && process.env.LIVEKIT_API_SECRET);
+  const livekit = livekitReady
+    ? new RoomServiceClient(
+        process.env.LIVEKIT_URL.replace(/^wss:/i, "https:").replace(/^ws:/i, "http:"),
+        process.env.LIVEKIT_API_KEY,
+        process.env.LIVEKIT_API_SECRET
+      )
+    : null;
+  async function livekitPublish(roomCode, userId, enabled) {
+    if (!livekit) return;
+    await livekit.updateParticipant("migo-room-" + roomCode, "migo-user-" + String(userId), {
+      canSubscribe: true, canPublish: Boolean(enabled), canPublishData: false
+    });
+  }
+  async function livekitRemove(roomCode, userId) {
+    if (!livekit) return;
+    try {
+      await livekit.removeParticipant("migo-room-" + roomCode, "migo-user-" + String(userId));
+    } catch (error) {
+      console.warn("LiveKit remove participant:", error.message);
+    }
+  }
+  async function livekitRevoke(roomCode, userId) {
+    if (!livekit) return;
+    try { await livekitPublish(roomCode, userId, false); }
+    catch (error) { console.warn("LiveKit revoke publish:", error.message); }
+  }
 
   const socketRooms = new Map();
   const mutedUsers = new Map();
@@ -266,6 +296,7 @@ async function seatSnapshot(room) {
         );
         if (!room) return ack({ ok: false, error: "ROOM_NOT_FOUND" });
         await releaseMic(roomCode, ctx.user._id, socket.id);
+        await livekitRevoke(roomCode, ctx.user._id);
         const seats = await seatSnapshot(room);
         emitRoom(roomCode, "seats:state", { seats });
         emitRoom(roomCode, "mic:state", { uid: ctx.user.uid, enabled: false });
@@ -291,8 +322,17 @@ async function seatSnapshot(room) {
         if (enabled) {
           const acquired = await acquireMic(roomCode, ctx.user._id, socket.id);
           if (!acquired) return ack({ ok: false, error: "MIC_ALREADY_ACTIVE" });
+          if (payload.transport === "livekit") {
+            try { await livekitPublish(roomCode, ctx.user._id, true); }
+            catch (error) {
+              await releaseMic(roomCode, ctx.user._id, socket.id);
+              console.warn("LiveKit publish permission:", error.message);
+              return ack({ ok: false, error: "LIVEKIT_NOT_CONNECTED" });
+            }
+          }
         } else {
           await releaseMic(roomCode, ctx.user._id, socket.id);
+          await livekitRevoke(roomCode, ctx.user._id);
         }
         emitRoom(roomCode, "mic:state", { uid: ctx.user.uid, enabled });
         ack({ ok: true, enabled, forcedMuted: muted });
@@ -323,7 +363,10 @@ async function seatSnapshot(room) {
         if (String(room.owner) === String(target._id)) return ack({ ok: false, error: "CANNOT_MUTE_OWNER" });
         const mute = payload.muted === true;
         mutedUsers.set(String(roomCode) + ":" + String(target._id), mute);
-        if (mute) await releaseMic(roomCode, target._id);
+        if (mute) {
+          await releaseMic(roomCode, target._id);
+          await livekitRevoke(roomCode, target._id);
+        }
         emitRoom(roomCode, "host:mute-state", { uid: targetUid, muted: mute });
         ack({ ok: true });
       } catch (_error) { ack({ ok: false, error: "SERVER_ERROR" }); }
@@ -342,6 +385,7 @@ async function seatSnapshot(room) {
         if (!updated.modifiedCount) return ack({ ok: false, error: "USER_NOT_IN_ROOM" });
         mutedUsers.delete(String(roomCode) + ":" + String(target._id));
         await releaseMic(roomCode, target._id);
+        await livekitRemove(roomCode, target._id);
         const refreshedRoom = await Room.findById(ctx.room._id).select("speakerSeats").lean();
         emitRoom(roomCode, "seats:state", { seats: await seatSnapshot(refreshedRoom || { speakerSeats: [] }) });
         emitRoom(roomCode, "mic:state", { uid: targetUid, enabled: false });
@@ -364,6 +408,7 @@ async function seatSnapshot(room) {
       const roomCode = socketRooms.get(socket.id);
       if (roomCode) {
         await releaseMic(roomCode, socket.auth.sub, socket.id);
+        await livekitRemove(roomCode, socket.auth.sub);
         emitRoom(roomCode, "room:peer-left", { socketId: socket.id, uid: socket.auth.uid });
         emitRoom(roomCode, "mic:state", { uid: socket.auth.uid, enabled: false });
         emitRoom(roomCode, "hand:state", { uid: socket.auth.uid, raised: false });
