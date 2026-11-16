@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const Room = require("./models/Room");
 const User = require("./models/User");
 const MicLease = require("./models/MicLease");
-const { RoomServiceClient } = require("livekit-server-sdk");
+const { RoomServiceClient, TrackSource } = require("livekit-server-sdk");
 
 function attachRealtime(httpServer, allowedOrigins) {
   const io = new Server(httpServer, {
@@ -43,7 +43,7 @@ function attachRealtime(httpServer, allowedOrigins) {
   async function livekitPublish(roomCode, userId, enabled) {
     if (!livekit) return;
     await livekit.updateParticipant("migo-room-" + roomCode, "migo-user-" + String(userId), {
-      canSubscribe: true, canPublish: Boolean(enabled), canPublishSources: ["microphone"], canPublishData: false
+      canSubscribe: true, canPublish: Boolean(enabled), canPublishSources: [TrackSource.MICROPHONE], canPublishData: false
     });
   }
   async function livekitRemove(roomCode, userId) {
