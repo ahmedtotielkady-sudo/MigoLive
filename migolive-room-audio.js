@@ -21,7 +21,12 @@
     listeners.get(name).add(fn);
     return () => listeners.get(name)?.delete(fn);
   }
-  function token() { return localStorage.getItem('migolive_token') || ''; }
+  function token() {
+    // Accept the API bridge token key as well as the legacy room-audio key.
+    // This keeps authenticated room sockets working when the newer app bridge is enabled.
+    return localStorage.getItem('migolive_token') ||
+      localStorage.getItem('migolive_api_token_v1') || '';
+  }
   function loadSocketClient() {
     if (window.io) return Promise.resolve(window.io);
     if (state.socketLoading) return state.socketLoading;
