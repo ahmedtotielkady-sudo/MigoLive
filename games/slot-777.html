@@ -105,7 +105,7 @@ const LINES=[[1,1,1,1,1],[0,0,0,0,0],[2,2,2,2,2],[0,1,2,1,0],[2,1,0,1,2],[0,0,1,
 const FREE={3:3,4:6,5:10};
 const MULT=[1,5,50,250],BASE=40;
 let bal=0,pend=0,ready=false,me=null,mi=0,free=0,spinning=false,stopNow=false,auto=0,sound=false,actx=null;
-function save(){if(ready)try{parent.postMessage({t:'refresh'},'*')}catch(e){}}
+function save(){} // Balance is server-owned; refresh only after a confirmed round.
 function ap(){const a=$('uav');if(!me)return;if(me.avatar){a.style.backgroundImage='url("'+me.avatar+'")';a.textContent=''}else{a.style.backgroundImage='none';a.textContent=(me.name||'').trim().charAt(0)}}
 const toWallet=()=>{try{parent.postMessage({t:'wallet'},'*')}catch(e){}};
 addEventListener('message',e=>{const d=e.data;if(!d)return;if(d.t==='bal'&&Number.isFinite(d.v)){bal=d.v;ready=true;upd()}else if(d.t==='me'){me=d;ap()}});
