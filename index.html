@@ -761,7 +761,8 @@ const fmtD=t=>new Date(t).toLocaleDateString('ar-EG',{day:'numeric',month:'long'
 const banTxt=x=>x.banUntil?'محظور حتى '+fmtD(x.banUntil):'محظور نهائياً';
 let banFor=null;
 function goBack(fb){if(history.length>1)history.back();else nav(fb)}
-function forceOut(msg){leaveRoom(true);me=null;try{localStorage.removeItem('mygo_session');localStorage.removeItem('mygo_remember_login')}catch(_){}document.body.classList.add('auth-screen');$('#app').classList.add('hide');$('#auth').classList.remove('hide');$('#p').value='';$('#aerr').textContent=msg||''}
+function forceOut(msg){leaveRoom(true);me=null;try{localStorage.removeItem('mygo_session');localStorage.removeItem('mygo_remember_login');localStorage.removeItem('migolive_token');localStorage.removeItem('migolive_api_token_v1')}catch(_){}document.body.classList.add('auth-screen');$('#app').classList.add('hide');$('#auth').classList.remove('hide');$('#p').value='';$('#aerr').textContent=msg||''}
+window.addEventListener('migolive:auth:session-replaced',()=>forceOut('تم تسجيل الدخول من جهاز آخر'));
 function start(){const current=U();if(!current){forceOut('انتهت جلسة الحساب؛ سجّل الدخول مرة أخرى');return}current.last=Date.now();act('تسجيل دخول');save();document.body.classList.remove('auth-screen');$('#auth').classList.add('hide');$('#app').classList.remove('hide');tab='rooms';room=null;lastKey='';try{history.replaceState(null,'','#rooms')}catch(e){}route()}
 function render(){
   const u=U();
@@ -1337,7 +1338,7 @@ function rMe(m){
   $('#gvip').onclick=()=>{tab='vip';render()};if($('#wallet-shortcut'))$('#wallet-shortcut').onclick=()=>{tab='wallet';render()};$('#gfr').onclick=()=>{tab='friends';render()};$('#ginv').onclick=()=>{tab='invite';render()};$('#gsec').onclick=()=>{tab='security';render()};
   if($('#ga'))$('#ga').onclick=()=>{tab='agent';render()};if($('#gship'))$('#gship').onclick=()=>{tab='shipping';render()};
   if($('#ag'))$('#ag').onclick=()=>{tab='agency';render()};if($('#gaDash'))$('#gaDash').onclick=()=>{tab='agency';render()};if($('#gperf'))$('#gperf').onclick=()=>{tab='hostperf';render()};$('#th').onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='light'?'dark':'light'};
-  $('#lo').onclick=()=>{if(U())U().last=Date.now();forceOut('')};
+  $('#lo').onclick=()=>{if(U())U().last=Date.now();const token=localStorage.getItem('migolive_token');if(token)fetch(API_BASE+'/auth/logout',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},cache:'no-store'}).catch(()=>{});forceOut('')};
 }
 const agentRate=f=>f.rate!=null?f.rate:(DB.settings.agentRate!=null?DB.settings.agentRate:5);
 const agRate=a=>a.rate!=null?a.rate:10;
