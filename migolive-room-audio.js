@@ -27,6 +27,53 @@
     return localStorage.getItem('migolive_token') ||
       localStorage.getItem('migolive_api_token_v1') || '';
   }
+
+  let sessionWasReplaced = false;
+  function forceLocalLogout(message) {
+    if (sessionWasReplaced) return;
+    sessionWasReplaced = true;
+    // Clear every token key currently supported by the MigoLive clients.
+    localStorage.removeItem('migolive_token');
+    localStorage.removeItem('migolive_api_token_v1');
+    state.leaving = true;
+    state.roomCode = null;
+    state.micEnabled = false;
+    disconnectLivekit().catch(() => {});
+    if (state.socket) {
+      const oldSocket = state.socket;
+      state.socket = null;
+      oldSocket.removeAllListeners();
+      oldSocket.disconnect();
+    }
+    emit('session-replaced', { message: message || 'تم تسجيل الدخول من جهاز آخر' });
+    window.dispatchEvent(new CustomEvent('migolive:auth:session-replaced', {
+      detail: { message: message || 'تم تسجيل الدخول من جهاز آخر' }
+    }));
+    // Reload lets the app boot into its normal signed-out/login screen.
+    setTimeout(() => window.location.reload(), 250);
+  }
+
+  async function refreshSession() {
+    const currentToken = token();
+    if (!currentToken || sessionWasReplaced) return;
+    try {
+      const response = await fetch(API_ORIGIN + '/api/auth/session/heartbeat', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + currentToken },
+        cache: 'no-store'
+      });
+      if (response.status === 401) {
+        forceLocalLogout('تم تسجيل الدخول من جهاز آخر');
+      }
+    } catch (_) {
+      // A temporary network outage must not erase a valid local login.
+    }
+  }
+
+  // Sliding seven-day session expiry while the app is active.
+  const sessionHeartbeat = setInterval(refreshSession, 5 * 60 * 1000);
+  if (typeof sessionHeartbeat.unref === 'function') sessionHeartbeat.unref();
+  window.addEventListener('online', refreshSession);
   function loadSocketClient() {
     if (window.io) return Promise.resolve(window.io);
     if (state.socketLoading) return state.socketLoading;
@@ -158,7 +205,16 @@
         reconnection: true,
         autoConnect: false
       });
-      state.socket.on('connect_error', e => emit('error', { message: e.message || 'تعذر الاتصال بالغرفة' }));
+      state.socket.on('connect_error', e => {
+        if (e?.message === 'SESSION_REPLACED' || e?.message === 'INVALID_TOKEN') {
+          forceLocalLogout('تم تسجيل الدخول من جهاز آخر');
+          return;
+        }
+        emit('error', { message: e.message || 'تعذر الاتصال بالغرفة' });
+      });
+      state.socket.on('auth:session-replaced', p => {
+        forceLocalLogout(p?.message || 'تم تسجيل الدخول من جهاز آخر');
+      });
       state.socket.on('connect', async () => {
         const roomCode = state.roomCode;
         if (!roomCode || state.leaving) return;
