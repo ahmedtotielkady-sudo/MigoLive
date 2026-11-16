@@ -215,6 +215,14 @@
       state.socket.on('auth:session-replaced', p => {
         forceLocalLogout(p?.message || 'تم تسجيل الدخول من جهاز آخر');
       });
+      // Socket.IO's server-side disconnect can arrive before the preceding
+      // notification event is delivered. Treat an explicit server disconnect
+      // as a replaced login unless this client initiated the disconnect itself.
+      state.socket.on('disconnect', reason => {
+        if (reason === 'io server disconnect' && !state.leaving) {
+          forceLocalLogout('تم تسجيل الدخول من جهاز آخر');
+        }
+      });
       state.socket.on('connect', async () => {
         const roomCode = state.roomCode;
         if (!roomCode || state.leaving) return;
