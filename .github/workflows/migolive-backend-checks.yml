@@ -8,6 +8,7 @@ on:
       - "backend/**"
       - "functions/api/**"
       - "migolive-room-audio.js"
+      - "index.html"
       - ".github/workflows/migolive-backend-checks.yml"
   pull_request:
     branches:
@@ -16,6 +17,7 @@ on:
       - "backend/**"
       - "functions/api/**"
       - "migolive-room-audio.js"
+      - "index.html"
 
 jobs:
   backend-syntax:
