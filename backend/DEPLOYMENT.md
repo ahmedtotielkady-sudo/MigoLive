@@ -12,7 +12,8 @@
   - `CORS_ORIGINS`: include every actual browser origin, comma-separated. For the current Railway frontend and Cloudflare Pages, use `https://migolive-production.up.railway.app,https://migolive.pages.dev` (add any custom domain actually used). The Android app's native requests may omit Origin, but web builds must match exactly.
   - `NODE_ENV`: `production`
   - `TURN_URLS`: comma-separated TURN server URLs, for example `turn:turn.example.com:3478?transport=udp,turns:turn.example.com:5349?transport=tcp`.
-  - `TURN_SHARED_SECRET`: a private random secret of at least 32 characters matching the coturn REST API shared secret. Never place this secret in frontend files or Git.
+  - `TURN_SHARED_SECRET`: optional private random secret of at least 32 characters matching the coturn REST API shared secret. Never place this secret in frontend files or Git.
+  - `TURNIX_API_TOKEN`: optional project API token from Turnix.io. When present, the authenticated ICE route requests short-lived TURN credentials server-side; this takes precedence over coturn settings. Store only in Railway Variables, never in Git or frontend files.
 - Health check path: `/api/health`
 
 ## Cloudflare Pages
@@ -58,6 +59,6 @@ The wallet screen and direct-message search/send/history now call the server API
 ## Real-time room voice
 - Room audio uses WebRTC peer connections; Socket.IO carries authenticated offer/answer/ICE signaling only.
 - Android preview builds must declare `RECORD_AUDIO` and `MODIFY_AUDIO_SETTINGS`; Capacitor's WebView permission handler requests microphone access at runtime.
-- `GET /api/rooms/ice-config` returns STUN plus short-lived TURN credentials when `TURN_URLS` and `TURN_SHARED_SECRET` are configured.
-- Without TURN, some users on mobile carrier networks, symmetric NAT, or restrictive Wi-Fi may fail to connect even though local-network calls work. Configure a reachable coturn-compatible TURN service before treating voice as production-ready.
+- `GET /api/rooms/ice-config` returns STUN plus short-lived TURN credentials. It prefers managed Turnix credentials when `TURNIX_API_TOKEN` is configured; otherwise it supports coturn through `TURN_URLS` and `TURN_SHARED_SECRET`.
+- Without TURN, some users on mobile carrier networks, symmetric NAT, or restrictive Wi-Fi may fail to connect even though local-network calls work. Configure Turnix or a reachable coturn-compatible TURN service before treating voice as production-ready.
 - Test with two physical Android devices on different networks: join one room, take separate speaker seats, start/stop each microphone, mute a speaker as host, and verify audio reconnect after switching networks.
