@@ -7,9 +7,9 @@ const vm = require("node:vm");
 test("all inline JavaScript in the main app page parses", () => {
   const htmlPath = path.resolve(__dirname, "../../index.html");
   const html = fs.readFileSync(htmlPath, "utf8");
-  const scripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script\\s*>/gi)];
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
   const inlineScripts = scripts.filter(([, attrs, body]) =>
-    !/\\bsrc\\s*=/.test(attrs) && body.trim()
+    !/\bsrc\s*=/.test(attrs) && body.trim()
   );
   assert.ok(inlineScripts.length > 0, "expected at least one inline app script");
   for (let i = 0; i < inlineScripts.length; i++) {
