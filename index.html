@@ -623,6 +623,10 @@ const dec=b=>new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0)
 const gicon=k=>DB.gIcons&&DB.gIcons[k]?`<img src="${esc(DB.gIcons[k])}" alt="">`:GM[k].i;
 const gamesGrid=()=>`<b>🎮 ألعاب العملات</b><p class="mu">تلعب بنفس رصيد حسابك، ولا يوجد رصيد تلقائي.</p><div class="gg">${Object.entries(GM).map(([k,g])=>`<button class="gt" data-g="${k}"><span class="gi">${gicon(k)}</span><b>${g.n}</b><small class="mu">${g.d}</small></button>`).join('')}</div><div class="sp"></div>`;
 async function openGame(k){
+if(!SERVER_GAME_ROUTES[k]){
+ toast('اللعبة دي لسه مش مربوطة بمحرك آمن على الخادم؛ تم إيقافها مؤقتاً لحماية رصيدك.');
+ return;
+}
 gameScrollY=window.scrollY||window.pageYOffset||0;
 document.documentElement.style.overflow='hidden';
 document.body.style.position='fixed';
@@ -676,9 +680,64 @@ render();
 }
 $('#gx').onclick=()=>{if(history.state&&history.state.mygoGame)history.back();else closeGame()};
 addEventListener('popstate',()=>{const dialogs=document.querySelectorAll('.dlg');if(dialogs.length){dialogs.forEach(x=>x.remove());return}if(gameOn){closeGame();return}if(rs){rsPop();return}if(room){try{history.pushState({migoRoom:true},'','#'+(roomMinimized?tab:'room-'+room.id))}catch(e){}showRoomCloseChoice();return}route()});
-addEventListener('message',e=>{const d=e.data;if(!d||!me||e.source!==$('#gf').contentWindow)return;
-  if(d.t==='get'){e.source.postMessage({t:'bal',v:U().coins},'*');e.source.postMessage({t:'me',name:U().name,avatar:okAv(U())?U().avatar:''},'*')}
-  else if(d.t==='set'&&Number.isFinite(d.v)&&d.v>=0&&d.v<=Number.MAX_SAFE_INTEGER){const next=Math.floor(d.v);if(Number.isSafeInteger(next)){U().coins=next;save();$('#mycoins').textContent=next;}}else if(d.t==='wallet'){closeGame();tab='wallet';try{history.replaceState(null,'','#wallet')}catch(e){}render()}});
+// Secure iframe wallet/game bridge: the browser is never allowed to write balances.
+const SERVER_GAME_ROUTES=Object.freeze({
+  slot:'/games/ocean-storm/spin',
+  slot777:'/games/slot-777/spin',
+  cleopatra:'/games/cleopatra-gold/spin'
+});
+async function sendAuthoritativeGameWallet(target){
+  const wallet=await apiRequest('/wallet');
+  const coins=Number(wallet.coins);
+  if(!Number.isSafeInteger(coins)||coins<0)throw new Error('رصيد المحفظة غير صالح');
+  U().coins=coins;save();
+  const top=$('#mycoins');if(top)top.textContent=fmt(coins);
+  if(target)target.postMessage({t:'bal',v:coins},'*');
+  return coins;
+}
+addEventListener('message',async e=>{
+  const d=e.data;
+  if(!d||!me||e.source!==$('#gf').contentWindow)return;
+  if(d.t==='migo:game-request'){
+    const requestId=String(d.requestId||''),path=String(d.path||'');
+    const expected=SERVER_GAME_ROUTES[gameOn];
+    if(!expected||path!==expected||!/^[A-Za-z0-9_-]{16,80}$/.test(requestId)){
+      try{e.source.postMessage({t:'migo:game-result',requestId,ok:false,message:'اللعبة غير متصلة بنظام الرصيد الآمن'},'*')}catch(_){}
+      return;
+    }
+    try{
+      const result=await apiRequest(path,{
+        method:'POST',
+        headers:{'idempotency-key':requestId},
+        body:JSON.stringify(d.body&&typeof d.body==='object'?d.body:{})
+      });
+      const coins=Number(result.coins);
+      if(!Number.isSafeInteger(coins)||coins<0)throw new Error('لم يرجع الخادم رصيداً صحيحاً');
+      U().coins=coins;save();
+      const top=$('#mycoins');if(top)top.textContent=fmt(coins);
+      e.source.postMessage({t:'migo:game-result',requestId,ok:true,data:{...result,coins}},'*');
+    }catch(error){
+      try{e.source.postMessage({t:'migo:game-result',requestId,ok:false,message:error.message||'تعذر تنفيذ الجولة'},'*')}catch(_){}
+    }
+    return;
+  }
+  if(d.t==='get'){
+    try{
+      const coins=await sendAuthoritativeGameWallet(e.source);
+      e.source.postMessage({t:'me',name:U().name,avatar:okAv(U())?U().avatar:''},'*');
+    }catch(error){
+      try{e.source.postMessage({t:'wallet-error',message:error.message||'تعذر الاتصال بالمحفظة'},'*')}catch(_){}
+    }
+  }else if(d.t==='set'){
+    // Legacy game pages may still emit this message. Ignore the requested value
+    // and replace it with the balance read from the authenticated API.
+    try{await sendAuthoritativeGameWallet(e.source)}catch(error){
+      try{e.source.postMessage({t:'wallet-error',message:error.message||'تعذر التحقق من الرصيد'},'*')}catch(_){}
+    }
+  }else if(d.t==='wallet'){
+    closeGame();tab='wallet';try{history.replaceState(null,'','#wallet')}catch(e){}render();
+  }
+});
 function rImg(f,mx,cb){if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,mx/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.8))};im.onerror=()=>toast('الملف ليس صورة');im.src=rd.result};rd.readAsDataURL(f)}
 const TABS=['rooms','games','msgs','wallet','me','owner','agent','agency','hostperf','vip','friends','notes','invite','security'];
 function nav(h){if(room){tab=h;render();return}if(location.hash.slice(1)!==h)location.hash=h}
