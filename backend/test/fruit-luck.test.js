@@ -20,9 +20,10 @@ test("fruit luck payout is calculated from the server result", () => {
   assert.equal(other.payout, 200);
 });
 
-test("fruit luck accepts only the defined bet buckets", () => {
-  const result = engine.play({ m: 50, "77": 0, o: 50 }, () => 624);
+test("fruit luck enforces 10-coin chip increments", () => {
+  assert.throws(() => engine.play({ m: 15, "77": 0, o: 0 }), /توزيع الرهانات/);
+  const result = engine.play({ m: 100, "77": 0, o: 100 }, () => 624);
   assert.equal(result.result, "o");
-  assert.equal(result.totalBet, 100);
-  assert.equal(result.payout, 100);
+  assert.equal(result.totalBet, 200);
+  assert.equal(result.payout, 200);
 });
