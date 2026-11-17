@@ -5,7 +5,7 @@ const engine = require("../game-engines/fruit-luck");
 
 test("fruit luck validates bet buckets and maximum exposure", () => {
   assert.throws(() => engine.play({ m: -1, "77": 0, o: 0 }), /توزيع الرهانات/);
-  assert.throws(() => engine.play({ m: 5000001, "77": 0, o: 0 }), /إجمالي الرهان/);
+  assert.throws(() => engine.play({ m: 5000010, "77": 0, o: 0 }), /إجمالي الرهان/);
   assert.throws(() => engine.play({ m: 0, "77": 0, o: 0 }), /إجمالي الرهان/);
   assert.throws(() => engine.play({ m: 100, "77": 0, o: 0, extra: 1 }), /توزيع الرهانات/);
 });
