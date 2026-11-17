@@ -639,8 +639,8 @@ document.body.classList.add('game-active');
 try{window.MyGoNative.enterFullscreen()}catch(e){}
 let gameSource;
 try{
- if(k==='cleopatra'||k==='warrior'||k==='fruit'){
-  const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':k==='warrior'?'games/big-warrior.html':'games/fruit-luck.html';
+ if(k==='cleopatra'||k==='warrior'||k==='fruit'||k==='wheel'){
+  const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':k==='warrior'?'games/big-warrior.html':k==='wheel'?'games/wheel-animals.html':'games/fruit-luck.html';
   const response=await fetch(gamePath,{cache:'no-store'});
   if(!response.ok)throw new Error('تعذر تحميل ملف اللعبة: '+gamePath);
   gameSource=await response.text();
