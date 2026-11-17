@@ -16,7 +16,7 @@ const MAX_TOTAL_BET = 5000000;
 
 function play(bets, randomBytes = crypto.randomBytes) {
   if (!Array.isArray(bets) || bets.length !== ANIMALS.length ||
-      bets.some(value => !Number.isSafeInteger(value) || value < 0 || value > MAX_TOTAL_BET)) {
+      bets.some(value => !Number.isSafeInteger(value) || value < 0 || value > MAX_TOTAL_BET || value % 500 !== 0)) {
     throw Object.assign(new Error("توزيع الرهانات غير صحيح"), { status: 400 });
   }
   const totalBet = bets.reduce((sum, value) => sum + value, 0);
