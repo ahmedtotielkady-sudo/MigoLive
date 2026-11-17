@@ -148,15 +148,25 @@ function showRes(r){
 function hideRes(){$("res").classList.remove("show");["m","77","o"].forEach(function(k){$("b_"+k).classList.remove("win")})}
 function tick(){
   var now=Date.now(),r=Math.floor(now/CYC),off=now%CYC;
-  if(r!==rid){if(rid&&settled!==rid&&total()>0)settle(rid);rid=r;lastPh=""}
+  if(r!==rid){
+    if(total()>0&&!roundResults[rid]){phase="res";requestFruitRound(rid);$("st").textContent="جارٍ تأكيد الجولة السابقة من الخادم...";lastPh="res";return}
+    if(total()>0&&settled!==rid)settle(rid);
+    rid=r;lastPh="";
+  }
   var ph=off<BET?"bet":off<SPE?"spin":off<RSE?"res":"wait";
-  if(ph==="bet"){$("cd").textContent=Math.ceil((BET-off)/1000);
-    if(lastPh!=="bet"){phase="bet";hideRes();$("st").textContent="ضع رهانك قبل انتهاء العد";hist=histFor(rid-1);drawHist()}}
-  else if(ph==="spin"){if(lastPh!=="spin"){phase="spin";if(total()>0)requestFruitRound(rid);else startSpin(outcome(rid),off-BET>700);hist=histFor(rid-1);drawHist()}}
-  else if(ph==="res"){if(lastPh!=="res"){phase="res";$("cd").textContent="\uD83C\uDF40";showRes(rid);hist=histFor(rid);drawHist()}}
+  if(ph==="bet"){
+    $("cd").textContent=Math.ceil((BET-off)/1000);
+    if(lastPh!=="bet"){phase="bet";hideRes();$("st").textContent="ضع رهانك قبل انتهاء العد";hist=histFor(rid-1);drawHist()}
+  }else if(ph==="spin"){
+    if(lastPh!=="spin"){phase="spin";if(total()>0)requestFruitRound(rid);else startSpin(outcome(rid),off-BET>700);hist=histFor(rid-1);drawHist()}
+  }else if(ph==="res"){
+    if(lastPh!=="res"){phase="res";$("cd").textContent="\uD83C\uDF40";showRes(rid);hist=histFor(rid);drawHist()}
+  }else if(lastPh!=="wait"){
+    phase="wait";$("cd").textContent="20";hideRes();$("st").textContent="الجولة القادمة بعد لحظات"
+  }
   if((ph==="spin"||ph==="res")&&total()>0&&!roundResults[rid])requestFruitRound(rid);
-  else if(lastPh!=="wait"){phase="wait";$("cd").textContent="20";hideRes();$("st").textContent="الجولة القادمة بعد لحظات"}
-  lastPh=ph}
+  lastPh=ph
+}
 $("qb").onclick=function(){$("rules").classList.add("show")};
 $("xr").onclick=function(){$("rules").classList.remove("show")};
 $("rb").onclick=function(){if(phase==="bet"){bets={m:0,"77":0,o:0};upd()}};
