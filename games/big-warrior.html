@@ -108,7 +108,7 @@ button:focus-visible,.card:focus-visible{outline:3px solid #fff;outline-offset:2
   var $=function(id){return document.getElementById(id)};
   $("ldLion").src=$("cLion").querySelector("img").src;$("ldTiger").src=$("cTiger").querySelector("img").src;
   var STEPS=[100,500,1000,2000,5000,10000], MULT=2, DRAW=8, START=10000;
-  var coins=START, round=1, stepIdx=0, pick=null, busy=false, pendingGameKey=null;
+  var coins=0, round=1, stepIdx=0, pick=null, busy=false, pendingGameKey=null;
   function save(){} // The server is the only wallet authority; never persist a client balance.
   var inMigo=window.parent!==window;
   async function loadWallet(){try{var token=localStorage.getItem("migolive_token");if(!token)throw new Error("سجّل الدخول أولاً");var response=await fetch("https://migolive-api-production.up.railway.app/api/wallet",{headers:{authorization:"Bearer "+token},cache:"no-store"});var data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||"تعذر تحميل المحفظة");coins=Number(data.coins)||0;render()}catch(e){setStatus(e.message||"تعذر تحميل المحفظة")}} loadWallet();
