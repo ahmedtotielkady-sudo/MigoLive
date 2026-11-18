@@ -192,7 +192,7 @@ async function spin(){
     bal=Number(response.coins)||0;free=Number(response.freeSpinsRemaining)||0;pend=0;
     $('win').textContent='0';upd();
     await Promise.all(cells.map((col,i)=>new Promise(res=>{
-      const t=setInterval(()=>{const p=col.map(x=>x._s);setCell(col[2],p[1]);setCell(col[1],p[0]);setCell(col[0],rnd(free>0));col.forEach(c=>c.animate([{transform:'translateY(-100%)'},{transform:'none'}],{duration:90}))},90);
+      const t=setInterval(()=>{const p=col.map(x=>x._s);setCell(col[2],p[1]);setCell(col[1],p[0]);setCell(col[0],rnd(free>0));col.forEach(c=>c.animate([{transform:'translateY(-100%)'},{transform:'none'}],{duration:90}))},110);
       const stopAt=Date.now()+500+i*260;
       const chk=setInterval(()=>{
         if(Date.now()>=stopAt||stopNow){
@@ -200,7 +200,7 @@ async function spin(){
           col.forEach((cell,row)=>{setCell(cell,g[i][row]);cell.animate([{transform:'translateY(-140%)'},{transform:'translateY(5%)',offset:.7},{transform:'none'}],{duration:280,easing:'ease-out',delay:(2-row)*60,fill:'backwards'})});
           beep(300+i*40);setTimeout(res,400);
         }
-      },30);
+      },50);
     })));
     (outcome.hits||[]).forEach(k=>{const [i,row]=k.split(',').map(Number);if(cells[i]&&cells[i][row])cells[i][row].classList.add('hit')});
     const win=Number(response.payout)||0;
