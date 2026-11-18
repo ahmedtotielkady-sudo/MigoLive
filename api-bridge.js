@@ -479,8 +479,8 @@
       if (!id || node.children.length > 8) return;
       const label = String(node.innerText || node.textContent || "").trim();
       if (label.length > 90) return;
-      if (gameAvailability[id] === false && /سلوت 777|عاصفة المحيط|عجلة الحيوانات|ذهب كليوباترا|حظ الفواكه|الصاروخ|المحارب الكبير/.test(label)) {
-        node.hidden = true;
+      if (/سلوت 777|عاصفة المحيط|عجلة الحيوانات|ذهب كليوباترا|حظ الفواكه|الصاروخ|المحارب الكبير/.test(label)) {
+        node.hidden = gameAvailability[id] === false;
         node.setAttribute("data-migo-game-managed", id);
       }
     });
@@ -561,10 +561,10 @@
     }
   }
   window.addEventListener("focus", () => {
-    if (token()) checkAppUpdatePolicy().then(allowed => { if (allowed) installOwnerUpdatePanel(); }).catch(() => {});
+    if (token()) checkAppUpdatePolicy().then(allowed => { if (allowed) { installOwnerUpdatePanel(); refreshGameAvailability().catch(() => {}); } }).catch(() => {});
   });
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && token()) checkAppUpdatePolicy().then(allowed => { if (allowed) installOwnerUpdatePanel(); }).catch(() => {});
+    if (document.visibilityState === "visible" && token()) checkAppUpdatePolicy().then(allowed => { if (allowed) { installOwnerUpdatePanel(); refreshGameAvailability().catch(() => {}); } }).catch(() => {});
   });
 
   const ownerPanelObserver = new MutationObserver(() => installOwnerUpdatePanel());
