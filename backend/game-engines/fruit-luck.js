@@ -1,6 +1,7 @@
 "use strict";
 const crypto = require("crypto");
-const SEGMENTS = Object.freeze(["o", "77", "m", "o", "m", "o", "m", "o", "m"]);\nconst MULTIPLIERS = Object.freeze({ m: 2, "77": 8, o: 2 });
+const SEGMENTS = Object.freeze(["o", "77", "m", "o", "m", "o", "m", "o", "m"]);
+const MULTIPLIERS = Object.freeze({ m: 2, "77": 8, o: 2 });
 const MAX_TOTAL_BET = 5000000;
 
 function play(bets, randomInt = crypto.randomInt) {
