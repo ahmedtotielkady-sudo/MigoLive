@@ -42,6 +42,9 @@ jobs:
       - name: Connect Slot 777 to server-authoritative wallet
         run: python3 scripts/apply-slot777-server.py
 
+      - name: Sync embedded Slot 777 game
+        run: python3 scripts/sync-embedded-slot777.py
+
       - name: Apply local notification center
         run: python3 scripts/apply-notification-center.py
 
