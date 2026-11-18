@@ -32,7 +32,7 @@ test("every game opened by the room launcher uses the matching server API", () =
     ["games/cleopatra-gold.html", "/games/cleopatra-gold/spin"],
     ["games/fruit-luck.html", "/games/fruit-luck/spin"],
     ["games/rocket-crash.html", "/games/rocket-crash/start"],
-    ["games/big-warrior.html", "/games/big-warrior/play"]
+    ["games/big-warrior.html", "/games/big-warrior/fight"]
   ];
   for (const [file, endpoint] of pages) {
     const html = read(file);
@@ -52,7 +52,7 @@ test("Animal Wheel never settles bets or changes the wallet in the browser", () 
 
 test("Rocket Crash has a safe request-id fallback and visible wallet failure state", () => {
   const html = read("games/rocket-crash.html");
-  assert.ok(html.includes("function makeRequestId()"));
+  assert.ok(html.includes("const makeRequestId="));
   assert.ok(html.includes("e.source!==window.parent"));
   assert.ok(html.includes("d.t==='wallet-error'"));
   assert.ok(html.includes("dialog.showModal()"));
