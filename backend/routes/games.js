@@ -15,9 +15,9 @@ const router = express.Router();
 const GAME_CATALOG = Object.freeze([
   { id:"slot-777", name:"سلوت 777", active:true, endpoint:"/slot-777/spin" },
   { id:"ocean-storm", name:"عاصفة المحيط", active:true, endpoint:"/ocean-storm/spin" },
-  { id:"wheel-animals", name:"عجلة الحيوانات", active:false, endpoint:null },
+  { id:"wheel-animals", name:"عجلة الحيوانات", active:false, endpoint:"/wheel-animals/spin" },
   { id:"cleopatra-gold", name:"ذهب كليوباترا", active:true, endpoint:"/cleopatra-gold/spin" },
-  { id:"fruit-luck", name:"حظ الفواكه", active:false, endpoint:null },
+  { id:"fruit-luck", name:"حظ الفواكه", active:false, endpoint:"/fruit-luck/spin" },
   { id:"rocket-crash", name:"الصاروخ", active:false, endpoint:null },
   { id:"big-warrior", name:"المحارب الكبير", active:true, endpoint:"/big-warrior/play" }
 ]);
