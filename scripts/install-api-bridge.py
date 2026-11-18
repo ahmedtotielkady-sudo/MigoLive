@@ -18,7 +18,7 @@ tag = '<script src="api-bridge.js"></script>'
 if tag not in html:
     if "</body>" not in html:
         raise SystemExit("www/index.html has no closing body tag")
-    html = html.replace("</body>", tag + "\\n</body>", 1)
+    html = html.replace("</body>", tag + chr(10) + "</body>", 1)
 
 shutil.copy2(source, web / "api-bridge.js")
 index.write_text(html, encoding="utf-8")
