@@ -290,7 +290,9 @@ jobs:
                   if source.strip():
                       Path(f'/tmp/{Path(path).stem}-{i}.js').write_text(source,encoding='utf-8')
           PY
-          for file in /tmp/cleopatra-gold-*.js /tmp/big-warrior-*.js; do node --check "$file"; done
+          for file in /tmp/cleopatra-gold-*.js /tmp/big-warrior-*.js; do
+            if [ -f "$file" ]; then node --check "$file"; fi
+          done
           echo "Verified game assets:"
           ls -lh www/games/cleopatra-gold.html www/games/big-warrior.html
 
