@@ -55,11 +55,11 @@ const hits=A.map((a,i)=>{const h=document.createElement('button');h.className='h
 const b=document.createElement('div');b.className='bet';b.style.left=a[3]+'%';b.style.top=(a[4]-8.5)+'%';st.appendChild(b);return [h,b]});
 [500,1000,10000,100000].forEach(v=>{const c=document.createElement('button');c.className='chip'+(v==500?' on':'');c.innerHTML='<u></u><s>'+v+'</s>';c.onclick=()=>{chip=v;document.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');tick(600)};document.getElementById('chips').appendChild(c)});
 const total=()=>bets.reduce((a,b)=>a+b,0);
-function ui(){document.getElementById('bal').textContent=F(bal);document.getElementById('tot').textContent=F(total());hits.forEach(([h,b],i)=>{b.style.display=bets[i]?'block':'none';b.textContent=F(bets[i])});try{if(ready)parent.postMessage({t:'set',v:bal},'*')}catch(e){}}
+function ui(){document.getElementById('bal').textContent=ready?F(Math.max(0,bal-total())):'—';document.getElementById('tot').textContent=F(total());hits.forEach(([h,b],i)=>{b.style.display=bets[i]?'block':'none';b.textContent=F(bets[i])})}
 function snd(f,d,t='sine',g=.15){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),k=ac.createGain();o.type=t;o.frequency.value=f;k.gain.value=g;k.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(k);k.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
 function tick(f){snd(f,.08)}
 function msg(t,ms=2500){ov.textContent=t;ov.classList.add('s');clearTimeout(msg.t);msg.t=setTimeout(()=>ov.classList.remove('s'),ms)}
-function add(i){if(busy)return;hits.forEach(([h])=>h.classList.remove('win'));if(chip>bal){msg('الرصيد لا يكفي');return}bal-=chip;bets[i]+=chip;betRound=Math.floor(Date.now()/CYC);saveP();snd(900,.1,'triangle');ui()}
+function add(i){if(busy)return;hits.forEach(([h])=>h.classList.remove('win'));if(!ready){msg('جارٍ تحميل رصيد المحفظة');return}if(chip>bal-total()){msg('الرصيد لا يكفي');return}const round=Math.floor(Date.now()/CYC);if(betRound!==round){bets=A.map(()=>0);betRound=round;wheelKey=''}if(!wheelKey)wheelKey=Array.from(crypto.getRandomValues(new Uint8Array(18))).map(x=>x.toString(16).padStart(2,'0')).join('');bets[i]+=chip;saveP();snd(900,.1,'triangle');ui()}
 
 let H=[];
 function renderH(){const hs=document.getElementById('hs'),bg=BG;hs.innerHTML='';for(let k=0;k<8;k++){const e=document.createElement('i'),a=A[H[k]];if(a){e.style.backgroundImage=bg;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%'}hs.appendChild(e)}}
@@ -68,9 +68,11 @@ function showWin(i,p){let w=document.getElementById('wv');if(!w){w=document.crea
 const CYC=34000,BET=25000,SEND=30200;
 function rng(n){let a=(n*2654435761)>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function resultOf(n){const r=rng(n);const w=A.map(a=>1/a[2]),s=w.reduce((a,b)=>a+b);let x=r()*s,k=0;for(;k<7;k++){x-=w[k];if(x<=0)break}return{i:k,tg:A[k][1]+(r()*16-8)}}
-let betRound=-1,doneN=-1,spunN=-1,rn=-1,siv;
-function saveP(){try{localStorage.setItem('wheelP',JSON.stringify({n:betRound,b:bets}))}catch(e){}}
-try{const q=JSON.parse(localStorage.getItem('wheelP')||'null');if(q&&q.b&&q.b.length==8){bets=q.b;betRound=q.n}}catch(e){}
+let betRound=-1,doneN=-1,spunN=-1,rn=-1,siv,wheelKey='',wheelPending=false;
+function saveP(){try{localStorage.setItem('wheelP',JSON.stringify({n:betRound,b:bets,k:wheelKey}))}catch(e){}}
+try{const q=JSON.parse(localStorage.getItem('wheelP')||'null');if(q&&q.b&&q.b.length==8){bets=q.b;betRound=q.n;wheelKey=typeof q.k==='string'?q.k:''}}catch(e){}
+function makeWheelKey(){return Array.from(crypto.getRandomValues(new Uint8Array(18))).map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function settleWheel(round){if(wheelPending||betRound!==round||!total())return;wheelPending=true;const key=wheelKey||makeWheelKey();wheelKey=key;saveP();try{const data=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{removeEventListener('message',handler);reject(new Error('انتهت مهلة الاتصال بالخادم'))},15000);const handler=e=>{const d=e.data;if(e.source!==window.parent||!d||d.t!=='migo:game-result'||d.requestId!==key)return;clearTimeout(timer);removeEventListener('message',handler);d.ok?resolve(d.data):reject(new Error(d.message||'تعذر تسوية الرهان'))};addEventListener('message',handler);parent.postMessage({t:'migo:game-request',requestId:key,path:'/games/wheel-animals/spin',body:{bets:bets.slice()}},'*')});const o=data&&data.outcome;if(!o||!Number.isInteger(o.index)||o.index<0||o.index>=A.length||!Number.isSafeInteger(Number(data.coins))||Number(data.coins)<0)throw new Error('استجابة عجلة الحيوانات غير مكتملة');bal=Number(data.coins);ready=true;const won=Number(o.payout)||0;const index=o.index;const d=((A[index][1]+(Math.random()*16-8)-cur)%360+360)%360;cur+=1800+d;nd.style.transform='rotate('+cur+'deg)';startTicks();bets=A.map(()=>0);betRound=-1;wheelKey='';saveP();ui();hits[index][0].classList.add('win');showWin(index,won);msg(won?'🎉 '+A[index][0]+' — ربحت '+F(won):'وقف على '+A[index][0]+' — حظ أوفر',4000)}catch(error){msg(error.message||'تعذر الاتصال بالخادم، احتفظنا برهانك لإعادة المحاولة',4000);spunN=round-1}finally{wheelPending=false}}
 function setH(fin){const L=[];for(let k=fin;k>fin-40&&L.length<8;k--){const r=resultOf(k);if(r.i>=0)L.push(r.i)}H=L;renderH()}
 function startTicks(){clearInterval(siv);let last=-1;siv=setInterval(()=>{const m=new DOMMatrix(getComputedStyle(nd).transform),a=(Math.atan2(m.b,m.a)*180/Math.PI+360)%360,k=Math.floor(a/22.5);if(k!==last){last=k;snd(500+Math.random()*80,.05,'square',.06)}},30);setTimeout(()=>clearInterval(siv),5200)}
 function applyRound(k,live){
@@ -89,9 +91,7 @@ function tick(){
  const now=Date.now(),n=Math.floor(now/CYC),t=now%CYC,fin=t>=SEND?n:n-1,c=document.getElementById('cd');
  if(n!==rn){rn=n;hits.forEach(([h])=>h.classList.remove('win'))}
  busy=t>=BET;
- if(t>=BET&&spunN<n){spunN=n;const r=resultOf(n),d=((r.tg-cur)%360+360)%360;
-  if(t<BET+600){cur+=1800+d;nd.style.transform='rotate('+cur+'deg)';startTicks()}
-  else{nd.style.transition='none';cur+=d;nd.style.transform='rotate('+cur+'deg)';void nd.offsetWidth;nd.style.transition=''}}
+ if(t>=BET&&spunN<n){spunN=n;if(betRound===n&&total()>0){settleWheel(n)}else{const r=resultOf(n),d=((r.tg-cur)%360+360)%360;if(t<BET+600){cur+=1800+d;nd.style.transform='rotate('+cur+'deg)';startTicks()}else{nd.style.transition='none';cur+=d;nd.style.transform='rotate('+cur+'deg)';void nd.offsetWidth;nd.style.transition=''}}}
  if(doneN<fin){const live=fin===n&&t-SEND<1500;let away=0,any=false;
   for(let k=doneN+1;k<=fin;k++){const o=applyRound(k,live&&k===fin);if(o.had){any=true;away+=o.p}}
   doneN=fin;setH(fin);
@@ -99,9 +99,9 @@ function tick(){
  if(t<BET){const s=Math.ceil((BET-t)/1000);if(c.textContent!=s){c.textContent=s;c.classList.remove('sp');if(s<=5)snd(800,.1,'square',.08)}}
  else{c.textContent='🎯';c.classList.add('sp')}
 }
-(function(){const now=Date.now(),n=Math.floor(now/CYC),t=now%CYC,fin=t>=SEND?n:n-1;
+(function(){const now=Date.now(),n=Math.floor(now/CYC),t=now%CYC,fin=t>=SEND?n:n-1;if(betRound>=0&&total()>0)settleWheel(betRound);
  doneN=(betRound>=0&&total()>0)?Math.min(betRound-1,fin):fin;
  spunN=n-1;cur=resultOf(n-1).tg;nd.style.transition='none';nd.style.transform='rotate('+cur+'deg)';void nd.offsetWidth;nd.style.transition='';
  setH(fin);ui();tick();setInterval(tick,200)})();
-addEventListener('message',e=>{const d=e.data;if(d&&d.t==='bal'){bal=d.v;ready=true;ui()}});try{parent.postMessage({t:'get'},'*')}catch(e){}
+addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data;if(d&&d.t==='wallet-error'){ready=false;msg(d.message||'تعذر تحميل المحفظة',4000);ui()}else if(d&&d.t==='bal'&&Number.isSafeInteger(Number(d.v))&&Number(d.v)>=0){bal=Number(d.v);ready=true;ui()}});try{parent.postMessage({t:'get'},'*')}catch(e){}
 </script></body></html>
