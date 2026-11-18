@@ -21,4 +21,9 @@ jobs:
         with:
           node-version: "22"
       - run: npm install --no-audit --no-fund
+      - name: Apply authoritative game wallet bridges before contract tests
+        working-directory: .
+        run: |
+          python3 scripts/apply-secure-game-wallet.py
+          python3 scripts/apply-slot777-server.py
       - run: npm test
