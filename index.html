@@ -1419,10 +1419,13 @@ async function ownerCreditUser(targetKey,amount,idempotencyKey,description='شح
   const coins=Math.floor(Number(amount));
   if(!target||!Number.isSafeInteger(Number(target.uid)))throw new Error('الحساب غير مربوط بمعرّف صالح');
   if(!Number.isSafeInteger(coins)||coins<1)throw new Error('قيمة الشحن يجب أن تكون موجبة');
-  const key=idempotencyKey||crypto.randomUUID().replace(/-/g,'');
+  const pendingId=targetKey+'|'+coins+'|'+description;
+  DB.pendingOwnerCredits=DB.pendingOwnerCredits||{};
+  let key=idempotencyKey||DB.pendingOwnerCredits[pendingId];
+  if(!key){key=crypto.randomUUID().replace(/-/g,'');DB.pendingOwnerCredits[pendingId]=key;if(!save())throw new Error('تعذر حفظ رقم العملية؛ لم يتم الشحن')}
   const result=await apiRequest('/wallet/admin/credit',{method:'POST',headers:{'idempotency-key':key},body:JSON.stringify({targetUid:Number(target.uid),amount:coins,description:String(description).slice(0,160)})});
   if(!Number.isSafeInteger(Number(result.coins))||Number(result.coins)<0)throw new Error('لم يصل تأكيد صحيح من المحفظة');
-  target.coins=Number(result.coins);addCharge(targetKey,coins);
+  target.coins=Number(result.coins);addCharge(targetKey,coins);if(!idempotencyKey){delete DB.pendingOwnerCredits[pendingId];save()}
   logIt('مالك',`شحن خادمي ${coins} عملة لـ ${target.name}`);save();
   const top=$('#mycoins');if(top&&me===targetKey)top.textContent=fmt(target.coins);
   return result;
