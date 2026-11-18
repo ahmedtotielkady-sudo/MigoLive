@@ -108,6 +108,7 @@ jobs:
           cp slot-777.html slot-ocean-storm.html wheel-animals.html www/
           mkdir -p www/games
           if [ -d games ]; then cp -R games/. www/games/; fi
+          python3 scripts/clean-game-ui-and-validate.py
           test -s www/games/cleopatra-gold.html
           test -s www/games/big-warrior.html
           python3 - <<'PY'
