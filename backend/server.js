@@ -54,6 +54,8 @@ app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: 
 
 app.use("/api/users", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), require("./routes/users"));
 
+app.use("/api/app-updates", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/app-updates"));
+
 app.use("/api/migration", rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false }), require("./routes/migration"));
 
 app.use("/api/messages", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), require("./routes/messages"));
