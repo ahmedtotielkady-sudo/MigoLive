@@ -96,9 +96,11 @@ try{snd=localStorage.getItem('cr-snd')!='0'}catch(e){}
 const walletPost=d=>{try{if(window.parent&&window.parent!==window)window.parent.postMessage(d,'*')}catch(e){}};
 const save=()=>{};
 const askWallet=()=>walletPost({t:'get'});
+const makeRequestId=()=>{try{if(window.crypto&&typeof crypto.randomUUID==='function')return crypto.randomUUID().replace(/-/g,'')}catch(_){}const bytes=new Uint8Array(16);try{if(window.crypto&&crypto.getRandomValues)crypto.getRandomValues(bytes);else for(let i=0;i<bytes.length;i++)bytes[i]=Math.floor(Math.random()*256)}catch(_){for(let i=0;i<bytes.length;i++)bytes[i]=Math.floor(Math.random()*256)}return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('')};
 const requestServer=(path,body={})=>new Promise((resolve,reject)=>{
- const requestId=crypto.randomUUID().replace(/-/g,'');
- const timer=setTimeout(()=>{pendingRequests.delete(requestId);reject(new Error('انتهت مهلة الاتصال'))},9000);
+ if(!window.parent||window.parent===window){reject(new Error('يجب فتح اللعبة من داخل ميجو لايف'));return}
+ const requestId=makeRequestId();
+ const timer=setTimeout(()=>{pendingRequests.delete(requestId);reject(new Error('انتهت مهلة الاتصال بالخادم'))},12000);
  pendingRequests.set(requestId,{resolve,reject,timer});
  walletPost({t:'migo:game-request',requestId,path,body});
 });
@@ -116,13 +118,14 @@ async function resumeRound(){
  }catch(e){}finally{resuming=false}
 }
 window.addEventListener('message',e=>{
+ if(e.source!==window.parent)return;
  const d=e.data||{};
  if(d.t==='migo:game-result'){
   const pending=pendingRequests.get(String(d.requestId||''));
   if(pending){clearTimeout(pending.timer);pendingRequests.delete(String(d.requestId));if(d.ok)pending.resolve(d.data||{});else pending.reject(new Error(d.message||'تعذر تنفيذ العملية'))}
   return;
  }
- if(d.t==='wallet-error'){walletReady=false;walletError=String(d.message||'تعذر تحميل رصيد المحفظة');return}
+ if(d.t==='wallet-error'){walletReady=false;walletError=String(d.message||'تعذر تحميل رصيد المحفظة');ui();$('#bal').title=walletError;const dialog=$('#nf');if(dialog&&!dialog.open){$('#nt').textContent='تعذر الاتصال بمحفظة ميجو لايف';$('#np').textContent=walletError;dialog.showModal()}return}
  if(d.t==='me'){const a=$('#userAvatar');if(a&&typeof d.avatar==='string'&&d.avatar.trim()){a.src=d.avatar.trim();a.style.display='block'}else if(a){a.removeAttribute('src');a.style.display='none'}}
  if(d.t==='bal'&&Number.isFinite(Number(d.v))&&Number(d.v)>=0){bal=Math.floor(Number(d.v));walletReady=true;walletError='';ui();resumeRound()}
 });
@@ -172,7 +175,7 @@ async function go(){
  finally{button.disabled=false;ui()}
 }
 function ui(){
- $('#bal').textContent=fmt(bal);$('#bet').textContent=fmt(BETS[bi]);
+ $('#bal').textContent=walletReady?fmt(bal):'—';$('#bal').title=walletReady?'رصيدك من محفظة ميجو لايف':(walletError||'جارٍ الاتصال بالمحفظة');$('#bet').textContent=fmt(BETS[bi]);
  const b=bet.st,g=$('#go'),c=$('#cash');let t,d=false,cl='bt';
  if(b=='queued'||(b=='live'&&state=='wait')){t='إلغاء الرهان';cl+=' cn'}
  else if(b=='live'){t='تم الرهان ✓';d=true}
@@ -285,7 +288,10 @@ const rl=$('#rules'),nf=$('#nf');
 $('#rb').onclick=()=>rl.showModal();$('#rc').onclick=()=>rl.close();rl.addEventListener('click',e=>{if(e.target===rl)rl.close()});
 $('#nc').onclick=()=>nf.close();nf.addEventListener('click',e=>{if(e.target===nf)nf.close()});
 $('#charge').textContent='فتح المحفظة';$('#charge').onclick=()=>{walletPost({t:'wallet'});nf.close()};
-size();startWait();askWallet();requestAnimationFrame(tick);
+size();startWait();askWallet();
+ window.addEventListener('focus',()=>{if(!walletReady)askWallet();else resumeRound()});
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){askWallet();}});
+ requestAnimationFrame(tick);
 </script>
 </body>
 </html>
