@@ -238,7 +238,7 @@ jobs:
           ]
           for old, new in jsfixes:
               count = html.count(old)
-              if count == 0 and 'الملف الأصلي غير متوفر حالياً' in html:
+              if count == 0 and ('ملف اللعبة الأصلي غير متوفر حالياً' in html or 'الملف الأصلي غير متوفر حالياً' in html):
                   # Keep the test APK buildable without pretending the missing game is integrated.
                   continue
               if count != 1:
