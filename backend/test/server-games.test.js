@@ -6,7 +6,7 @@ const engine = require("../game-engines/server-games");
 test("animal wheel and fruit outcomes are selected from server tables", () => {
   assert.deepEqual(engine.spin("wheel-animals", 100, 0), { symbol:"rabbit", multiplier:0, payout:0 });
   assert.deepEqual(engine.spin("wheel-animals", 100, 420), { symbol:"fox", multiplier:2, payout:200 });
-  assert.deepEqual(engine.spin("fruit-luck", 50, 850), { symbol:"orange", multiplier:3, payout:150 });
+  assert.deepEqual(engine.spin("fruit-luck", 50, 800), { symbol:"orange", multiplier:3, payout:150 });
 });
 
 test("spin rejects invalid bets and unknown games", () => {
