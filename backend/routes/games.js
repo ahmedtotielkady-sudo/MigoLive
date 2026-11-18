@@ -37,7 +37,8 @@ router.get("/catalog", async (_req, res, next) => {
   } catch (error) { return next(error); }
 });
 
-router.use(requireAuth, requireGameEnabled);
+router.use(requireAuth);
+router.use(requireGameEnabled);
 
 // Only this route is live initially. Other game IDs remain unavailable until
 // their original payout rules have been ported and independently tested.
