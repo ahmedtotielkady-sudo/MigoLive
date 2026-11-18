@@ -139,7 +139,8 @@ button:focus-visible,.card:focus-visible{outline:3px solid #fff;outline-offset:2
   $("go").onclick=async function(){
     if(!pick||busy||coins<=0)return;
     busy=true;render();
-    let animationPending=false;\n    const chosen=pick, amount=STEPS[stepIdx], key=(pendingGameKey||(pendingGameKey=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+"_"+Math.random().toString(36).slice(2))));
+    let animationPending=false;
+    const chosen=pick, amount=STEPS[stepIdx], key=(pendingGameKey||(pendingGameKey=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+"_"+Math.random().toString(36).slice(2))));
     setStatus("جارٍ تنفيذ الجولة بأمان على الخادم...");
     try{
       const token=localStorage.getItem("migolive_token");
