@@ -109,11 +109,28 @@ async function resumeRound(){
  if(resuming||!walletReady)return;resuming=true;
  try{
   const data=await requestServer('/games/rocket-crash/state');
+  bal=Math.max(0,Math.floor(Number(data.coins)||0));
+  if(Array.isArray(data.results)){
+   hist=data.results.map(item=>Number(item.multiplier)||1).filter(Number.isFinite).slice(0,10);
+   ui();
+  }
   if(data.active){
    roundId=data.roundId;bet={amt:Number(data.bet)||0,st:'live',win:0};
    if(data.phase==='wait'){state='wait';t0=performance.now()+Math.max(0,Number(data.startAt)-Date.now())}
    else{state='fly';t0=performance.now()-Math.max(0,Date.now()-Number(data.startAt));mult=Number(data.multiplier)||1}
    cp=Infinity;ui();
+  }else{
+   roundId=null;
+   const latest=Array.isArray(data.results)&&data.results[0];
+   if(latest&&latest.status==='lost'){
+    state='crash';cp=Number(latest.multiplier)||1;res='💥 انفجر · خسرت '+fmt(latest.bet);
+    bet={amt:0,st:'none',win:0};ui();clearTimeout(window.__migoRocketResultTimer);
+    window.__migoRocketResultTimer=setTimeout(()=>{if(state==='crash')startWait()},2600);
+   }else if(latest&&latest.status==='settled'){
+    state='crash';cp=Number(latest.multiplier)||1;res='✓ تم السحب · فوز '+fmt(latest.payout);
+    bet={amt:0,st:'none',win:0};ui();clearTimeout(window.__migoRocketResultTimer);
+    window.__migoRocketResultTimer=setTimeout(()=>{if(state==='crash')startWait()},2600);
+   }
   }
  }catch(e){}finally{resuming=false}
 }
