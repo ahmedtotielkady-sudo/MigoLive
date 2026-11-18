@@ -36,7 +36,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/gifts", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/gifts"));
 
-app.use("/api/wallet", rateLimit({ windowMs: 60_000, limit: 40, standardHeaders: true, legacyHeaders: false }), require("./routes/wallet"));
+app.use("/api/wallet", require("./routes/wallet"));
 
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/games"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ocean-storm"));
