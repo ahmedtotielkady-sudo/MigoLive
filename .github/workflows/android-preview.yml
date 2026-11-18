@@ -253,6 +253,9 @@ jobs:
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
 
+      - name: Install image tooling for launcher icon validation
+        run: python3 -m pip install --user Pillow
+
       - name: Apply Migo Live launcher icon
         run: python3 scripts/apply-android-app-icon.py
 
