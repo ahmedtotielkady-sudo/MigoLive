@@ -1,4 +1,5 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const Wallet = require("../models/Wallet");
@@ -7,6 +8,15 @@ const requireAuth = require("../middleware/requireAuth");
 
 const router = express.Router();
 router.use(requireAuth);
+// Apply the wallet limit per authenticated account, not per shared mobile-network IP.
+// The previous IP-wide 40/minute limit was exhausted by normal wallet refreshes.
+router.use(rateLimit({
+  windowMs: 60_000,
+  limit: 240,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String(req.auth.sub)
+}));
 
 router.get("/", async (req, res, next) => {
   try {
