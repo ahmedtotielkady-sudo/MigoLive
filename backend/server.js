@@ -40,7 +40,7 @@ app.use("/api/wallet", rateLimit({ windowMs: 60_000, limit: 40, standardHeaders:
 
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/games"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ocean-storm"));
-app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/cleopatra-gold"));
+app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/cleopatra-gold"));\napp.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/big-warrior"));
 
 app.use("/api/rooms/ice-config", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ice-config"));
 app.use("/api/rooms/livekit", rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), require("./routes/livekit"));
