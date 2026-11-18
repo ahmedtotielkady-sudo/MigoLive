@@ -59,6 +59,24 @@ router.post("/big-warrior/play", async (req, res) => {
     });
     return res.json({ ok:true, gameId:"big-warrior", ...result });
   } catch (error) {
+    if (error && error.code === 11000) {
+      try {
+        const prior = await GameRound.findOne({ idempotencyKey:key }).lean();
+        if (prior) {
+          if (String(prior.userId)!==req.auth.sub || prior.gameId!=="big-warrior" ||
+              Number(prior.outcome && prior.outcome.requestedBet)!==bet ||
+              String(prior.outcome && prior.outcome.pick)!==pick) {
+            return res.status(409).json({ ok:false, message:"معرّف الجولة مستخدم لطلب مختلف" });
+          }
+          const current = await User.findById(req.auth.sub).select("coins").lean();
+          if (current) return res.json({ ok:true, gameId:"big-warrior", roundId:prior.roundId,
+            coins:current.coins, bet:prior.bet, payout:prior.payout,
+            winner:prior.outcome.winner, won:!!prior.outcome.won, repeated:true });
+        }
+      } catch (_lookupError) {
+        return res.status(503).json({ ok:false, message:"تعذر التحقق من نتيجة الجولة، أعد المحاولة بنفس المعرّف" });
+      }
+    }
     return res.status(error.status || 500).json({ ok:false,
       message:error.status ? error.message : "تعذر تنفيذ الجولة" });
   } finally { await session.endSession(); }
