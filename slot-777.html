@@ -163,17 +163,18 @@ function countUp(to){
   (function f(t){const p=Math.min(1,(t-t0)/d);$('win').textContent=fmt(to*p);if(p<1)requestAnimationFrame(f)})(t0);
 }
 
+// MIGO_SERVER_SLOT777_V1 — server-authoritative game result
 async function spin(){
   if(spinning){stopNow=true;return}
-  const bet=BASE*MULT[mi],isFree=free>0;
-  if(!isFree&&bal<bet){auto=0;updAuto();modal('العملة غير كافية',[['إلغاء',null,'g'],['تعبئة رصيد',toWallet]]);return}
-  spinning=true;stopNow=false;
-  if(isFree)free--;else bal-=bet;
-  $('win').textContent='0';clearHit();upd();
-  $('spin').textContent='قف';$('spin').classList.add('stop');
-  const g=makeGrid(isFree);
-  const ev=evaluate(g,bet),win=ev.win;pend=win;save();
-  await Promise.all(cells.map((col,i)=>new Promise(res=>{
+  const bet=BASE*MULT[mi];if(!ready){modal('المحفظة غير متصلة',[['حسنًا',null,'g']]);return}
+  spinning=true;stopNow=false;$('win').textContent='0';clearHit();upd();$('spin').textContent='جارٍ التأكيد';$('spin').classList.add('stop');
+  try{
+    const key=Array.from(crypto.getRandomValues(new Uint8Array(18))).map(x=>x.toString(16).padStart(2,'0')).join('');
+    const data=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('انتهت مهلة الاتصال')),20000);const listener=e=>{const d=e.data;if(d&&d.t==='migo:game-result'&&d.requestId===key){clearTimeout(timer);removeEventListener('message',listener);d.ok?resolve(d.data):reject(new Error(d.message||'تعذر تنفيذ الجولة'))}};addEventListener('message',listener);parent.postMessage({t:'migo:game-request',requestId:key,path:'/games/slot-777/spin',body:{bet}},'*')});
+    const outcome=data.outcome||{},g=outcome.grid;if(!Array.isArray(g)||g.length!==5)throw new Error('نتيجة الجولة غير مكتملة');
+    bal=Number(data.coins)||0;free=Number(data.freeSpinsRemaining)||0;ready=true;const win=Number(data.payout)||0,ev={win,bonus:Number(outcome.bonus)||0,hits:outcome.hits||[]};
+    $('spin').textContent='قف';
+      await Promise.all(cells.map((col,i)=>new Promise(res=>{
     const t=setInterval(()=>{const p=col.map(c=>c._s);setCell(col[2],p[1]);setCell(col[1],p[0]);setCell(col[0],rnd());col.forEach(c=>c.animate([{transform:'translateY(-100%)'},{transform:'none'}],{duration:90}))},90);
     const stopAt=Date.now()+500+i*260;
     const chk=setInterval(()=>{
@@ -183,17 +184,15 @@ async function spin(){
       }
     },30);
   })));
-  bal+=win;pend=0;
-  ev.hit.forEach(k=>{const[i,r]=k.split(',');cells[i][r].classList.add('hit')});
-  if(win>0){countUp(win);beep(660);setTimeout(()=>beep(880),120)}
-  if(ev.bonus>=3){free+=FREE[Math.min(ev.bonus,5)]}
-  spinning=false;stopNow=false;
-  $('spin').textContent='دوران';$('spin').classList.remove('stop');
-  upd();if(ev.bonus>=3)$('msg').textContent='بونص! لفات مجانية: '+free;
-  if(free>0)setTimeout(()=>{if(!spinning)spin()},1400);
-  else if(auto>0){auto--;updAuto();setTimeout(()=>{if(!spinning)spin()},1000)}
-}
 
+    ev.hits.forEach(k=>{const[i,r]=k.split(',');if(cells[i]&&cells[i][r])cells[i][r].classList.add('hit')});
+    if(win>0){countUp(win);beep(660);setTimeout(()=>beep(880),120)}
+    spinning=false;stopNow=false;$('spin').textContent='دوران';$('spin').classList.remove('stop');upd();if(free>0)$('msg').textContent='بونص! لفات مجانية: '+free;parent.postMessage({t:'refresh'},'*');
+    if(free>0)setTimeout(()=>{if(!spinning)spin()},1200);else if(auto>0){auto--;updAuto();setTimeout(()=>{if(!spinning)spin()},1000)}
+    return;
+  }catch(error){console.error(error);$('msg').textContent=error.message||'تعذر الاتصال بالخادم';}
+  spinning=false;stopNow=false;$('spin').textContent='دوران';$('spin').classList.remove('stop');upd();
+}
 $('spin').onclick=spin;
 $('up').onclick=()=>{if(!spinning){mi=Math.min(MULT.length-1,mi+1);upd()}};
 $('minus').onclick=()=>{if(!spinning){mi=Math.max(0,mi-1);upd()}};
