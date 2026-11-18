@@ -536,7 +536,7 @@ async function apiRequest(path, options={}) {
   if(token) headers.set('authorization','Bearer '+token);
   let response;
   try { response=await fetch(API_BASE+path,{...options,headers,cache:'no-store'}); }
-  catch(_) { throw new Error('تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت وإعدادات الخادم'); }
+  catch(_) { throw new Error('تعذر الاتصال الآن. تحقق من الإنترنت وحاول مرة أخرى'); }
   let data={}; try { data=await response.json(); } catch(_) {}
   if(!response.ok) throw new Error(data.message||'تعذر تنفيذ الطلب');
   return data;
@@ -707,7 +707,7 @@ addEventListener('message',async e=>{
     const expected=SERVER_GAME_ROUTES[gameOn];
     const rocketAction=gameOn==='rocket'&&['/games/rocket-crash/state','/games/rocket-crash/cashout','/games/rocket-crash/cancel'].includes(path);
     if(!expected||(path!==expected&&!rocketAction)||!/^[A-Za-z0-9_-]{16,80}$/.test(requestId)){
-      try{e.source.postMessage({t:'migo:game-result',requestId,ok:false,message:'اللعبة غير متصلة بنظام الرصيد الآمن'},'*')}catch(_){}
+      try{e.source.postMessage({t:'migo:game-result',requestId,ok:false,message:'تعذر تشغيل اللعبة الآن'},'*')}catch(_){}
       return;
     }
     try{
@@ -717,7 +717,7 @@ addEventListener('message',async e=>{
         body:JSON.stringify(d.body&&typeof d.body==='object'?d.body:{})
       });
       const coins=Number(result.coins);
-      if(!Number.isSafeInteger(coins)||coins<0)throw new Error('لم يرجع الخادم رصيداً صحيحاً');
+      if(!Number.isSafeInteger(coins)||coins<0)throw new Error('تعذر تحديث رصيدك الآن');
       U().coins=coins;save();
       const top=$('#mycoins');if(top)top.textContent=fmt(coins);
       e.source.postMessage({t:'migo:game-result',requestId,ok:true,data:{...result,coins}},'*');
@@ -801,12 +801,12 @@ $('#bin').onclick=async()=>{
     if(loginMode==='id'&&!/^\d{5,10}$/.test(raw))return e.textContent='أدخل رقم ID الصحيح فقط';
   }
   $('#bin').disabled=true;
-  const oldLabel=$('#bin').textContent; $('#bin').textContent='جارٍ الاتصال بالخادم...';
+  const oldLabel=$('#bin').textContent; $('#bin').textContent='جارٍ تسجيل الدخول...';
   try {
     const result=reg
       ? await apiRequest('/auth/register',{method:'POST',body:JSON.stringify({username:raw,displayName:raw,phone,password})})
       : await apiRequest('/auth/login',{method:'POST',body:JSON.stringify({identifier:loginMode==='phone'?(phone||raw):raw,password})});
-    if(!result.token||!result.user)throw new Error('استجابة الخادم غير مكتملة');
+    if(!result.token||!result.user)throw new Error('تعذر إكمال تسجيل الدخول');
     localStorage.setItem('migolive_token',result.token);
     applyServerUser(result.user,await hash(password));
     try { sessionStorage.removeItem('mygo_owner_code_pending'); } catch(_) {}
