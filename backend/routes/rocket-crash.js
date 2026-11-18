@@ -92,7 +92,7 @@ router.get("/rocket-crash/:roundId/state", async (req,res) => {
     let result;
     await session.withTransaction(async () => {
       const round = await GameRound.findOne({
-        roundId:req.params.roundId, userId:req.auth.sub, gameId:"rocket-crash"
+        roundId:String(req.params.roundId || (req.body && req.body.roundId) || ""), userId:req.auth.sub, gameId:"rocket-crash"
       }).session(session);
       if (!round) throw fail("الجولة غير موجودة", 404);
       if (round.status !== "accepted") {
@@ -133,7 +133,7 @@ router.post(["/rocket-crash/cashout", "/rocket-crash/:roundId/cashout"], async (
     let result;
     await session.withTransaction(async () => {
       const round = await GameRound.findOne({
-        roundId:req.params.roundId, userId:req.auth.sub, gameId:"rocket-crash"
+        roundId:String(req.params.roundId || (req.body && req.body.roundId) || ""), userId:req.auth.sub, gameId:"rocket-crash"
       }).session(session);
       if (!round) throw fail("الجولة غير موجودة", 404);
       if (round.outcome.cashoutKey) {
