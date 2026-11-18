@@ -24,7 +24,9 @@ test("legacy migration only accepts profile fields and ignores wallet and privil
     assert.ok(route.includes('"' + field + '"'), "must explicitly reject " + field);
   }
   assert.match(route, /userId: req\.auth\.sub/);
-  assert.match(route, /unique: true/);
+  const model = read("backend/models/LegacyMigration.js");
+  assert.match(model, /unique: true/);
+  assert.match(model, /legacyMigrationSchema\.index\(\{ userId: 1, migrationId: 1 \}, \{ unique: true \}\)/);
   assert.match(route, /withTransaction/);
 });
 
