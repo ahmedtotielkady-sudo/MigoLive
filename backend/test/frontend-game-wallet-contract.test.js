@@ -9,7 +9,7 @@ const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
 test("both embedded slot games use their matching server settlement endpoints", () => {
   const app = read("index.html");
-  const match = app.match(/const GB=\\{([\\s\\S]*?)\\};\\s*const GM=/);
+  const match = app.match(/const GB=\{([\s\S]*?)\};\s*const GM=/);
   assert.ok(match, "embedded game bundle must exist");
   for (const [key, endpoint] of [
     ["slot", "/games/ocean-storm/spin"],
@@ -46,8 +46,8 @@ test("Animal Wheel never settles bets or changes the wallet in the browser", () 
   assert.ok(html.includes("path:'/games/wheel-animals/spin'"));
   assert.ok(html.includes("body:{bets:bets.slice()}"));
   assert.ok(html.includes("bal=Number(data.coins)"));
-  assert.doesNotMatch(html, /bal\\s*\\+=\\s*p/);
-  assert.doesNotMatch(html, /postMessage\\(\\{t:'set',v:bal/);
+  assert.doesNotMatch(html, /bal\s*\+=\s*p/);
+  assert.doesNotMatch(html, /postMessage\(\{t:'set',v:bal/);
 });
 
 test("Rocket Crash has a safe request-id fallback and visible wallet failure state", () => {
