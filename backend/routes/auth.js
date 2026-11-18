@@ -38,19 +38,20 @@ function issueToken(user, sessionId) {
 }
 
 router.post("/register", async (req, res, next) => {
+  let dbSession;
   try {
     const username = String(req.body.username || "").trim();
     const displayName = String(req.body.displayName || username).trim().slice(0, 40);
-    const phone = String(req.body.phone || "").replace(/[\s()-]/g, "");
+    const phone = String(req.body.phone || "").replace(/[\\s()-]/g, "");
     const password = String(req.body.password || "");
 
-    if (!/^[\p{L}\p{N}_.-]{3,24}$/u.test(username)) {
+    if (!/^[\\p{L}\\p{N}_.-]{3,24}$/u.test(username)) {
       return res.status(400).json({ ok: false, message: "اسم المستخدم يجب أن يكون من 3 إلى 24 حرفًا أو رقمًا" });
     }
     if (password.length < 8 || password.length > 72) {
       return res.status(400).json({ ok: false, message: "كلمة المرور يجب ألا تقل عن 8 أحرف" });
     }
-    if (phone && !/^\+?[0-9]{7,15}$/.test(phone)) {
+    if (phone && !/^\\+?[0-9]{7,15}$/.test(phone)) {
       return res.status(400).json({ ok: false, message: "رقم الهاتف غير صحيح" });
     }
 
@@ -62,35 +63,54 @@ router.post("/register", async (req, res, next) => {
       return res.status(409).json({ ok: false, message: "اسم المستخدم أو رقم الهاتف مستخدم بالفعل" });
     }
 
-    const counter = await Counter.findOneAndUpdate(
-      { _id: "userUid" },
-      { $inc: { value: 1 } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
+    // Hash before opening the transaction so CPU work does not hold MongoDB locks.
     const passwordHash = await bcrypt.hash(password, 12);
     const sessionId = crypto.randomUUID();
-    const user = await User.create({
-      activeSessionId: sessionId,
-      activeSessionExpiresAt: new Date(Date.now() + SESSION_TTL_MS),
-      uid: 100000 + counter.value,
-      username: normalized,
-      displayName,
-      phone: phone || undefined,
-      passwordHash,
-      coins: INITIAL_SIGNUP_COINS,
-      role: "user"
+    const now = new Date();
+    dbSession = await User.startSession();
+    let createdUser;
+
+    // The UID counter, user record, and canonical wallet are one atomic unit.
+    // If any write fails, MongoDB rolls all three back; no account can be left
+    // registered without its initial 100-coin wallet.
+    await dbSession.withTransaction(async () => {
+      const counter = await Counter.findOneAndUpdate(
+        { _id: "userUid" },
+        { $inc: { value: 1 } },
+        { new: true, upsert: true, setDefaultsOnInsert: true, session: dbSession }
+      );
+
+      const [user] = await User.create([{
+        activeSessionId: sessionId,
+        activeSessionExpiresAt: new Date(now.getTime() + SESSION_TTL_MS),
+        uid: 100000 + counter.value,
+        username: normalized,
+        displayName,
+        phone: phone || undefined,
+        passwordHash,
+        coins: INITIAL_SIGNUP_COINS,
+        role: "user"
+      }], { session: dbSession });
+
+      await Wallet.create([{
+        userId: user._id,
+        balance: INITIAL_SIGNUP_COINS
+      }], { session: dbSession });
+
+      createdUser = user;
     });
-    await Wallet.updateOne({ userId: user._id }, { $setOnInsert: { userId: user._id, balance: INITIAL_SIGNUP_COINS } }, { upsert: true });
-    const token = issueToken(user, sessionId);
-    return res.status(201).json({ ok: true, token, user: publicUser(user) });
+
+    const token = issueToken(createdUser, sessionId);
+    return res.status(201).json({ ok: true, token, user: publicUser(createdUser) });
   } catch (error) {
     if (error && error.code === 11000) {
       return res.status(409).json({ ok: false, message: "اسم المستخدم أو رقم الهاتف مستخدم بالفعل" });
     }
     return next(error);
+  } finally {
+    if (dbSession) await dbSession.endSession();
   }
 });
-
 router.post("/login", async (req, res, next) => {
   try {
     const identifier = String(req.body.identifier || "").trim();
