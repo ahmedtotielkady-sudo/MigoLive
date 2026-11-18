@@ -6,7 +6,7 @@ import shutil
 
 root = Path("android/app/src/main")
 res = root / "res"
-source = Path("assets/migo-app-icon.png")
+source = Path("assets/migo-live-icon.jpg")
 manifest = root / "AndroidManifest.xml"
 if not manifest.is_file():
     raise SystemExit("AndroidManifest.xml missing")
