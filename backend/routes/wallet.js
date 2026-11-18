@@ -89,18 +89,22 @@ router.post("/transfer", async (req, res, next) => {
     // A concurrent retry can pass the initial lookup before the unique ledger
     // index accepts the first request. Resolve that race as an idempotent replay.
     if (error && error.code === 11000) {
-      const existing = await WalletTransaction.findOne({ idempotencyKey: key }).lean();
-      const recipient = await User.findOne({ uid: targetUid }).select("_id").lean();
-      if (existing && recipient &&
-          String(existing.from || "") === req.auth.sub &&
-          String(existing.to || "") === String(recipient._id) &&
-          existing.amount === amount && existing.type === type) {
-        const sender = await User.findById(req.auth.sub).select("coins").lean();
-        if (sender) return res.json({
-          ok: true, coins: sender.coins, transactionId: String(existing._id), repeated: true
-        });
+      try {
+        const existing = await WalletTransaction.findOne({ idempotencyKey: key }).lean();
+        const recipient = await User.findOne({ uid: targetUid }).select("_id").lean();
+        if (existing && recipient &&
+            String(existing.from || "") === req.auth.sub &&
+            String(existing.to || "") === String(recipient._id) &&
+            existing.amount === amount && existing.type === type) {
+          const sender = await User.findById(req.auth.sub).select("coins").lean();
+          if (sender) return res.json({
+            ok: true, coins: sender.coins, transactionId: String(existing._id), repeated: true
+          });
+        }
+        return res.status(409).json({ ok: false, message: "معرّف العملية مستخدم بالفعل" });
+      } catch (_lookupError) {
+        return res.status(503).json({ ok: false, message: "تعذر التحقق من نتيجة العملية، أعد المحاولة بنفس المعرّف" });
       }
-      return res.status(409).json({ ok: false, message: "معرّف العملية مستخدم بالفعل" });
     }
     return res.status(error.status || 500).json({
       ok: false,
@@ -175,22 +179,26 @@ router.post("/admin/credit", async (req, res) => {
     // Handle simultaneous retries after MongoDB's unique idempotency index
     // rejects the losing transaction. Never apply the credit a second time.
     if (error && error.code === 11000) {
-      const [existing, admin, target] = await Promise.all([
-        WalletTransaction.findOne({ idempotencyKey: key }).lean(),
-        User.findById(req.auth.sub).select("_id role status").lean(),
-        User.findOne({ uid: targetUid }).select("_id uid coins").lean()
-      ]);
-      if (existing && admin && target &&
-          admin.status === "active" && ["owner", "admin"].includes(admin.role) &&
-          String(existing.from || "") === String(admin._id) &&
-          String(existing.to || "") === String(target._id) &&
-          existing.amount === amount && existing.type === "admin_adjustment") {
-        return res.json({
-          ok: true, uid: target.uid, coins: target.coins,
-          transactionId: String(existing._id), repeated: true
-        });
+      try {
+        const [existing, admin, target] = await Promise.all([
+          WalletTransaction.findOne({ idempotencyKey: key }).lean(),
+          User.findById(req.auth.sub).select("_id role status").lean(),
+          User.findOne({ uid: targetUid }).select("_id uid coins").lean()
+        ]);
+        if (existing && admin && target &&
+            admin.status === "active" && ["owner", "admin"].includes(admin.role) &&
+            String(existing.from || "") === String(admin._id) &&
+            String(existing.to || "") === String(target._id) &&
+            existing.amount === amount && existing.type === "admin_adjustment") {
+          return res.json({
+            ok: true, uid: target.uid, coins: target.coins,
+            transactionId: String(existing._id), repeated: true
+          });
+        }
+        return res.status(409).json({ ok: false, message: "معرّف العملية مستخدم بالفعل" });
+      } catch (_lookupError) {
+        return res.status(503).json({ ok: false, message: "تعذر التحقق من نتيجة الشحن، أعد المحاولة بنفس المعرّف" });
       }
-      return res.status(409).json({ ok: false, message: "معرّف العملية مستخدم بالفعل" });
     }
     return res.status(error.status || 500).json({
       ok: false,
