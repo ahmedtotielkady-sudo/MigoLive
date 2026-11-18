@@ -9,6 +9,7 @@ on:
       - feature/mongodb-primary-integration
       - android-build-validation-2026-11-18
       - work/restore-warrior-server-wallet-2026-11-18
+      - work/migolive-seven-games-wallet-2026-11-17
   workflow_dispatch:
 
 permissions:
