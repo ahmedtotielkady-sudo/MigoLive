@@ -4,6 +4,8 @@ const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
+const requireAuth = require("./middleware/requireAuth");
+const requireGameEnabled = require("./middleware/requireGameEnabled");
 const http = require("http");
 const { attachRealtime } = require("./realtime");
 
@@ -37,6 +39,11 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/gifts", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/gifts"));
 
 app.use("/api/wallet", require("./routes/wallet"));
+
+// Owner-managed game policy is persisted in MongoDB. All game API requests pass
+// through the policy gate before reaching individual game routers.
+app.use("/api/game-control", rateLimit({ windowMs: 60_000, limit: 40, standardHeaders: true, legacyHeaders: false }), require("./routes/game-control"));
+app.use("/api/games", requireAuth, requireGameEnabled);
 
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/games"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ocean-storm"));
