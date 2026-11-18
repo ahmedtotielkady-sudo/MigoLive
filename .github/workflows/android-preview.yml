@@ -55,6 +55,7 @@ jobs:
         run: |
           mkdir -p www
           cp index.html www/index.html
+          python3 scripts/install-api-bridge.py
           cp migolive-back-navigation.js www/migolive-back-navigation.js
           python3 - <<'PY'
           from pathlib import Path
