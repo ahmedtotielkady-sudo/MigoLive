@@ -261,6 +261,7 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
+          aapt dump badging app/build/outputs/apk/debug/app-debug.apk | grep -E '^application:|^launchable-activity:'
 
       - name: Give APK a unique test filename
         run: cp android/app/build/outputs/apk/debug/app-debug.apk MigoLive_Test_V2_2026.apk
