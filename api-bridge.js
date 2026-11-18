@@ -349,20 +349,20 @@
         method: "GET", cache: "no-store",
         headers: { "X-App-Version-Code": String(MIGO_APP_VERSION_CODE) }
       });
-      if (data.blocked) {
+      // Show the blocking screen only for an explicit owner-issued global
+      // maintenance command. Version mismatches and fresh installs do not lock the app.
+      if (data.blocked === true && data.reason === "maintenance") {
         showUpdateBlock(data, () => checkAppUpdatePolicy().catch(() => {}));
         return false;
       }
       hideUpdateBlock();
       return true;
     } catch (error) {
-      // Fail closed: if the server cannot confirm the installed APK is allowed,
-      // keep the app locked and let the user retry rather than bypass enforcement.
-      showUpdateBlock({
-        message: "تعذر التحقق من صلاحية إصدار التطبيق. اتصل بالإنترنت ثم أعد المحاولة."
-      }, () => checkAppUpdatePolicy().catch(() => {}));
-      console.warn("MigoLive update policy check failed:", error.message);
-      return false;
+      // A network/API error is not an owner shutdown command. Never show the
+      // maintenance screen on first install or because connectivity is unavailable.
+      hideUpdateBlock();
+      console.warn("MigoLive maintenance check unavailable:", error.message);
+      return true;
     } finally {
       updateCheckRunning = false;
     }

@@ -31,16 +31,17 @@ router.get("/status", async (req, res, next) => {
     const currentUser = await User.findById(req.auth.sub).select("role status").lean();
     const isOwner = !!(currentUser && currentUser.status === "active" && currentUser.role === "owner");
     const maintenanceBlocked = !isOwner && !!(policy && policy.maintenanceEnabled);
-    const updateBlocked = !isOwner && !!(policy && policy.enabled && versionCode < minimumVersionCode);
-    const blocked = maintenanceBlocked || updateBlocked;
+    // Only the explicit owner maintenance switch may block all users.
+    // Merely installing or opening a fresh APK must never trigger this screen.
+    const blocked = maintenanceBlocked;
     return res.json({
       ok: true,
       blocked,
-      reason: maintenanceBlocked ? "maintenance" : (updateBlocked ? "update" : ""),
+      reason: maintenanceBlocked ? "maintenance" : "",
       latestVersionCode,
       minimumVersionCode,
       apkUrl: policy ? policy.apkUrl : "",
-      message: maintenanceBlocked ? (policy.maintenanceMessage || "التطبيق متوقف مؤقتًا من مالك التطبيق. يُرجى التواصل مع مالك التطبيق.") : (policy ? policy.contactMessage : "يتوفر تحديث جديد لميجو لايف")
+      message: maintenanceBlocked ? (policy.maintenanceMessage || "التطبيق متوقف مؤقتًا من مالك التطبيق. يُرجى التواصل مع مالك التطبيق.") : ""
     });
   } catch (error) { return next(error); }
 });
@@ -84,9 +85,10 @@ router.put("/policy", requireOwner, async (req, res, next) => {
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     ).lean();
     return res.json({ ok: true, policy: {
-      enabled: policy.enabled, latestVersionCode: policy.latestVersionCode,
-      minimumVersionCode: policy.minimumVersionCode, apkUrl: policy.apkUrl,
-      contactMessage: policy.contactMessage, updatedAt: policy.updatedAt
+      enabled: policy.enabled, maintenanceEnabled: !!policy.maintenanceEnabled,
+      maintenanceMessage: policy.maintenanceMessage || "",
+      latestVersionCode: policy.latestVersionCode, minimumVersionCode: policy.minimumVersionCode,
+      apkUrl: policy.apkUrl, contactMessage: policy.contactMessage, updatedAt: policy.updatedAt
     } });
   } catch (error) { return next(error); }
 });
