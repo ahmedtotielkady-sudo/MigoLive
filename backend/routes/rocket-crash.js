@@ -56,6 +56,19 @@ async function readRoundState(userId, requestedRoundId) {
       result = { active: true, roundId: round.roundId, bet: round.bet,
         phase: "wait", startAt, multiplier: 1, coins: user.coins };
     });
+    const recent = await GameRound.find({
+      userId, gameId: "rocket-crash", status: { $in: ["settled", "lost", "cancelled"] }
+    }).sort({ settledAt: -1, createdAt: -1 }).limit(10)
+      .select("roundId bet payout status outcome.crashAtMultiplier outcome.cashoutMultiplier settledAt")
+      .lean();
+    result.results = recent.map(round => ({
+      roundId: round.roundId,
+      status: round.status,
+      bet: Number(round.bet) || 0,
+      payout: Number(round.payout) || 0,
+      multiplier: Number(round.outcome && (round.outcome.cashoutMultiplier || round.outcome.crashAtMultiplier)) || 1,
+      settledAt: round.settledAt || null
+    }));
     return result;
   } finally {
     await session.endSession();
