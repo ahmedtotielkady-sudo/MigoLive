@@ -1,7 +1,8 @@
 "use strict";
 const express=require("express"),mongoose=require("mongoose"),crypto=require("crypto");
 const User=require("../models/User"),Wallet=require("../models/Wallet"),WalletTransaction=require("../models/WalletTransaction"),GameRound=require("../models/GameRound"),GameState=require("../models/GameState"),requireAuth=require("../middleware/requireAuth"),requireGameEnabled=require("../middleware/requireGameEnabled"),engine=require("../game-engines/cleopatra-gold");
-const router=express.Router();router.use(requireAuth, requireGameEnabled);
+const router=express.Router();router.use(requireAuth);
+router.use(requireGameEnabled);
 router.post("/cleopatra-gold/spin",async(req,res)=>{
  const bet=Number(req.body&&req.body.bet),key=String(req.get("idempotency-key")||"");
  if(!/^[A-Za-z0-9_-]{16,80}$/.test(key))return res.status(400).json({ok:false,message:"معرّف الجولة مطلوب"});
