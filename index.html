@@ -711,12 +711,15 @@ addEventListener('message',async e=>{
       return;
     }
     try{
-      const result=await apiRequest(path,{
-        method:'POST',
-        headers:{'idempotency-key':requestId},
-        body:JSON.stringify(d.body&&typeof d.body==='object'?d.body:{})
-      });
-      const coins=Number(result.coins);
+      const method=path.endsWith('/state')?'GET':'POST';
+      const requestOptions={method,headers:{'idempotency-key':requestId}};
+      if(method!=='GET')requestOptions.body=JSON.stringify(d.body&&typeof d.body==='object'?d.body:{});
+      const result=await apiRequest(path,requestOptions);
+      let coins=Number(result.coins);
+      if(!Number.isSafeInteger(coins)||coins<0){
+        const wallet=await apiRequest('/wallet');
+        coins=Number(wallet.coins);
+      }
       if(!Number.isSafeInteger(coins)||coins<0)throw new Error('تعذر تحديث رصيدك الآن');
       U().coins=coins;save();
       const top=$('#mycoins');if(top)top.textContent=fmt(coins);
