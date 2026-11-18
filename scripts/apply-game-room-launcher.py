@@ -169,9 +169,9 @@ js = r"""
     const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{name:"",avatar:""};
     e.source.postMessage({t:"me",name:profile.name||"",avatar:profile.avatar||""},"*");
     if(typeof window.__migoRefreshWallet==="function"){
-     window.__migoRefreshWallet().then(()=>{
-      const current=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{coins:0};
-      e.source.postMessage({t:"bal",v:Number(current.coins)||0},"*");
+     window.__migoRefreshWallet().then(wallet=>{
+      if(!wallet||!Number.isSafeInteger(Number(wallet.coins)))throw new Error("تعذر تأكيد رصيد المحفظة");
+      e.source.postMessage({t:"bal",v:Number(wallet.coins)},"*");
      }).catch(err=>e.source.postMessage({t:"wallet-error",message:err.message||"تعذر تحميل المحفظة"},"*"));
     }else e.source.postMessage({t:"wallet-error",message:"خدمة المحفظة غير جاهزة"},"*");
    }else if(d.t==="migo:game-request"){
