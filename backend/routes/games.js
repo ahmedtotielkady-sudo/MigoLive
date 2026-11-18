@@ -7,6 +7,7 @@ const WalletTransaction = require("../models/WalletTransaction");
 const GameRound = require("../models/GameRound");
 const GameState = require("../models/GameState");
 const requireAuth = require("../middleware/requireAuth");
+const AppGamePolicy = require("../models/AppGamePolicy");
 const requireGameEnabled = require("../middleware/requireGameEnabled");
 const slot777 = require("../game-engines/slot-777");
 
@@ -22,15 +23,19 @@ const GAME_CATALOG = Object.freeze([
   { id:"rocket-crash", name:"الصاروخ", visible:true, active:false, endpoint:"/rocket-crash/start" },
   { id:"big-warrior", name:"المحارب الكبير", visible:true, active:false, endpoint:"/big-warrior/play" }
 ]);
-router.get("/catalog", (req, res) => res.json({
-  ok:true,
-  wallet:"central",
-  games:GAME_CATALOG.map(game => ({
-    ...game,
-    wallet:"central",
-    settlement:"server_api_ready_pending_frontend_wiring_and_database_integration_tests"
-  }))
-}));
+router.get("/catalog", async (_req, res, next) => {
+  try {
+    const policy = await AppGamePolicy.findById("global").lean();
+    const stored = policy && policy.games ? policy.games : {};
+    const games = GAME_CATALOG.filter(game => {
+      const value = stored instanceof Map ? stored.get(game.id) : stored[game.id];
+      return !(value && value.enabled === false);
+    }).map(game => ({ ...game, wallet:"central",
+      settlement:"server_api_ready_pending_frontend_wiring_and_database_integration_tests"
+    }));
+    return res.json({ ok:true, wallet:"central", games });
+  } catch (error) { return next(error); }
+});
 
 router.use(requireAuth, requireGameEnabled);
 
