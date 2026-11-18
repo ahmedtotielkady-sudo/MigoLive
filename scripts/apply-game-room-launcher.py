@@ -10,8 +10,8 @@ html = p.read_text(encoding="utf-8")
 profile_anchor = "function U(){return DB.users[me]}"
 profile_getter = """function U(){return DB.users[me]}
 window.__migoGetGameProfile=function(){
- try{const u=U();return {name:u&&u.name?u.name:"",avatar:u&&typeof okAv==="function"&&okAv(u)?u.avatar:"",coins:u&&Number.isFinite(Number(u.coins))?Number(u.coins):0}}
- catch(_){return {name:"",avatar:"",coins:0}}
+ try{const u=U();return {name:u&&u.name?u.name:"",avatar:u&&typeof okAv==="function"&&okAv(u)?u.avatar:"",}}
+ catch(_){return {name:"",avatar:""}}
 };"""
 if profile_anchor in html and "window.__migoGetGameProfile" not in html:
     html = html.replace(profile_anchor, profile_getter, 1)
@@ -137,7 +137,7 @@ js = r"""
   const frame=overlay.querySelector("iframe");
   frame.onload=()=>{
    try{
-    const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{name:"",avatar:"",coins:0};
+    const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{name:"",avatar:""};
     frame.contentWindow.postMessage({t:"me",name:profile.name||"",avatar:profile.avatar||""},"*");
     // Do not seed games with a possibly stale local balance. They request the
     // canonical wallet through the authenticated bridge after loading.
