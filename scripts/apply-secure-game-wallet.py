@@ -16,8 +16,8 @@ old = '''   }else if(d.t==="set"&&Number.isFinite(d.v)&&d.v>=0){
 new = '''   }else if(d.t==="set"){
     // Game iframe balances are untrusted. Never accept a client-calculated
     // balance; only a verified server-side settlement may change wallet coins.
-    const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{coins:0};
-    e.source.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
+    // Ignore iframe balance writes; re-read the canonical server wallet only.
+    if(typeof window.__migoRefreshWallet==="function")window.__migoRefreshWallet().catch(()=>{});
    }else if(d.t==="wallet"){'''
 count = html.count(old)
 if count == 1:
@@ -43,8 +43,8 @@ launcher_old = '''   }else if(d.t==="set"&&Number.isFinite(d.v)&&d.v>=0){
    }else if(d.t==="wallet"){'''
 launcher_new = '''   }else if(d.t==="set"){
     // The game iframe cannot authoritatively set a wallet balance.
-    const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{coins:0};
-    e.source.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
+    // Ignore iframe balance writes; re-read the canonical server wallet only.
+    if(typeof window.__migoRefreshWallet==="function")window.__migoRefreshWallet().catch(()=>{});
    }else if(d.t==="wallet"){'''
 launcher_count = launcher.count(launcher_old)
 if launcher_count == 1:
