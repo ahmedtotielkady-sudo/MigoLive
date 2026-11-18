@@ -71,7 +71,22 @@ router.post("/rocket-crash/start", async (req,res) => {
   } finally { await session.endSession(); }
 });
 
-router.get("/rocket-crash/state", async (req,res) => {\n  try {\n    const round = await GameRound.findOne({ userId:req.auth.sub, gameId:"rocket-crash", status:"accepted" }).sort({ createdAt:-1 }).lean();\n    if (!round) return res.json({ ok:true, gameId:"rocket-crash", active:false });\n    const now=Date.now(), startAt=new Date(round.outcome.startAt).getTime();\n    const phase=now<startAt ? "wait" : "fly";\n    const multiplier=phase==="wait" ? 1 : currentMultiplier(round);\n    return res.json({ ok:true, gameId:"rocket-crash", active:true, roundId:round.roundId, bet:round.bet, phase, startAt, multiplier });\n  } catch (_) { return res.status(500).json({ ok:false, message:"تعذر قراءة حالة الجولة" }); }\n});\n\nrouter.get("/rocket-crash/:roundId/state", async (req,res) => {
+router.get("/rocket-crash/state", async (req,res) => {\n  try {\n    const round = await GameRound.findOne({ userId:req.auth.sub, gameId:"rocket-crash", status:"accepted" }).sort({ createdAt:-1 }).lean();\n    if (!round) return res.json({ ok:true, gameId:"rocket-crash", active:false });\n    const now=Date.now(), startAt=new Date(round.outcome.startAt).getTime();\n    const phase=now<startAt ? "wait" : "fly";\n    const multiplier=phase==="wait" ? 1 : currentMultiplier(round);\n    return res.json({ ok:true, gameId:"rocket-crash", active:true, roundId:round.roundId, bet:round.bet, phase, startAt, multiplier });\n  } catch (_) { return res.status(500).json({ ok:false, message:"تعذر قراءة حالة الجولة" }); }\n});\n\nrouter.get("/rocket-crash/state", async (req,res) => {
+  try {
+    const round=await GameRound.findOne({userId:req.auth.sub,gameId:"rocket-crash",status:"accepted"}).sort({createdAt:-1}).lean();
+    if(!round) return res.json({ok:true,gameId:"rocket-crash",active:false});
+    const startAt=new Date(round.outcome.startAt).getTime(), now=Date.now();
+    const phase=now<startAt?"wait":"fly";
+    const multiplier=phase==="wait"?1:currentMultiplier(round);
+    if(multiplier>=Number(round.outcome.crashAtMultiplier)){
+      await GameRound.updateOne({_id:round._id,status:"accepted"},{$set:{status:"lost","outcome.crashedAt":new Date(now)}});
+      return res.json({ok:true,gameId:"rocket-crash",active:false,crashed:true});
+    }
+    return res.json({ok:true,gameId:"rocket-crash",active:true,roundId:round.roundId,bet:round.bet,phase,startAt,multiplier});
+  } catch (_) { return res.status(500).json({ok:false,message:"تعذر قراءة حالة الجولة"}); }
+});
+
+router.get("/rocket-crash/:roundId/state", async (req,res) => {
   const session = await mongoose.startSession();
   try {
     let result;
@@ -171,6 +186,37 @@ router.post(["/rocket-crash/cashout", "/rocket-crash/:roundId/cashout"], async (
     return res.status(error.status || 500).json({ ok:false,
       message:error.status ? error.message : "تعذر تنفيذ السحب" });
   } finally { await session.endSession(); }
+});
+
+router.post("/rocket-crash/cancel", async (req,res) => {
+  const key=String(req.get("idempotency-key")||"");
+  const roundId=String(req.body && req.body.roundId || "");
+  if(!validKey(key)||!roundId) return res.status(400).json({ok:false,message:"بيانات الإلغاء غير مكتملة"});
+  const session=await mongoose.startSession();
+  try{
+    let result;
+    await session.withTransaction(async()=>{
+      const round=await GameRound.findOne({roundId,userId:req.auth.sub,gameId:"rocket-crash"}).session(session);
+      if(!round) throw fail("الجولة غير موجودة",404);
+      if(round.status==="cancelled"){
+        const user=await User.findById(req.auth.sub).session(session).select("coins");
+        result={roundId,coins:user?user.coins:0,cancelled:true,repeated:true};return;
+      }
+      if(round.status!=="accepted"||Date.now()>=new Date(round.outcome.startAt).getTime())
+        throw fail("لا يمكن إلغاء الجولة بعد بدء الصاروخ",409);
+      const user=await User.findOne({_id:req.auth.sub,status:"active"}).session(session).select("coins");
+      if(!user) throw fail("الحساب غير موجود أو غير نشط",404);
+      user.coins+=round.bet;
+      await WalletTransaction.create([{to:user._id,amount:round.bet,type:"refund",description:"استرداد رهان الصاروخ الملغي",idempotencyKey:round.roundId+"_cancel"}],{session});
+      await user.save({session});
+      await Wallet.updateOne({userId:user._id},{$set:{balance:user.coins}},{upsert:true,session});
+      round.status="cancelled";round.payout=round.bet;round.settledAt=new Date();
+      round.outcome.cancelKey=key;round.markModified("outcome");await round.save({session});
+      result={roundId,coins:user.coins,cancelled:true,repeated:false};
+    });
+    return res.json({ok:true,gameId:"rocket-crash",...result});
+  }catch(error){return res.status(error.status||500).json({ok:false,message:error.status?error.message:"تعذر إلغاء الرهان"});}
+  finally{await session.endSession();}
 });
 
 module.exports = router;
