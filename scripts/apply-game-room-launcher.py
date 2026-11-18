@@ -171,10 +171,17 @@ js = r"""
   try{
    if(d.t==="migo:game-request"){
     (async()=>{
-     const allowed={"/games/cleopatra-gold/spin":true,"/games/ocean-storm/spin":true,"/games/slot-777/spin":true,"/games/cleopatra-gold/spin":true};
-     if(!allowed[d.path])throw new Error("طلب اللعبة غير مسموح");
+     const allowed={
+      "/games/cleopatra-gold/spin":true,
+      "/games/ocean-storm/spin":true,
+      "/games/slot-777/spin":true,
+      "/games/big-warrior/fight":true,
+      "/games/wheel-animals/spin":true,
+      "/games/fruit-luck/spin":true
+     };
+     if(!allowed[d.path])throw new Error("اللعبة غير مفعلة على الخادم بعد");
      const key=String(d.requestId||"");
-     if(!/^[a-f0-9]{36}$/.test(key))throw new Error("معرّف الجولة غير صحيح");
+     if(!/^[A-Za-z0-9_-]{16,80}$/.test(key))throw new Error("معرّف الجولة غير صحيح");
      const result=await apiRequest(d.path,{method:"POST",headers:{"idempotency-key":key},body:JSON.stringify(d.body||{})});
      e.source.postMessage({t:"migo:game-result",requestId:key,ok:true,data:result},e.origin==="null"?"*":e.origin);
     })().catch(err=>{
