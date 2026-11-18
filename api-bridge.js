@@ -376,37 +376,68 @@
   }, 15000);
 
   // Owner-only control panel entry. The server independently checks role on save.
+  function findAdminSectionsContainer() {
+    const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4,[role=heading],strong,b,div,section"));
+    const heading = headings.find(node => {
+      if (!node || !node.getClientRects().length) return false;
+      const label = String(node.innerText || node.textContent || "").trim().replace(/\\s+/g, " ");
+      return label === "أقسام الإدارة" || label === "اقسام الادارة";
+    });
+    if (!heading) return null;
+    // The section title is followed by the admin feature grid in the existing UI.
+    return heading.parentElement?.parentElement || heading.parentElement || null;
+  }
   function installOwnerUpdatePanel() {
     if (typeof me === "undefined" || !me) return;
     const owner = DB && DB.users && DB.users[me] && DB.users[me].role === "owner";
+    const oldUpdate = document.getElementById("migo-owner-update-entry");
+    const oldGames = document.getElementById("migo-owner-games-entry");
+    const oldGrid = document.getElementById("migo-owner-admin-controls");
     if (!owner) {
-      for (const id of ["migo-owner-update-entry","migo-owner-games-entry"]) { const old = document.getElementById(id); if (old) old.remove(); }
+      if (oldUpdate) oldUpdate.remove();
+      if (oldGames) oldGames.remove();
+      if (oldGrid) oldGrid.remove();
       return;
     }
-    let entry = document.getElementById("migo-owner-update-entry");
-    if (!entry) {
-      entry = document.createElement("button");
-      entry.id = "migo-owner-update-entry";
-      entry.type = "button";
-      entry.textContent = "⚙️ إدارة تحديث التطبيق";
-      entry.style.cssText = "border:0;border-radius:12px;padding:12px 15px;background:#6f35a5;color:#fff;font-weight:800;display:block;width:100%;margin:10px 0";
-      entry.onclick = openOwnerUpdatePanel;
+    const section = findAdminSectionsContainer();
+    if (!section) {
+      // Never float owner controls over the app. Wait until the administration
+      // section is rendered, then MutationObserver will insert them there.
+      if (oldGrid) oldGrid.remove();
+      if (oldUpdate) oldUpdate.remove();
+      if (oldGames) oldGames.remove();
+      return;
+    }
+    let grid = document.getElementById("migo-owner-admin-controls");
+    if (!grid) {
+      grid = document.createElement("div");
+      grid.id = "migo-owner-admin-controls";
+      grid.style.cssText = "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%;margin:14px 0";
     }
     let gamesEntry = document.getElementById("migo-owner-games-entry");
-    if (!gamesEntry) { gamesEntry = document.createElement("button"); gamesEntry.id = "migo-owner-games-entry"; gamesEntry.type = "button"; gamesEntry.textContent = "🎮 التحكم في تشغيل الألعاب"; gamesEntry.style.cssText = entry.style.cssText; gamesEntry.onclick = openOwnerGameControlPanel; }
-    // Prefer placing the controls inside an already-open owner/admin panel.
-    const candidates = Array.from(document.querySelectorAll('[id*="owner" i],[class*="owner" i],[id*="admin" i],[class*="admin" i],[data-page*="owner" i]'));
-    const panel = candidates.find(node => {
-      if (!node || node.id === "migo-owner-update-panel" || !node.getClientRects().length) return false;
-      const text = String(node.innerText || node.textContent || "").slice(0, 1200);
-      return /مالك التطبيق|لوحة المالك|owner panel|admin panel/i.test(text);
-    });
-    if (panel) {
-      if (entry.parentElement !== panel) panel.appendChild(entry);
-      if (gamesEntry.parentElement !== panel) panel.appendChild(gamesEntry);
-    } else if (!entry.isConnected) {
-      entry.style.cssText = "position:fixed;bottom:86px;left:12px;z-index:99990;border:0;border-radius:14px;padding:12px 15px;background:#6f35a5;color:#fff;font-weight:800;box-shadow:0 5px 18px #0003";
-      document.body.append(entry, gamesEntry);
+    if (!gamesEntry) {
+      gamesEntry = document.createElement("button");
+      gamesEntry.id = "migo-owner-games-entry";
+      gamesEntry.type = "button";
+      gamesEntry.textContent = "🎮 التحكم في الألعاب";
+      gamesEntry.onclick = openOwnerGameControlPanel;
+    }
+    let updateEntry = document.getElementById("migo-owner-update-entry");
+    if (!updateEntry) {
+      updateEntry = document.createElement("button");
+      updateEntry.id = "migo-owner-update-entry";
+      updateEntry.type = "button";
+      updateEntry.textContent = "⚙️ التحكم في التحديث";
+      updateEntry.onclick = openOwnerUpdatePanel;
+    }
+    const buttonStyle = "min-height:58px;border:1px solid #a56be8;border-radius:14px;padding:12px;background:#fff;color:#512477;font-weight:800;font-size:15px;white-space:normal";
+    gamesEntry.style.cssText = buttonStyle;
+    updateEntry.style.cssText = buttonStyle;
+    grid.append(gamesEntry, updateEntry);
+    if (grid.parentElement !== section) {
+      const heading = Array.from(section.querySelectorAll("h1,h2,h3,h4,[role=heading]")).find(node => /أقسام الإدارة|اقسام الادارة/.test(node.textContent || ""));
+      if (heading && heading.nextSibling) section.insertBefore(grid, heading.nextSibling);
+      else section.appendChild(grid);
     }
   }
   const MIGO_GAME_LABELS = {
