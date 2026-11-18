@@ -371,16 +371,35 @@
 
   // Owner-only control panel entry. The server independently checks role on save.
   function installOwnerUpdatePanel() {
-    if (document.getElementById("migo-owner-update-entry") || typeof me === "undefined" || !me) return;
+    if (typeof me === "undefined" || !me) return;
     const owner = DB && DB.users && DB.users[me] && DB.users[me].role === "owner";
-    if (!owner) return;
-    const entry = document.createElement("button");
-    entry.id = "migo-owner-update-entry";
-    entry.type = "button";
-    entry.textContent = "⚙️ إدارة تحديث التطبيق";
-    entry.style.cssText = "position:fixed;bottom:86px;left:12px;z-index:99990;border:0;border-radius:14px;padding:12px 15px;background:#6f35a5;color:#fff;font-weight:800;box-shadow:0 5px 18px #0003";
-    entry.onclick = openOwnerUpdatePanel;
-    document.body.appendChild(entry);
+    if (!owner) {
+      const old = document.getElementById("migo-owner-update-entry");
+      if (old) old.remove();
+      return;
+    }
+    let entry = document.getElementById("migo-owner-update-entry");
+    if (!entry) {
+      entry = document.createElement("button");
+      entry.id = "migo-owner-update-entry";
+      entry.type = "button";
+      entry.textContent = "⚙️ إدارة تحديث التطبيق";
+      entry.style.cssText = "border:0;border-radius:12px;padding:12px 15px;background:#6f35a5;color:#fff;font-weight:800;display:block;width:100%;margin:10px 0";
+      entry.onclick = openOwnerUpdatePanel;
+    }
+    // Prefer placing the control inside an already-open owner/admin panel.
+    const candidates = Array.from(document.querySelectorAll('[id*="owner" i],[class*="owner" i],[id*="admin" i],[class*="admin" i],[data-page*="owner" i]'));
+    const panel = candidates.find(node => {
+      if (!node || node.id === "migo-owner-update-panel" || !node.getClientRects().length) return false;
+      const text = String(node.innerText || node.textContent || "").slice(0, 1200);
+      return /مالك التطبيق|لوحة المالك|owner panel|admin panel/i.test(text);
+    });
+    if (panel) {
+      if (entry.parentElement !== panel) panel.appendChild(entry);
+    } else if (!entry.isConnected) {
+      entry.style.cssText = "position:fixed;bottom:86px;left:12px;z-index:99990;border:0;border-radius:14px;padding:12px 15px;background:#6f35a5;color:#fff;font-weight:800;box-shadow:0 5px 18px #0003";
+      document.body.appendChild(entry);
+    }
   }
   async function openOwnerUpdatePanel() {
     let modal = document.getElementById("migo-owner-update-panel");
@@ -442,6 +461,9 @@
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && token()) checkAppUpdatePolicy().then(allowed => { if (allowed) installOwnerUpdatePanel(); }).catch(() => {});
   });
+
+  const ownerPanelObserver = new MutationObserver(() => installOwnerUpdatePanel());
+  if (document.body) ownerPanelObserver.observe(document.body, { childList: true, subtree: true });
 
   // Restore server identity validation for remembered sessions.
   if (token() && typeof me !== 'undefined' && me && DB.users[me]) {
