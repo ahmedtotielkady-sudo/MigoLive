@@ -1,0 +1,48 @@
+name: Railway baseline integration check
+
+on:
+  push:
+    branches:
+      - integration/railway-production-migolive-2026-11-19
+    paths:
+      - .github/workflows/railway-integration-check.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: migolive-railway-baseline-integration
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Railway production baseline
+        uses: actions/checkout@v4
+        with:
+          ref: integration/railway-production-migolive-2026-11-19
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge reviewed seven-game branch without force
+        run: |
+          git fetch origin work/migolive-server-seven-games-mainline-2026-11-18
+          git merge --no-ff --no-edit FETCH_HEAD
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --no-audit --no-fund
+
+      - name: Run backend tests
+        working-directory: backend
+        run: npm test
+
+      - name: Push validated integration commit
+        run: git push origin HEAD:integration/railway-production-migolive-2026-11-19
