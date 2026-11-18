@@ -124,5 +124,13 @@ function tick(){
  doneN=(betRound>=0&&total()>0)?Math.min(betRound-1,fin):fin;
  spunN=n-1;cur=resultOf(n-1).tg;nd.style.transition='none';nd.style.transform='rotate('+cur+'deg)';void nd.offsetWidth;nd.style.transition='';
  setH(fin);ui();tick();setInterval(tick,200)})();
-addEventListener('message',e=>{const d=e.data;if(d&&d.t==='bal'){bal=d.v;ready=true;ui()}});try{parent.postMessage({t:'get'},'*')}catch(e){}
+addEventListener('message',e=>{
+ if(e.source!==parent)return;
+ const d=e.data||{};
+ if(d.t==='wallet-error'){ready=false;document.getElementById('bal').textContent='—';document.getElementById('bal').title=d.message||'تعذر تحميل الرصيد';msg(d.message||'تعذر تحميل رصيد المحفظة',4000);return}
+ if(d.t==='bal'&&Number.isSafeInteger(Number(d.v))&&Number(d.v)>=0){bal=Number(d.v);ready=true;document.getElementById('bal').title='رصيدك من محفظة ميجو لايف';ui()}
+});
+try{parent.postMessage({t:'get'},'*')}catch(e){}
+window.addEventListener('focus',()=>{try{parent.postMessage({t:'get'},'*')}catch(e){}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){try{parent.postMessage({t:'get'},'*')}catch(e){}}});
 </script></body></html>
