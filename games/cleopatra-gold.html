@@ -91,7 +91,7 @@ let bal=0,bi=0,fs=0,mult=1,busy=false,auto=false,grid=[],fsWin=0,walletReady=fal
 function rnd(r){const L=SY.filter(s=>!(s[0]=='W'&&(r==0||r==4)));let x=Math.random()*L.reduce((a,s)=>a+s[2],0);for(const s of L){if((x-=s[2])<0)return s[0]}return 'q'}
 const cell=id=>`<div class="c"><i class="i-${id}"></i></div>`;
 const col=r=>[rnd(r),rnd(r),rnd(r),rnd(r)];
-const save=()=>{if(walletReady)parent.postMessage({t:'set',v:Math.max(0,Math.floor(bal))},'*')};
+const save=()=>{if(walletReady)parent.postMessage({t:'refresh'},'*')};
 const msg=(t,c)=>{const m=$('#msg');m.textContent=t;m.className='info '+(c||'')};
 function ui(){
  $('#bal').textContent=bal.toLocaleString('en');$('#bet').textContent=BETS[bi].toLocaleString('en');
@@ -145,7 +145,7 @@ async function spin(){
   });
   const o=response.outcome||{},fin=o.grid;
   if(!Array.isArray(fin)||fin.length!==5)throw new Error('استجابة الجولة غير مكتملة');
-  bal=Number(response.coins)||0;fs=Number(o.freeSpinsRemaining)||0;walletReady=true;grid=fin;
+  if(!Number.isSafeInteger(Number(response.coins))||Number(response.coins)<0)throw new Error('رصيد المحفظة الوارد من الخادم غير صالح');bal=Number(response.coins);fs=Number(o.freeSpinsRemaining)||0;walletReady=true;grid=fin;
   await roll(fin);
   const win=Number(response.payout)||0;
   (o.hits||[]).forEach(k=>{const[a,b]=k.split(':');const cell=document.querySelectorAll('.st')[a]?.children[Number(b)];if(cell)cell.classList.add('win')});
@@ -166,7 +166,7 @@ $('#auto').onclick=e=>{auto=!auto;e.currentTarget.classList.toggle('on',auto);if
 addEventListener('keydown',e=>{if(e.code=='Space'){e.preventDefault();spin()}});
 const rl=$('#rules');$('#rb').onclick=()=>rl.showModal();$('#rc').onclick=()=>rl.close();rl.addEventListener('click',e=>{if(e.target===rl)rl.close()});
 const nf=$('#nf');$('#nc').onclick=()=>nf.close();nf.addEventListener('click',e=>{if(e.target===nf)nf.close()});
-window.addEventListener('message',e=>{const d=e.data;if(d&&d.t==='bal'&&Number.isFinite(+d.v)&&+d.v>=0){bal=Math.floor(+d.v);walletReady=true;ui();msg('رصيد المحفظة متصل','win')}});
+window.addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data;if(d&&d.t==='wallet-error'){walletReady=false;msg(d.message||'تعذر تحميل رصيد المحفظة','lose');ui()}else if(d&&d.t==='bal'&&Number.isSafeInteger(Number(d.v))&&Number(d.v)>=0){bal=Number(d.v);walletReady=true;ui();msg('رصيد المحفظة متصل','win')}});
 parent.postMessage({t:'get'},'*');
 init();
 </script>
