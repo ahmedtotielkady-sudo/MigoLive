@@ -7,6 +7,7 @@ const Counter = require("../models/Counter");
 const requireAuth = require("../middleware/requireAuth");
 const rateLimit = require("express-rate-limit");
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const router = express.Router();
@@ -62,25 +63,37 @@ router.post("/register", async (req, res, next) => {
       return res.status(409).json({ ok: false, message: "اسم المستخدم أو رقم الهاتف مستخدم بالفعل" });
     }
 
-    const counter = await Counter.findOneAndUpdate(
-      { _id: "userUid" },
-      { $inc: { value: 1 } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
     const passwordHash = await bcrypt.hash(password, 12);
     const sessionId = crypto.randomUUID();
-    const user = await User.create({
-      activeSessionId: sessionId,
-      activeSessionExpiresAt: new Date(Date.now() + SESSION_TTL_MS),
-      uid: 100000 + counter.value,
-      username: normalized,
-      displayName,
-      phone: phone || undefined,
-      passwordHash,
-      coins: INITIAL_SIGNUP_COINS,
-      role: "user"
-    });
-    await Wallet.updateOne({ userId: user._id }, { $setOnInsert: { userId: user._id, balance: INITIAL_SIGNUP_COINS } }, { upsert: true });
+    const dbSession = await mongoose.startSession();
+    let user;
+    try {
+      await dbSession.withTransaction(async () => {
+        const counter = await Counter.findOneAndUpdate(
+          { _id: "userUid" },
+          { $inc: { value: 1 } },
+          { new: true, upsert: true, setDefaultsOnInsert: true, session: dbSession }
+        );
+        const createdUsers = await User.create([{
+          activeSessionId: sessionId,
+          activeSessionExpiresAt: new Date(Date.now() + SESSION_TTL_MS),
+          uid: 100000 + counter.value,
+          username: normalized,
+          displayName,
+          phone: phone || undefined,
+          passwordHash,
+          coins: INITIAL_SIGNUP_COINS,
+          role: "user"
+        }], { session: dbSession });
+        user = createdUsers[0];
+        await Wallet.create([{
+          userId: user._id,
+          balance: INITIAL_SIGNUP_COINS
+        }], { session: dbSession });
+      });
+    } finally {
+      await dbSession.endSession();
+    }
     const token = issueToken(user, sessionId);
     return res.status(201).json({ ok: true, token, user: publicUser(user) });
   } catch (error) {
