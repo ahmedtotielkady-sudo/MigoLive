@@ -139,7 +139,7 @@ button:focus-visible,.card:focus-visible{outline:3px solid #fff;outline-offset:2
   $("go").onclick=async function(){
     if(!pick||busy||coins<=0)return;
     busy=true;render();
-    const chosen=pick, amount=STEPS[stepIdx], key=(pendingGameKey||(pendingGameKey=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+"_"+Math.random().toString(36).slice(2))));
+    let animationPending=false;\n    const chosen=pick, amount=STEPS[stepIdx], key=(pendingGameKey||(pendingGameKey=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+"_"+Math.random().toString(36).slice(2))));
     setStatus("جارٍ تنفيذ الجولة بأمان على الخادم...");
     try{
       const token=localStorage.getItem("migolive_token");
@@ -167,11 +167,11 @@ button:focus-visible,.card:focus-visible{outline:3px solid #fff;outline-offset:2
         setTimeout(function(){
           $("rTitle").textContent=won?"فوز! 🎉":"حظ أوفر 😅";$("rTitle").className=won?"good":"bad";
           $("rAmt").textContent=won?"+ "+fmt(gain):"− "+fmt(amount);$("rAmt").className=won?"good":"bad";
-          $("rTxt").textContent="رصيدك أصبح "+fmt(coins);$("next").textContent="جولة جديدة";$("resultM").classList.add("open");
+          $("rTxt").textContent="رصيدك أصبح "+fmt(coins);$("next").textContent="جولة جديدة";$("resultM").classList.add("open");busy=false;render();
         },900);
       },2600);
     }catch(error){setStatus(error.message||"تعذر تنفيذ الجولة");}
-    finally{busy=false;render();}
+    finally{if(!animationPending){busy=false;render();}}
   };
 
   $("next").onclick=function(){
