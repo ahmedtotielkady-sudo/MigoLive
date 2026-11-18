@@ -137,7 +137,7 @@ router.get("/rocket-crash/:roundId/state", async (req,res) => {
       try {
         await session.withTransaction(async () => {
           const current = await GameRound.findOne({ _id:round._id, status:"accepted" }).session(session);
-          if (current) { current.status = "lost"; current.outcome.crashedAt = new Date(now); await current.save({ session }); }
+          if (current) { current.status = "lost"; current.outcome.crashedAt = new Date(now); current.markModified("outcome"); await current.save({ session }); }
         });
       } finally { await session.endSession(); }
       return res.json({ ok:true, roundId:round.roundId, status:"lost", crashed:true, multiplier:null });
@@ -169,6 +169,7 @@ router.post("/rocket-crash/:roundId/cashout", async (req,res) => {
       if (multiplier >= Number(round.outcome.crashAtMultiplier)) {
         round.status = "lost";
         round.outcome.crashedAt = new Date(now);
+        round.markModified("outcome");
         await round.save({ session });
         result = { roundId:round.roundId, status:"lost", payout:0, crashed:true };
         return;
@@ -188,6 +189,7 @@ router.post("/rocket-crash/:roundId/cashout", async (req,res) => {
       round.outcome.cashoutKey = cashoutKey;
       round.outcome.cashoutMultiplier = multiplier;
       round.outcome.cashoutAt = new Date(now);
+      round.markModified("outcome");
       round.settledAt = new Date(now);
       await round.save({ session });
       result = { roundId:round.roundId, status:"settled", payout, coins:user.coins,
