@@ -12,7 +12,8 @@ const requireGameEnabled = require("../middleware/requireGameEnabled");
 const oceanStorm = require("../game-engines/ocean-storm");
 
 const router = express.Router();
-router.use(requireAuth, requireGameEnabled);
+router.use(requireAuth);
+router.use(requireGameEnabled);
 
 router.post("/ocean-storm/spin", async (req, res) => {
   const bet = Number(req.body && req.body.bet);
