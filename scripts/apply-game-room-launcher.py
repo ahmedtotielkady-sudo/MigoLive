@@ -171,7 +171,7 @@ js = r"""
   try{
    if(d.t==="migo:game-request"){
     (async()=>{
-     const allowed={"/games/cleopatra-gold/spin":true,"/games/ocean-storm/spin":true,"/games/slot-777/spin":true,"/games/cleopatra-gold/spin":true};
+     const allowed={"/games/cleopatra-gold/spin":true,"/games/ocean-storm/spin":true,"/games/slot-777/spin":true,"/games/wheel-animals/spin":true,"/games/fruit-luck/spin":true,"/games/cleopatra-gold/spin":true};
      if(!allowed[d.path])throw new Error("طلب اللعبة غير مسموح");
      const key=String(d.requestId||"");
      if(!/^[a-f0-9]{36}$/.test(key))throw new Error("معرّف الجولة غير صحيح");
