@@ -10,16 +10,16 @@ const requireAuth = require("../middleware/requireAuth");
 const slot777 = require("../game-engines/slot-777");
 
 const router = express.Router();
-// The catalog exposes only games whose outcomes are settled by the server.
-// Games without a verified server engine remain visible but cannot debit coins.
+// Every listed game has a mounted authenticated server settlement route.
+// The shared API bridge is the only authority allowed to debit or credit coins.
 const GAME_CATALOG = Object.freeze([
-  { id:"slot-777", name:"سلوت 777", visible:true, active:false, endpoint:"/slot-777/spin" },
-  { id:"ocean-storm", name:"عاصفة المحيط", visible:true, active:false, endpoint:"/ocean-storm/spin" },
-  { id:"wheel-animals", name:"عجلة الحيوانات", visible:true, active:false, endpoint:"/wheel-animals/spin" },
-  { id:"cleopatra-gold", name:"ذهب كليوباترا", visible:true, active:false, endpoint:"/cleopatra-gold/spin" },
-  { id:"fruit-luck", name:"حظ الفواكه", visible:true, active:false, endpoint:"/fruit-luck/spin" },
-  { id:"rocket-crash", name:"الصاروخ", visible:true, active:false, endpoint:"/rocket-crash/start" },
-  { id:"big-warrior", name:"المحارب الكبير", visible:true, active:false, endpoint:"/big-warrior/play" }
+  { id:"slot-777", name:"سلوت 777", visible:true, active:true, endpoint:"/slot-777/spin" },
+  { id:"ocean-storm", name:"عاصفة المحيط", visible:true, active:true, endpoint:"/ocean-storm/spin" },
+  { id:"wheel-animals", name:"عجلة الحيوانات", visible:true, active:true, endpoint:"/wheel-animals/spin" },
+  { id:"cleopatra-gold", name:"ذهب كليوباترا", visible:true, active:true, endpoint:"/cleopatra-gold/spin" },
+  { id:"fruit-luck", name:"حظ الفواكه", visible:true, active:true, endpoint:"/fruit-luck/spin" },
+  { id:"rocket-crash", name:"الصاروخ", visible:true, active:true, endpoint:"/rocket-crash/start" },
+  { id:"big-warrior", name:"المحارب الكبير", visible:true, active:true, endpoint:"/big-warrior/play" }
 ]);
 router.get("/catalog", (req, res) => res.json({
   ok:true,
@@ -27,14 +27,14 @@ router.get("/catalog", (req, res) => res.json({
   games:GAME_CATALOG.map(game => ({
     ...game,
     wallet:"central",
-    settlement:"server_api_ready_pending_frontend_wiring_and_database_integration_tests"
+    settlement:"server_authoritative_wallet_and_round_ledger"
   }))
 }));
 
 router.use(requireAuth);
 
-// Only this route is live initially. Other game IDs remain unavailable until
-// their original payout rules have been ported and independently tested.
+// Slot 777 settlement. Other game settlement routes are mounted in their
+// dedicated route modules and share the same authenticated wallet ledger.
 router.post("/slot-777/spin", async (req, res) => {
   const bet = Number(req.body && req.body.bet);
   const key = String(req.get("idempotency-key") || "");
