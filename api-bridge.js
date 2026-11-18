@@ -178,16 +178,12 @@
     if (Number.isSafeInteger(Number(data.coins)) && Number(data.coins) >= 0) {
       syncWalletBalance(Number(data.coins));
     }
-    // Wait for the canonical wallet read before replying to the game iframe.
-    // If another action happened concurrently, return that latest balance.
-    try {
-      const latest = await refreshWallet();
-      if (latest && Number.isSafeInteger(Number(latest.coins))) data.coins = Number(latest.coins);
-    } catch (error) {
-      // The game settlement already succeeded; retain its authoritative result
-      // and surface the refresh failure without pretending the transaction failed.
+    // Return the completed server settlement immediately. Reconcile the shared
+    // wallet in the background so an extra network round-trip does not delay
+    // the animation/result shown by the game.
+    refreshWallet().catch((error) => {
       console.warn('Post-game wallet refresh failed:', error.message);
-    }
+    });
     return data;
   };
   window.__migoRefreshWallet = refreshWallet;
