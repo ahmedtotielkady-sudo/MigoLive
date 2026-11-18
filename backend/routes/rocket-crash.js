@@ -12,7 +12,8 @@ const requireGameEnabled = require("../middleware/requireGameEnabled");
 const engine = require("../game-engines/rocket-crash");
 
 const router = express.Router();
-router.use(requireAuth, requireGameEnabled);
+router.use(requireAuth);
+router.use(requireGameEnabled);
 
 const MAX_MULTIPLIER = 100;
 const validKey = key => /^[A-Za-z0-9_-]{16,80}$/.test(key);
