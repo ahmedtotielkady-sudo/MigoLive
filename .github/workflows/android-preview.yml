@@ -257,7 +257,7 @@ jobs:
         run: python3 scripts/apply-android-app-icon.py
 
       - name: Enable Gradle dependency cache
-        uses: actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build debug APK
         run: |
