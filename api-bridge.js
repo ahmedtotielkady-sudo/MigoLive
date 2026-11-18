@@ -110,15 +110,36 @@
     };
   }
 
+  function syncWalletBalance(value) {
+    const coins = Number(value);
+    if (!Number.isSafeInteger(coins) || coins < 0) throw new Error('رصيد المحفظة الوارد من الخادم غير صالح');
+    if (typeof me !== 'undefined' && me && DB.users && DB.users[me]) {
+      DB.users[me].coins = coins;
+      save();
+    }
+    const selectors = [
+      '#mycoins', '[data-server-wallet-balance]', '[data-wallet-balance]',
+      '#walletCoins', '#walletBalance', '#wallet-balance',
+      '.wallet-balance', '.coins-balance'
+    ];
+    for (const selector of selectors) {
+      document.querySelectorAll(selector).forEach((node) => {
+        node.textContent = String(coins);
+      });
+    }
+    window.dispatchEvent(new CustomEvent('migo:wallet-updated', { detail: { coins } }));
+    return coins;
+  }
+
   async function refreshWallet() {
-    if (!token() || typeof me === 'undefined' || !me || !DB.users[me]) return;
-    const data = await api('/wallet');
-    DB.users[me].coins = Number(data.coins) || 0;
-    save();
-    const top = $id('mycoins');
-    if (top) top.textContent = DB.users[me].coins;
-    const walletBalance = document.querySelector('#main [data-server-wallet-balance]');
-    if (walletBalance) walletBalance.textContent = DB.users[me].coins;
+    if (!token() || typeof me === 'undefined' || !me) return null;
+    // User.coins is the single canonical balance. Bypass HTTP caches so the
+    // app wallet and every game iframe always read the same latest value.
+    const data = await api('/wallet', { method: 'GET', cache: 'no-store' });
+    if (!Number.isSafeInteger(Number(data.coins)) || Number(data.coins) < 0) {
+      throw new Error('الخادم لم يرجع رصيد محفظة صالحًا');
+    }
+    syncWalletBalance(Number(data.coins));
     return data;
   }
 
@@ -140,9 +161,8 @@
     if (path === '/games/rocket-crash/state') {
       // The rocket state endpoint is read-only; it still requires authentication.
       const data = await api(path, { method: 'GET', cache: 'no-store' });
-      if (Number.isSafeInteger(Number(data.coins))) {
-        const current = DB.users[me];
-        if (current) { current.coins = Number(data.coins); save(); }
+      if (Number.isSafeInteger(Number(data.coins)) && Number(data.coins) >= 0) {
+        syncWalletBalance(Number(data.coins));
       }
       return data;
     }
@@ -155,22 +175,29 @@
       headers: { 'Idempotency-Key': String(requestId) },
       body: JSON.stringify(body && typeof body === 'object' ? body : {})
     });
-    if (Number.isSafeInteger(Number(data.coins))) {
-      const current = DB.users[me];
-      if (current) {
-        current.coins = Number(data.coins);
-        save();
-        const top = $id('mycoins');
-        if (top) top.textContent = current.coins;
-      }
-      window.dispatchEvent(new CustomEvent('migo:wallet-updated', { detail: { coins: Number(data.coins) } }));
+    if (Number.isSafeInteger(Number(data.coins)) && Number(data.coins) >= 0) {
+      syncWalletBalance(Number(data.coins));
     }
-    // Re-read canonical balance after settlement to reconcile the UI with the
-    // wallet endpoint; the settlement response remains the immediate game result.
-    refreshWallet().catch((e) => console.warn('Post-game wallet refresh failed:', e.message));
+    // Wait for the canonical wallet read before replying to the game iframe.
+    // If another action happened concurrently, return that latest balance.
+    try {
+      const latest = await refreshWallet();
+      if (latest && Number.isSafeInteger(Number(latest.coins))) data.coins = Number(latest.coins);
+    } catch (error) {
+      // The game settlement already succeeded; retain its authoritative result
+      // and surface the refresh failure without pretending the transaction failed.
+      console.warn('Post-game wallet refresh failed:', error.message);
+    }
     return data;
   };
   window.__migoRefreshWallet = refreshWallet;
+  window.__migoSyncWalletBalance = syncWalletBalance;
+
+  // Reconcile after returning from a game, a payment screen, or backgrounding.
+  window.addEventListener('focus', () => { refreshWallet().catch((e) => console.warn('Wallet focus refresh failed:', e.message)); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshWallet().catch((e) => console.warn('Wallet resume refresh failed:', e.message));
+  });
 
   // Keep the balance display synchronized with the server whenever the wallet opens.
   if (typeof rWallet === 'function') {
