@@ -18,7 +18,9 @@ test("signup grants 100 coins and login never changes the balance", () => {
   const authRoute = read("routes/auth.js");
   assert.match(authRoute, /const INITIAL_SIGNUP_COINS = 100/);
   assert.match(authRoute, /coins:\s*INITIAL_SIGNUP_COINS/);
-  assert.match(authRoute, /\$setOnInsert:\s*\{\s*userId:\s*user\._id,\s*balance:\s*INITIAL_SIGNUP_COINS/);
-  const loginRoute = authRoute.slice(authRoute.indexOf('router.post("/login"'), authRoute.indexOf('const crypto = require("crypto")'));
+  assert.match(authRoute, /Wallet\.create\(\[\{\s*userId:\s*user\._id,\s*balance:\s*INITIAL_SIGNUP_COINS\s*\}\],\s*\{\s*session:\s*dbSession\s*\}\)/);
+  const loginStart = authRoute.indexOf('router.post("/login"');
+  const loginEnd = authRoute.indexOf("const OwnerClaim = require", loginStart);
+  const loginRoute = authRoute.slice(loginStart, loginEnd);
   assert.doesNotMatch(loginRoute, /coins\s*=|\$inc|INITIAL_SIGNUP_COINS/);
 });
