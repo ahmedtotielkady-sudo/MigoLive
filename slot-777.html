@@ -98,12 +98,12 @@ const LINES=[[1,1,1,1,1],[0,0,0,0,0],[2,2,2,2,2],[0,1,2,1,0],[2,1,0,1,2],[0,0,1,
 const FREE={3:3,4:6,5:10};
 const MULT=[1,5,50,250],BASE=40;
 let bal=0,pend=0,ready=false,me=null,mi=0,free=0,spinning=false,stopNow=false,auto=0,sound=false,actx=null;
-function save(){if(ready)try{parent.postMessage({t:'set',v:bal+pend},'*')}catch(e){}}
+function save(){if(ready)try{parent.postMessage({t:'refresh'},'*')}catch(e){}}
 function ap(){const a=$('uav');if(!me)return;if(me.avatar){a.style.backgroundImage='url("'+me.avatar+'")';a.textContent=''}else{a.style.backgroundImage='none';a.textContent=(me.name||'').trim().charAt(0)}}
 const toWallet=()=>{try{parent.postMessage({t:'wallet'},'*')}catch(e){}};
-addEventListener('message',e=>{const d=e.data;if(!d)return;if(d.t==='bal'&&Number.isFinite(d.v)){bal=d.v;ready=true;upd()}else if(d.t==='me'){me=d;ap()}});
+addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data;if(!d)return;if(d.t==='wallet-error'){ready=false;$('bal').textContent='—';$('msg').textContent=d.message||'تعذر تحميل المحفظة'}else if(d.t==='bal'&&Number.isSafeInteger(Number(d.v))&&Number(d.v)>=0){bal=Number(d.v);ready=true;upd()}else if(d.t==='me'){me=d;ap()}});
 try{parent.postMessage({t:'get'},'*')}catch(e){}
-setTimeout(()=>{if(!ready&&bal===0){bal=5000;upd()}},1500);
+setTimeout(()=>{if(!ready){$('bal').textContent='—';$('msg').textContent='تعذر تحميل رصيد المحفظة'}} ,5000);
 
 // RNG: single function, easy to tune via WT
 function rnd(nw){const w=WT.map((x,i)=>nw&&i===W?0:x);let r=Math.random()*w.reduce((a,b)=>a+b),i=0;while((r-=w[i])>=0)i++;return i}
@@ -172,7 +172,7 @@ async function spin(){
     const key=Array.from(crypto.getRandomValues(new Uint8Array(18))).map(x=>x.toString(16).padStart(2,'0')).join('');
     const data=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('انتهت مهلة الاتصال')),20000);const listener=e=>{const d=e.data;if(d&&d.t==='migo:game-result'&&d.requestId===key){clearTimeout(timer);removeEventListener('message',listener);d.ok?resolve(d.data):reject(new Error(d.message||'تعذر تنفيذ الجولة'))}};addEventListener('message',listener);parent.postMessage({t:'migo:game-request',requestId:key,path:'/games/slot-777/spin',body:{bet}},'*')});
     const outcome=data.outcome||{},g=outcome.grid;if(!Array.isArray(g)||g.length!==5)throw new Error('نتيجة الجولة غير مكتملة');
-    bal=Number(data.coins)||0;free=Number(data.freeSpinsRemaining)||0;ready=true;const win=Number(data.payout)||0,ev={win,bonus:Number(outcome.bonus)||0,hits:outcome.hits||[]};
+    if(!Number.isSafeInteger(Number(data.coins))||Number(data.coins)<0)throw new Error('رصيد المحفظة الوارد من الخادم غير صالح');bal=Number(data.coins);free=Number(data.freeSpinsRemaining)||0;ready=true;const win=Number(data.payout)||0,ev={win,bonus:Number(outcome.bonus)||0,hits:outcome.hits||[]};
     $('spin').textContent='قف';
       await Promise.all(cells.map((col,i)=>new Promise(res=>{
     const t=setInterval(()=>{const p=col.map(c=>c._s);setCell(col[2],p[1]);setCell(col[1],p[0]);setCell(col[0],rnd());col.forEach(c=>c.animate([{transform:'translateY(-100%)'},{transform:'none'}],{duration:90}))},90);
