@@ -1315,7 +1315,7 @@ async function refreshServerWallet(m){
     const history=await apiRequest('/wallet/transactions?limit=20');
     if(rows)rows.innerHTML=history.transactions&&history.transactions.length?history.transactions.map(tx=>'<div class="row" style="justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)"><span>'+esc(tx.description||tx.type||'معاملة')+'</span><b>'+(tx.direction==='in'?'+':'−')+fmt(tx.amount)+'</b></div>').join(''):'لا توجد معاملات مسجلة بعد';
     const top=document.querySelector('#mycoins');if(top)top.textContent=fmt(user.coins);
-  }catch(error){if(status)status.textContent='تعذر تحديث الرصيد الآن;if(rows)rows.textContent='تعذر تحميل سجل العمليات الآن.'}
+  }catch(error){if(status)status.textContent='تعذر تحديث الرصيد الآن';if(rows)rows.textContent='تعذر تحميل سجل العمليات الآن.'}
 }
 function rWallet0(m){
   m.innerHTML=`<div class="card" style="text-align:center"><div class="mu">رصيدك الحالي</div><div id="server-wallet-balance" style="font-size:36px;font-weight:900;color:var(--gd)">🪙 ${U().coins}</div><div id="server-wallet-status" class="mu">جارٍ تحديث رصيدك...</div><button type="button" class="btn o s" id="wallet-refresh">↻ تحديث الرصيد</button></div><div class="card"><b>آخر معاملات المحفظة</b><div id="server-wallet-transactions" class="mu">جارٍ التحميل...</div></div>
