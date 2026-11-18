@@ -129,10 +129,19 @@ function outcome(r){var g=rng(r*7919+13);g();g();var x=g(),res=x<.25?"77":x<.625
 function histFor(last){var a=[];for(var k=0;k<9;k++)a.push(outcome(last-k).res);return a}
 function total(){return bets.m+bets["77"]+bets.o}
 function startSpin(o,late){
-  phase="spin";$("cd").textContent="\uD83C\uDF40";$("st").textContent="العجلة تدور...";
+  phase="spin";$("cd").textContent="\\uD83C\\uDF40";$("st").textContent="العجلة تدور...";
   var target=-ANG[o.i]+o.off,cur=((rot%360)+360)%360,d=((target-cur)%360+360)%360,rt=$("rot");
-  if(late){rot=rot+d;rt.style.transition="none"}else{rot=rot+360*6+d;rt.style.transition="transform 5.5s cubic-bezier(.12,.6,.1,1)"}
-  rt.style.transform="rotate("+rot+"deg)"}
+  // Keep the wheel visibly spinning even when the server reply arrives late.
+  var remaining=Math.max(0,SPE-(Date.now()%CYC));
+  var duration=Math.max(1200,Math.min(5500,remaining||1800));
+  var from=rot;
+  rot=rot+360*5+d;
+  rt.style.transition="none";
+  rt.style.transform="rotate("+from+"deg)";
+  void rt.offsetWidth;
+  rt.style.transition="transform "+duration+"ms cubic-bezier(.12,.6,.1,1)";
+  rt.style.transform="rotate("+rot+"deg)";
+}
 function settle(r){
   if(settled===r)return lastInfo;
   const server=roundResults[r];if(total()>0&&!server)return null;
