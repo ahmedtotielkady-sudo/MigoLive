@@ -65,13 +65,13 @@ test("all seven game pages display only server-confirmed wallet balances and sur
     assert.ok(html.includes(marker), file + " must handle wallet state or server requests");
   }
   const slot = read("slot-777.html");
-  assert.doesNotMatch(slot, /bal\\s*=\\s*5000/);
-  assert.doesNotMatch(slot, /postMessage\\(\\{t:'set',v:/);
+  assert.doesNotMatch(slot, /bal\s*=\s*5000/);
+  assert.doesNotMatch(slot, /postMessage\(\{t:'set',v:/);
   const ocean = read("slot-ocean-storm.html");
-  assert.doesNotMatch(ocean, /postMessage\\(\\{t:"set",v:/);
+  assert.doesNotMatch(ocean, /postMessage\(\{t:"set",v:/);
   const wheel = read("wheel-animals.html");
-  assert.doesNotMatch(wheel, /bal\\s*\\+=\\s*p/);
-  assert.doesNotMatch(wheel, /postMessage\\(\\{t:'set',v:bal/);
+  assert.doesNotMatch(wheel, /bal\s*\+=\s*p/);
+  assert.doesNotMatch(wheel, /postMessage\(\{t:'set',v:bal/);
 });
 
 test("Rocket Crash has a safe request-id fallback and visible wallet failure state", () => {
