@@ -22,6 +22,7 @@ REPLACEMENTS = {
     "خدمة الألعاب غير متصلة بالخادم": "الألعاب غير متاحة مؤقتًا",
     "تعذر تحميل رصيد المحفظة": "تعذر تحميل الرصيد",
 }
+ROOT_GAME_FILES = ["slot-777.html", "slot-ocean-storm.html", "wheel-animals.html"]
 GAME_FILES = [
     "games/slot-777.html",
     "games/slot-ocean-storm.html",
@@ -57,7 +58,7 @@ class InlineScripts(HTMLParser):
             self.active = False
 
 changed = []
-for rel in ["index.html", "api-bridge.js", *GAME_FILES]:
+for rel in ["index.html", "api-bridge.js", *ROOT_GAME_FILES, *GAME_FILES]:
     path = ROOT / rel
     if not path.is_file():
         raise SystemExit(f"Required app/game asset is missing: {path}")
