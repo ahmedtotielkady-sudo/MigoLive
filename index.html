@@ -1425,6 +1425,21 @@ async function ownerCreditUser(targetKey,amount,idempotencyKey,description='شح
   const top=$('#mycoins');if(top&&me===targetKey)top.textContent=fmt(target.coins);
   return result;
 }
+async function ownerDebitUser(targetKey,amount,idempotencyKey,description){
+  const target=DB.users[targetKey];
+  if(!U()||U().role!=='owner')throw new Error('الإجراء متاح للمالك فقط');
+  const coins=Math.floor(Number(amount));
+  if(!target||!Number.isSafeInteger(Number(target.uid)))throw new Error('الحساب غير مرتبط بالمحفظة');
+  if(!Number.isSafeInteger(coins)||coins<1)throw new Error('قيمة العملية غير صحيحة');
+  if(!String(description||'').trim())throw new Error('سبب العملية مطلوب');
+  const key=idempotencyKey||crypto.randomUUID().replace(/-/g,'');
+  const result=await apiRequest('/wallet/admin/debit',{method:'POST',headers:{'idempotency-key':key},body:JSON.stringify({targetUid:Number(target.uid),amount:coins,description:String(description).slice(0,160)})});
+  if(!Number.isSafeInteger(Number(result.coins))||Number(result.coins)<0)throw new Error('لم يصل تأكيد صحيح من المحفظة');
+  target.coins=Number(result.coins);save();
+  const top=$('#mycoins');if(top&&me===targetKey)top.textContent=fmt(target.coins);
+  return result;
+}
+
 function ag(id){return DB.agencies.find(a=>a.id==id)}
 function reqs(f){const l=DB.joins.map((j,i)=>({j,i})).filter(({j})=>j.status==='pending'&&ag(j.agency)&&DB.users[j.user]&&f(ag(j.agency)));
   return l.length?l.map(({j,i})=>`<div class="card row"><div class="grow"><b>${esc(DB.users[j.user].name)}</b><div class="mu">${esc(ag(j.agency).name)} · ${j.t}</div></div><button class="btn s" data-ok="${i}">قبول</button><button class="btn r s" data-no="${i}">رفض</button></div>`).join(''):'<p class="mu">لا توجد طلبات</p>'}
@@ -1581,7 +1596,21 @@ function rOwner(m){
   if(ot==='staff')staffOwnerBind(m);
   if(ot==='support')supportOwnerBind(m);
   if(ot==='appupdate')appUpdateOwnerBind(m);
-  m.querySelectorAll('[data-country-ok]').forEach(b=>b.onclick=()=>{if(!U()||U().role!=='owner')return toast('الموافقة للمالك فقط');const q=(DB.countryRequests||[]).find(x=>x.id==b.dataset.countryOk&&x.status==='pending'),u=q&&DB.users[q.user];if(!q||!u)return toast('الطلب غير موجود');if((+u.coins||0)<100000)return toast('رصيد المستخدم لم يعد كافياً');u.coins-=100000;u.country=q.country;u.countrySetOnce=true;q.status='approved';q.reviewed=Date.now();q.reviewedBy=me;logIt('المالك',`وافق على تغيير بلد ${u.name} إلى ${q.country} وخصم 100,000 عملة`);notifyUserResult(q.user,`تمت الموافقة على تغيير بلدك إلى ${q.country} وخصم 100,000 عملة`);save();toast('تمت الموافقة وتغيير البلد');render()});
+  m.querySelectorAll('[data-country-ok]').forEach(b=>b.onclick=async()=>{
+    if(!U()||U().role!=='owner')return toast('الموافقة للمالك فقط');
+    const q=(DB.countryRequests||[]).find(x=>x.id==b.dataset.countryOk&&x.status==='pending'),u=q&&DB.users[q.user];
+    if(!q||!u)return toast('الطلب غير موجود');
+    q.serverDebitKey=q.serverDebitKey||crypto.randomUUID().replace(/-/g,'');
+    if(!save())return toast('تعذر حفظ رقم العملية');
+    b.disabled=true;
+    try{
+      await ownerDebitUser(q.user,100000,q.serverDebitKey,`رسوم تغيير البلد إلى ${q.country}`);
+      u.country=q.country;u.countrySetOnce=true;q.status='approved';q.reviewed=Date.now();q.reviewedBy=me;
+      logIt('المالك',`وافق على تغيير بلد ${u.name} إلى ${q.country} بعد تسجيل الرسوم`);
+      notifyUserResult(q.user,`تمت الموافقة على تغيير بلدك إلى ${q.country}`);
+      save();toast('تمت الموافقة');render();
+    }catch(error){b.disabled=false;toast(error.message||'تعذر تنفيذ الطلب')}
+  });
   m.querySelectorAll('[data-country-no]').forEach(b=>b.onclick=()=>{if(!U()||U().role!=='owner')return toast('الرفض للمالك فقط');const q=(DB.countryRequests||[]).find(x=>x.id==b.dataset.countryNo&&x.status==='pending');if(!q)return;q.status='rejected';q.reviewed=Date.now();q.reviewedBy=me;logIt('المالك',`رفض طلب تغيير بلد الحساب ${q.user}`);notifyUserResult(q.user,`تم رفض طلب تغيير البلد إلى ${q.country}`);save();toast('تم رفض الطلب');render()});
   if(ot==='hostapps')localHostAppsBind(m);
   if(ot==='referrals')localReferralsBind(m);
