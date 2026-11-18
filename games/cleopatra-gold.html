@@ -153,7 +153,7 @@ async function spin(){
   msg(win?'مبروك! فزت '+win.toLocaleString('en')+' عملة':'حظ أوفر',win?'win':'lose');
   $('#bal').textContent=bal.toLocaleString('en');
   if(win>0){for(let i=0;i<6;i++)await sleep(12)}
-  if(!fs){if(fsWin){msg('انتهت اللفات المجانية · إجمالي الربح '+fsWin.toLocaleString('en'),'win')}mult=1;fsWin=0}
+  if(!fs){if(fsWin){msg('فزت','win')}mult=1;fsWin=0}
   parent.postMessage({t:'refresh'},'*');
  }catch(error){msg(error.message||'تعذر الاتصال بالخادم','lose')}
  busy=false;ui();
