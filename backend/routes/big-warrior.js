@@ -11,7 +11,7 @@ const engine = require("../game-engines/big-warrior");
 const router = express.Router();
 router.use(requireAuth);
 
-router.post("/big-warrior/play", async (req, res) => {
+router.post(["/big-warrior/play", "/big-warrior/fight"], async (req, res) => {
   const bet = Number(req.body && req.body.bet);
   const pick = String(req.body && req.body.pick || "");
   const key = String(req.get("idempotency-key") || "");
