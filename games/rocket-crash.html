@@ -261,6 +261,7 @@ async function pollRoundState(){
   }
  }catch(e){}finally{statePending=false}
 }
+let animationFrame=0;
 function tick(){
  const n=performance.now();
  if(state==='wait'){if(n>=t0)startFly()}
@@ -276,7 +277,7 @@ function tick(){
    if(mult>=cp){mult=cp;pts.push([t,cp]);crash()}else pts.push([t,mult]);
   }
  }
- ov();draw();requestAnimationFrame(tick);
+ ov();draw();if(!document.hidden)animationFrame=requestAnimationFrame(tick);
 }
 $('#chips').innerHTML=CH.map(v=>`<button data-v="${v}">${fmt(v)}</button>`).join('');
 $('#chips').onclick=e=>{const v=+e.target.dataset.v;if(v&&!e.target.disabled){bi=BETS.indexOf(v);ui()}};
@@ -290,7 +291,7 @@ $('#nc').onclick=()=>nf.close();nf.addEventListener('click',e=>{if(e.target===nf
 $('#charge').textContent='فتح المحفظة';$('#charge').onclick=()=>{walletPost({t:'wallet'});nf.close()};
 size();startWait();askWallet();
  window.addEventListener('focus',()=>{if(!walletReady)askWallet();else resumeRound()});
- document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){askWallet();}});
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){askWallet();animationFrame=requestAnimationFrame(tick);}else{cancelAnimationFrame(animationFrame);animationFrame=0;}});
  requestAnimationFrame(tick);
 </script>
 </body>
