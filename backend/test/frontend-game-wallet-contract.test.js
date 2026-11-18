@@ -60,3 +60,16 @@ test("room game launcher forwards authenticated game requests and never trusts i
   assert.ok(!launcher.includes("u.coins=Math.floor(d.v)"));
   assert.ok(!launcher.includes('postMessage({t:"bal",v:Number(profile.coins)||0}'));
 });
+
+
+test("app wallet uses one canonical no-cache server balance and updates all wallet views", () => {
+  const bridge = read("api-bridge.js");
+  const wallet = read("backend/routes/wallet.js");
+  assert.ok(bridge.includes("function syncWalletBalance(value)"));
+  assert.ok(bridge.includes("api('/wallet', { method: 'GET', cache: 'no-store' })"));
+  assert.ok(bridge.includes("window.__migoSyncWalletBalance = syncWalletBalance"));
+  assert.ok(bridge.includes("await refreshWallet()"));
+  assert.ok(bridge.includes("'[data-wallet-balance]'"));
+  assert.ok(wallet.includes('Cache-Control", "no-store, no-cache, must-revalidate, private'));
+  assert.ok(wallet.includes('User.findById(req.auth.sub).select("uid coins")'));
+});
