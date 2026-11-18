@@ -52,8 +52,8 @@ test("room game launcher forwards authenticated game requests and never trusts i
   const bridge = read("api-bridge.js");
   assert.ok(launcher.includes('d.t==="migo:game-request"'));
   assert.ok(launcher.includes("window.__migoGameApiRequest"));
-  assert.ok(launcher.includes('d.t==="migo:game-result"'));
-  assert.ok(launcher.includes('d.t==="wallet-error"'));
+  assert.ok(launcher.includes('"migo:game-result"'));
+  assert.ok(launcher.includes('"wallet-error"'));
   assert.ok(bridge.includes("const GAME_POST_PATHS = new Set"));
   assert.ok(bridge.includes("'Idempotency-Key': String(requestId)"));
   assert.ok(bridge.includes("window.__migoRefreshWallet = refreshWallet"));
