@@ -1,6 +1,6 @@
 "use strict";
 const crypto = require("crypto");
-const MULTIPLIERS = Object.freeze({ m: 2, "77": 8, o: 2 });
+const SEGMENTS = Object.freeze(["o", "77", "m", "o", "m", "o", "m", "o", "m"]);\nconst MULTIPLIERS = Object.freeze({ m: 2, "77": 8, o: 2 });
 const MAX_TOTAL_BET = 5000000;
 
 function play(bets, randomInt = crypto.randomInt) {
@@ -19,4 +19,4 @@ function play(bets, randomInt = crypto.randomInt) {
   const payout = normalized[result] * MULTIPLIERS[result];
   return { result, multiplier: MULTIPLIERS[result], totalBet, payout, net: payout - totalBet, requestedBets: normalized };
 }
-module.exports = { play, MULTIPLIERS, MAX_TOTAL_BET };
+module.exports = { play, SEGMENTS, MULTIPLIERS, MAX_TOTAL_BET };
