@@ -256,11 +256,25 @@ jobs:
       - name: Apply Migo Live launcher icon
         run: python3 scripts/apply-android-app-icon.py
 
+      - name: Enable Gradle dependency cache
+        uses: actions/setup-gradle@v4
+
       - name: Build debug APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          for attempt in 1 2 3; do
+            if ./gradlew assembleDebug --no-daemon; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Android build failed after 3 attempts"
+              exit 1
+            fi
+            echo "Gradle dependency/build attempt $attempt failed; retrying after 15 seconds"
+            sleep 15
+          done
+          test -s app/build/outputs/apk/debug/app-debug.apk
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
           if [ -z "$AAPT" ]; then
             echo "Android build-tools aapt was not found"
