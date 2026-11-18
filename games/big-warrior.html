@@ -80,7 +80,7 @@ function gameRequest(){
   const timer=setTimeout(()=>{removeEventListener("message",handler);reject(new Error("تأخر تأكيد الجولة. أعد المحاولة"))},20000);
   function handler(e){if(e.source!==parent)return;const d=e.data;if(!d||d.t!=="migo:game-result"||d.requestId!==requestId)return;clearTimeout(timer);removeEventListener("message",handler);d.ok?resolve(d.data):reject(new Error(d.message||"تعذر تنفيذ الجولة"))}
   addEventListener("message",handler);
-  parent.postMessage({t:"migo:game-request",requestId,path:"/games/big-warrior/play",body:{bet,pick}},"*");
+  parent.postMessage({t:"migo:game-request",requestId,path:"/games/big-warrior/fight",body:{bet,pick}},"*");
  });
 }
 async function play(){
