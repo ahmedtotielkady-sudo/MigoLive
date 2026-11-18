@@ -7,6 +7,7 @@ const WalletTransaction = require("../models/WalletTransaction");
 const GameRound = require("../models/GameRound");
 const GameState = require("../models/GameState");
 const requireAuth = require("../middleware/requireAuth");
+const requireGameEnabled = require("../middleware/requireGameEnabled");
 const slot777 = require("../game-engines/slot-777");
 
 const router = express.Router();
@@ -31,7 +32,7 @@ router.get("/catalog", (req, res) => res.json({
   }))
 }));
 
-router.use(requireAuth);
+router.use(requireAuth, requireGameEnabled);
 
 // Only this route is live initially. Other game IDs remain unavailable until
 // their original payout rules have been ported and independently tested.
