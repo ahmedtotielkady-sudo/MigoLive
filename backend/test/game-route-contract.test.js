@@ -62,3 +62,13 @@ test("all other game endpoints are authenticated and settle against the same wal
     assert.match(source, /Wallet\.updateOne/, file + " must sync wallet mirror");
   }
 });
+
+
+test("rocket polling stays below the shared game API rate limit and wallet errors are visible", () => {
+  const rocket = read("../games/rocket-crash.html");
+  const server = read("server.js");
+  assert.match(rocket, /lastStatePoll>=1500/);
+  assert.match(server, /app\\.use\\("\\/api\\/games", rateLimit\\(\\{ windowMs: 60_000, limit: 90/);
+  assert.match(rocket, /walletError=String\\(d\\.message/);
+  assert.match(rocket, /if\\(walletError\\)\\{m\\.className='w'/);
+});
