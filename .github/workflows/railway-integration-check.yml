@@ -6,6 +6,9 @@ on:
       - integration/railway-production-migolive-2026-11-19
     paths:
       - .github/workflows/railway-integration-check.yml
+  pull_request:
+    branches:
+      - integration/railway-production-migolive-2026-11-19
   workflow_dispatch:
 
 permissions:
