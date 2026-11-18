@@ -175,14 +175,14 @@ async function spin(){
     if(!Number.isSafeInteger(Number(data.coins))||Number(data.coins)<0)throw new Error('رصيد المحفظة الوارد من الخادم غير صالح');bal=Number(data.coins);free=Number(data.freeSpinsRemaining)||0;ready=true;const win=Number(data.payout)||0,ev={win,bonus:Number(outcome.bonus)||0,hits:outcome.hits||[]};
     $('spin').textContent='قف';
       await Promise.all(cells.map((col,i)=>new Promise(res=>{
-    const t=setInterval(()=>{const p=col.map(c=>c._s);setCell(col[2],p[1]);setCell(col[1],p[0]);setCell(col[0],rnd());col.forEach(c=>c.animate([{transform:'translateY(-100%)'},{transform:'none'}],{duration:90}))},90);
+    const t=setInterval(()=>{const p=col.map(c=>c._s);setCell(col[2],p[1]);setCell(col[1],p[0]);setCell(col[0],rnd());col.forEach(c=>c.animate([{transform:'translateY(-100%)'},{transform:'none'}],{duration:90}))},110);
     const stopAt=Date.now()+500+i*260;
     const chk=setInterval(()=>{
       if(Date.now()>=stopAt||stopNow){
         clearInterval(t);clearInterval(chk);
         col.forEach((c,r)=>{setCell(c,g[i][r]);c.animate([{transform:'translateY(-140%)'},{transform:'translateY(5%)',offset:.7},{transform:'none'}],{duration:280,easing:'ease-out',delay:(2-r)*60,fill:'backwards'})});beep(300+i*40);setTimeout(res,400);
       }
-    },30);
+    },50);
   })));
 
     ev.hits.forEach(k=>{const[i,r]=k.split(',');if(cells[i]&&cells[i][r])cells[i][r].classList.add('hit')});
