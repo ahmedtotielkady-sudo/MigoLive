@@ -13,21 +13,21 @@ const router = express.Router();
 // The catalog exposes only games whose outcomes are settled by the server.
 // Games without a verified server engine remain visible but cannot debit coins.
 const GAME_CATALOG = Object.freeze([
-  { id:"slot-777", name:"سلوت 777", active:true, endpoint:"/slot-777/spin" },
-  { id:"ocean-storm", name:"عاصفة المحيط", active:true, endpoint:"/ocean-storm/spin" },
-  { id:"wheel-animals", name:"عجلة الحيوانات", active:false, endpoint:"/wheel-animals/spin" },
-  { id:"cleopatra-gold", name:"ذهب كليوباترا", active:true, endpoint:"/cleopatra-gold/spin" },
-  { id:"fruit-luck", name:"حظ الفواكه", active:false, endpoint:"/fruit-luck/spin" },
-  { id:"rocket-crash", name:"الصاروخ", active:false, endpoint:"/rocket-crash/start" },
-  { id:"big-warrior", name:"المحارب الكبير", active:true, endpoint:"/big-warrior/play" }
+  { id:"slot-777", name:"سلوت 777", visible:true, active:false, endpoint:"/slot-777/spin" },
+  { id:"ocean-storm", name:"عاصفة المحيط", visible:true, active:false, endpoint:"/ocean-storm/spin" },
+  { id:"wheel-animals", name:"عجلة الحيوانات", visible:true, active:false, endpoint:"/wheel-animals/spin" },
+  { id:"cleopatra-gold", name:"ذهب كليوباترا", visible:true, active:false, endpoint:"/cleopatra-gold/spin" },
+  { id:"fruit-luck", name:"حظ الفواكه", visible:true, active:false, endpoint:"/fruit-luck/spin" },
+  { id:"rocket-crash", name:"الصاروخ", visible:true, active:false, endpoint:"/rocket-crash/start" },
+  { id:"big-warrior", name:"المحارب الكبير", visible:true, active:false, endpoint:"/big-warrior/play" }
 ]);
 router.get("/catalog", (req, res) => res.json({
   ok:true,
   wallet:"central",
   games:GAME_CATALOG.map(game => ({
     ...game,
-    wallet:game.active ? "central" : "unavailable",
-    settlement:game.active ? "server_only" : (game.endpoint ? "server_api_ready_pending_integration_tests" : "disabled_until_engine_verified")
+    wallet:"central",
+    settlement:"server_api_ready_pending_frontend_wiring_and_database_integration_tests"
   }))
 }));
 
