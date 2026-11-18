@@ -10,6 +10,27 @@ const requireAuth = require("../middleware/requireAuth");
 const slot777 = require("../game-engines/slot-777");
 
 const router = express.Router();
+// The catalog exposes only games whose outcomes are settled by the server.
+// Games without a verified server engine remain visible but cannot debit coins.
+const GAME_CATALOG = Object.freeze([
+  { id:"slot-777", name:"سلوت 777", active:true, endpoint:"/slot-777/spin" },
+  { id:"ocean-storm", name:"عاصفة المحيط", active:true, endpoint:"/ocean-storm/spin" },
+  { id:"wheel-animals", name:"عجلة الحيوانات", active:false, endpoint:null },
+  { id:"cleopatra-gold", name:"ذهب كليوباترا", active:true, endpoint:"/cleopatra-gold/spin" },
+  { id:"fruit-luck", name:"حظ الفواكه", active:false, endpoint:null },
+  { id:"rocket-crash", name:"الصاروخ", active:false, endpoint:null },
+  { id:"big-warrior", name:"المحارب الكبير", active:true, endpoint:"/big-warrior/play" }
+]);
+router.get("/catalog", (req, res) => res.json({
+  ok:true,
+  wallet:"central",
+  games:GAME_CATALOG.map(game => ({
+    ...game,
+    wallet:game.active ? "central" : "unavailable",
+    settlement:game.active ? "server_only" : "disabled_until_engine_verified"
+  }))
+}));
+
 router.use(requireAuth);
 
 // Only this route is live initially. Other game IDs remain unavailable until
