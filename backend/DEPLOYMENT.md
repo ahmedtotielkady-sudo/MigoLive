@@ -73,3 +73,15 @@ GitHub Actions currently runs the backend unit suite successfully (41 tests). Un
 6. Only then merge and deploy to Railway after review and explicit approval.
 
 Existing local-only accounts are not automatically migrated. No production balances are changed by this branch.
+
+## Legacy profile migration (new, partial)
+
+- `GET /api/migration/status` returns migration records for the authenticated account.
+- `POST /api/migration/legacy` accepts an idempotency identifier and an allowlisted profile object containing only `displayName` and/or an HTTPS `avatar` URL.
+- The API authenticates the current server account, stores a unique migration record per account + migration ID, and updates the profile in a MongoDB transaction.
+- The app bridge attempts this only when it finds a legacy local profile with the same numeric UID as the authenticated server account.
+- Client-supplied coins, wallet values, roles, IDs, passwords, password hashes, status, sessions and transactions are ignored. The server wallet remains authoritative.
+- The frontend removes the locally cached password hash from server-backed user records. The bearer token and a migration retry identifier remain client-side for the current web session implementation.
+- This is not a full local-data migration. It does not import local-only accounts, rooms, members, private messages, gifts, agencies or game history. Those require verified ownership/account mapping and separate migration paths.
+- Do not delete or clear local records based on this partial migration response. Keep a backup until all required data classes are migrated and independently verified.
+
