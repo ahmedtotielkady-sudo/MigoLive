@@ -613,6 +613,11 @@
   const ownerPanelObserver = new MutationObserver(() => installOwnerUpdatePanel());
   if (document.body) ownerPanelObserver.observe(document.body, { childList: true, subtree: true });
 
+  // Expose owner controls to the native owner dashboard cards. The controls
+  // are opened only by explicit clicks inside the administration menu.
+  window.__migoOpenOwnerGameControlPanel = openOwnerGameControlPanel;
+  window.__migoOpenOwnerUpdatePanel = openOwnerUpdatePanel;
+
   // Restore server identity validation for remembered sessions.
   if (token() && typeof me !== 'undefined' && me && DB.users[me]) {
     api('/auth/me').then(async (data) => {

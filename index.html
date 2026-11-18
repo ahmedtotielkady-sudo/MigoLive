@@ -1693,14 +1693,25 @@ function ownerTotalBadge(){const n=ownerPendingTotal();return n?'<span class="ow
 function ownerDashboardHTML(tabsO=[]){
  const us=Object.values(DB.users),pending=ownerPendingCount('tp'),allPending=ownerPendingTotal();
  const icons={tp:'🧾',set:'⚙️',coins:'🪙',agents:'🛡️',users:'👥',hosts:'🎙️',alog:'📋',ag:'🏢',ship:'🏦',ledger:'📒',vip:'💎',gifts:'🎁',broadcast:'📣',events:'🎉',staff:'🔐',appupdate:'📲',countries:'🌍',support:'🆘',hostapps:'🎤',referrals:'🎟️',vipplans:'💠',localsec:'🛡️'};
- const cards=tabsO.filter(([k])=>k!=='dash').map(([k,label])=>`<button type="button" class="owner-menu-item" data-jump="${k}"><span class="owner-menu-icon">${icons[k]||'📂'}</span><span class="owner-menu-label">${label.replace(/^\S+\s/,'')}</span>${ownerPendingBadge(k)}<span class="owner-menu-arrow">‹</span></button>`).join('');
+ const cards=tabsO.filter(([k])=>k!=='dash'&&k!=='appupdate').map(([k,label])=>`<button type="button" class="owner-menu-item" data-jump="${k}"><span class="owner-menu-icon">${icons[k]||'📂'}</span><span class="owner-menu-label">${label.replace(/^\S+\s/,'')}</span>${ownerPendingBadge(k)}<span class="owner-menu-arrow">‹</span></button>`).join('')+`
+ <button type="button" class="owner-menu-item" data-owner-action="games"><span class="owner-menu-icon">🎮</span><span class="owner-menu-label">التحكم في الألعاب</span><span class="owner-menu-arrow">‹</span></button>
+ <button type="button" class="owner-menu-item" data-owner-action="updates"><span class="owner-menu-icon">📲</span><span class="owner-menu-label">التحكم في التحديث</span><span class="owner-menu-arrow">‹</span></button>`;
  return `<section class="owner-summary card"><b>📊 ملخص التطبيق</b><div class="owner-stats">
  <div><span>الحسابات</span><b>${us.length}</b></div><div><span>إجمالي العملات</span><b>${fmt(us.reduce((a,x)=>a+(+x.coins||0),0))}</b></div><div><span>طلبات الشحن المعلقة</span><b>${pending}</b></div><div class="owner-pending-summary"><span>كل الإجراءات المعلقة</span><b>${allPending}</b></div>
  <div><span>الهدايا</span><b>${DB.giftCat.length}</b></div><div><span>الغرف</span><b>${DB.rooms.length}</b></div><div><span>وكالات المضيفين</span><b>${DB.agencies.length}</b></div><div><span>وكالات الشحن</span><b>${DB.shippingAgencies.length}</b></div><div><span>الفعاليات النشطة</span><b>${DB.events.filter(e=>e.active!==false&&(!e.until||e.until>Date.now())).length}</b></div>
  </div></section><section class="owner-menu-section"><h4>أقسام الإدارة</h4><p class="mu">اختار القسم المطلوب؛ كل قسم هيفتح في صفحة مستقلة.</p><div class="owner-menu-grid">${cards}</div></section>
  <section class="card"><b>آخر سجل إداري</b><div class="sp"></div>${(DB.audit||[]).slice(0,8).map(x=>`<div class="mu" style="padding:6px 0;border-bottom:1px solid var(--line)">${new Date(x.t).toLocaleString('ar-EG')} · ${esc(x.type)} · ${esc(x.detail)}</div>`).join('')||'<span class="mu">لا توجد عمليات بعد</span>'}</section>`;
 }
-function ownerDashboardBind(m){m.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{ot=b.dataset.jump;banFor=null;render()})}
+function ownerDashboardBind(m){
+ m.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{ot=b.dataset.jump;banFor=null;render()});
+ m.querySelectorAll('[data-owner-action]').forEach(b=>b.onclick=()=>{
+   if(!U()||U().role!=='owner')return toast('هذا التحكم للمالك فقط');
+   const action=b.dataset.ownerAction;
+   const fn=action==='games'?window.__migoOpenOwnerGameControlPanel:window.__migoOpenOwnerUpdatePanel;
+   if(typeof fn!=='function')return toast('تعذر تحميل لوحة التحكم؛ أعد فتح التطبيق');
+   fn();
+ });
+}
 window.__migoOwnerSectionBack=function(){
  if(tab==='owner'&&ot!=='dash'){ot='dash';banFor=null;render();return true}
  return false
