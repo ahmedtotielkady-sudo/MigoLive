@@ -122,6 +122,56 @@
     return data;
   }
 
+  // Shared, authenticated bridge for every game iframe. The iframe can request
+  // an action, but cannot choose an outcome or write a balance.
+  const GAME_POST_PATHS = new Set([
+    '/games/slot-777/spin',
+    '/games/ocean-storm/spin',
+    '/games/wheel-animals/spin',
+    '/games/cleopatra-gold/spin',
+    '/games/fruit-luck/spin',
+    '/games/rocket-crash/start',
+    '/games/rocket-crash/cashout',
+    '/games/rocket-crash/cancel',
+    '/games/big-warrior/play',
+    '/games/big-warrior/fight'
+  ]);
+  window.__migoGameApiRequest = async (path, body, requestId) => {
+    if (path === '/games/rocket-crash/state') {
+      // The rocket state endpoint is read-only; it still requires authentication.
+      const data = await api(path, { method: 'GET', cache: 'no-store' });
+      if (Number.isSafeInteger(Number(data.coins))) {
+        const current = DB.users[me];
+        if (current) { current.coins = Number(data.coins); save(); }
+      }
+      return data;
+    }
+    if (!GAME_POST_PATHS.has(path)) throw new Error('طلب اللعبة غير مسموح');
+    if (!/^[A-Za-z0-9_-]{16,80}$/.test(String(requestId || ''))) {
+      throw new Error('معرّف الجولة غير صالح');
+    }
+    const data = await api(path, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': String(requestId) },
+      body: JSON.stringify(body && typeof body === 'object' ? body : {})
+    });
+    if (Number.isSafeInteger(Number(data.coins))) {
+      const current = DB.users[me];
+      if (current) {
+        current.coins = Number(data.coins);
+        save();
+        const top = $id('mycoins');
+        if (top) top.textContent = current.coins;
+      }
+      window.dispatchEvent(new CustomEvent('migo:wallet-updated', { detail: { coins: Number(data.coins) } }));
+    }
+    // Re-read canonical balance after settlement to reconcile the UI with the
+    // wallet endpoint; the settlement response remains the immediate game result.
+    refreshWallet().catch((e) => console.warn('Post-game wallet refresh failed:', e.message));
+    return data;
+  };
+  window.__migoRefreshWallet = refreshWallet;
+
   // Keep the balance display synchronized with the server whenever the wallet opens.
   if (typeof rWallet === 'function') {
     const oldWallet = rWallet;
