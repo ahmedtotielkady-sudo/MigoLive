@@ -11,18 +11,18 @@ test("fruit luck validates bet buckets and maximum exposure", () => {
 });
 
 test("fruit luck payout is calculated from the server result", () => {
-  const seven = engine.play({ m: 0, "77": 100, o: 0 }, () => 0);
+  const seven = engine.play({ m: 0, "77": 100, o: 0 }, () => 1);
   assert.equal(seven.result, "77");
   assert.equal(seven.multiplier, 8);
   assert.equal(seven.payout, 800);
-  const other = engine.play({ m: 100, "77": 0, o: 0 }, () => 999);
+  const other = engine.play({ m: 100, "77": 0, o: 0 }, () => 8);
   assert.equal(other.result, "m");
   assert.equal(other.payout, 200);
 });
 
 test("fruit luck enforces 10-coin chip increments", () => {
   assert.throws(() => engine.play({ m: 15, "77": 0, o: 0 }), /توزيع الرهانات/);
-  const result = engine.play({ m: 100, "77": 0, o: 100 }, () => 624);
+  const result = engine.play({ m: 100, "77": 0, o: 100 }, () => 0);
   assert.equal(result.result, "o");
   assert.equal(result.totalBet, 200);
   assert.equal(result.payout, 200);
