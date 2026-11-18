@@ -50,6 +50,30 @@ test("Animal Wheel never settles bets or changes the wallet in the browser", () 
   assert.doesNotMatch(html, /postMessage\(\{t:'set',v:bal/);
 });
 
+test("all seven game pages display only server-confirmed wallet balances and surface load errors", () => {
+  const checks = [
+    ["slot-777.html", "wallet-error"],
+    ["slot-ocean-storm.html", "wallet-error"],
+    ["wheel-animals.html", "wallet-error"],
+    ["games/cleopatra-gold.html", "wallet-error"],
+    ["games/fruit-luck.html", "wallet-error"],
+    ["games/rocket-crash.html", "wallet-error"],
+    ["games/big-warrior.html", "migo:game-request"]
+  ];
+  for (const [file, marker] of checks) {
+    const html = read(file);
+    assert.ok(html.includes(marker), file + " must handle wallet state or server requests");
+  }
+  const slot = read("slot-777.html");
+  assert.doesNotMatch(slot, /bal\\s*=\\s*5000/);
+  assert.doesNotMatch(slot, /postMessage\\(\\{t:'set',v:/);
+  const ocean = read("slot-ocean-storm.html");
+  assert.doesNotMatch(ocean, /postMessage\\(\\{t:"set",v:/);
+  const wheel = read("wheel-animals.html");
+  assert.doesNotMatch(wheel, /bal\\s*\\+=\\s*p/);
+  assert.doesNotMatch(wheel, /postMessage\\(\\{t:'set',v:bal/);
+});
+
 test("Rocket Crash has a safe request-id fallback and visible wallet failure state", () => {
   const html = read("games/rocket-crash.html");
   assert.ok(html.includes("const makeRequestId="));
