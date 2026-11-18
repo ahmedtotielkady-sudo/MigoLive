@@ -452,7 +452,7 @@
   let gameAvailability = Object.fromEntries(GAME_SLUGS.map(id => [id, true]));
   function gameIdFromText(value) {
     const text = String(value || "").toLowerCase();
-    return GAME_SLUGS.find(id => text.includes(id) || (id === "slot-777" && /slot777|slot_777/.test(text)) || text.includes(MIGO_GAME_LABELS[id].toLowerCase())) || "";
+    return GAME_SLUGS.find(id => text.includes(id) || (id === "slot-777" && /slot777|slot_777/.test(text)) || text.includes(MIGO_GAME_LABELS[id].toLowerCase()) || (id === "rocket-crash" && /صاروخ الفضاء/.test(text)) || (id === "fruit-luck" && /فواكه الحظ/.test(text))) || "";
   }
   function applyGameAvailabilityToUI() {
     document.querySelectorAll("[data-game-id],[data-game],[data-gameid],a[href],iframe[src]").forEach(node => {
@@ -496,6 +496,8 @@
   window.__migoRefreshGameAvailability = refreshGameAvailability;
   const gameUiObserver = new MutationObserver(() => applyGameAvailabilityToUI());
   if (document.body) gameUiObserver.observe(document.body, { childList: true, subtree: true });
+  // Poll for owner changes while users remain inside the app; the server also blocks direct game API calls immediately.
+  setInterval(() => { if (token() && document.visibilityState === "visible") refreshGameAvailability().catch(() => {}); }, 15000);
   document.addEventListener("click", event => {
     const node = event.target && event.target.closest && event.target.closest("[data-game-id],[data-game],[data-gameid],a[href],iframe[src]");
     if (!node) return;
