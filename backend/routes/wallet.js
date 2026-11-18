@@ -10,6 +10,7 @@ router.use(requireAuth);
 
 router.get("/", async (req, res, next) => {
   try {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
     const user = await User.findById(req.auth.sub).select("uid coins");
     if (!user) return res.status(404).json({ ok: false, message: "الحساب غير موجود" });
     await Wallet.updateOne(
