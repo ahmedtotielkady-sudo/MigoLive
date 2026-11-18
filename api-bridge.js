@@ -31,6 +31,45 @@
     });
     return key;
   };
+  // One-time, authenticated migration of safe profile fields from a matching legacy UID.
+  // Wallet, roles, passwords, sessions and local transaction history are never uploaded.
+  async function migrateLegacyProfile(serverUser) {
+    if (!serverUser || !serverUser.uid || !token()) return;
+    const legacy = Object.values(DB.users || {}).find((user) =>
+      user && Number(user.uid) === Number(serverUser.uid) && !user.serverBacked
+    );
+    if (!legacy) return;
+    const profile = {};
+    const displayName = String(legacy.displayName || legacy.name || '').trim();
+    const avatar = String(legacy.avatar || '').trim();
+    if (displayName && displayName.length <= 40) profile.displayName = displayName;
+    if (avatar.length <= 500 && (!avatar || /^https:\/\//i.test(avatar))) profile.avatar = avatar;
+    if (!Object.keys(profile).length) return;
+    const idKey = 'migolive_legacy_migration_' + String(serverUser.uid);
+    let migrationId = '';
+    try {
+      migrationId = localStorage.getItem(idKey) || '';
+      if (!/^[a-zA-Z0-9_-]{16,80}$/.test(migrationId)) {
+        migrationId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID().replace(/-/g, '')
+          : ('legacy' + Date.now() + Math.random().toString(36).slice(2)).slice(0, 48);
+        localStorage.setItem(idKey, migrationId);
+      }
+    } catch (_) {
+      migrationId = ('legacy' + Date.now() + Math.random().toString(36).slice(2)).slice(0, 48);
+    }
+    const result = await api('/migration/legacy', {
+      method: 'POST',
+      body: JSON.stringify({ migrationId, profile })
+    });
+    if (result.ok && DB.users['server-' + serverUser.uid]) {
+      if (profile.displayName) DB.users['server-' + serverUser.uid].name = profile.displayName;
+      if (profile.avatar) DB.users['server-' + serverUser.uid].avatar = profile.avatar;
+      save();
+    }
+    return result;
+  }
+
   const originalLogin = $id('bin') && $id('bin').onclick;
   if ($id('bin') && typeof originalLogin === 'function') {
     $id('bin').onclick = async () => {
@@ -54,6 +93,7 @@
         saveToken(data.token);
         const key = await cacheUser(data.user, password);
         me = key;
+        migrateLegacyProfile(data.user).catch((e) => console.warn('Legacy profile migration pending:', e.message));
         save();
         try { localStorage.setItem('mygo_session', key); localStorage.setItem('mygo_remember_login', '1'); } catch (_) {}
         message('');
@@ -203,6 +243,7 @@
   if (token() && typeof me !== 'undefined' && me && DB.users[me]) {
     api('/auth/me').then(async (data) => {
       const key = await cacheUser(data.user);
+      migrateLegacyProfile(data.user).catch((e) => console.warn('Legacy profile migration pending:', e.message));
       if (key !== me) { me = key; try { localStorage.setItem('mygo_session', key); } catch (_) {} }
       refreshWallet().catch(() => {});
     }).catch(() => {
