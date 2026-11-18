@@ -1408,9 +1408,22 @@ function agentStats(k){const mine=DB.tx.filter(x=>x.k==='tr'&&x.from===k),td=new
   return{ops:mine.length,total:mine.reduce((p,x)=>p+x.amt,0),fee:mine.reduce((p,x)=>p+(x.fee||0),0),day:mine.filter(x=>new Date(x.t).toDateString()===td).reduce((p,x)=>p+x.amt,0)}}
 function findUser(q){q=String(q||'').trim().toLowerCase();if(/^\d{5,9}$/.test(q)){const e=Object.entries(DB.users).find(([,x])=>String(x.uid)===q);return e?e[0]:null}return DB.users[q]?q:null}
 function transfer(from,to,amt){
-  const t=DB.users[to];if(!t)return'المستخدم غير موجود';amt=Math.floor(+amt);if(!(amt>0))return'مبلغ غير صحيح';
-  if(from)return'شحن المستخدمين متاح لوكالات الشحن المعتمدة والإدارة فقط';
-  t.coins=(+t.coins||0)+amt;addCharge(to,amt);logIt('مالك',`المالك ← ${t.name}: ${amt} عملة`);return''
+  if(from)return'التحويل بين الحسابات يتم من خلال المحفظة';
+  return'استخدم عملية الشحن المعتمدة من لوحة المالك';
+}
+async function ownerCreditUser(targetKey,amount,idempotencyKey,description='شحن من المالك'){
+  const target=DB.users[targetKey];
+  if(!U()||U().role!=='owner')throw new Error('الشحن متاح للمالك فقط');
+  const coins=Math.floor(Number(amount));
+  if(!target||!Number.isSafeInteger(Number(target.uid)))throw new Error('الحساب غير مربوط بمعرّف صالح');
+  if(!Number.isSafeInteger(coins)||coins<1)throw new Error('قيمة الشحن يجب أن تكون موجبة');
+  const key=idempotencyKey||crypto.randomUUID().replace(/-/g,'');
+  const result=await apiRequest('/wallet/admin/credit',{method:'POST',headers:{'idempotency-key':key},body:JSON.stringify({targetUid:Number(target.uid),amount:coins,description:String(description).slice(0,160)})});
+  if(!Number.isSafeInteger(Number(result.coins))||Number(result.coins)<0)throw new Error('لم يصل تأكيد صحيح من المحفظة');
+  target.coins=Number(result.coins);addCharge(targetKey,coins);
+  logIt('مالك',`شحن خادمي ${coins} عملة لـ ${target.name}`);save();
+  const top=$('#mycoins');if(top&&me===targetKey)top.textContent=fmt(target.coins);
+  return result;
 }
 function ag(id){return DB.agencies.find(a=>a.id==id)}
 function reqs(f){const l=DB.joins.map((j,i)=>({j,i})).filter(({j})=>j.status==='pending'&&ag(j.agency)&&DB.users[j.user]&&f(ag(j.agency)));
@@ -1488,9 +1501,20 @@ function agentsOwnerHTML(agents){
 function agentsOwnerBind(m){
   const box=b=>b.closest('[data-agc]'),f=(b,n)=>box(b).querySelector(`[data-f="${n}"]`);
   $('#adrs').onclick=()=>{DB.settings.agentRate=Math.min(100,Math.max(0,Math.floor(+$('#adr').value)||0));logIt('مالك','تحديث نسبة عمولة الوكلاء');save();toast('تم الحفظ')};
-  m.querySelectorAll('[data-as]').forEach(b=>b.onclick=()=>{const k=b.dataset.as,a=DB.users[k],n=Math.floor(+f(b,'stock').value);if(!a||!(n>0))return toast('اكتب مبلغاً صحيحاً');a.coins+=n;DB.tx.unshift({t:Date.now(),k:'st',to:k,amt:n});notify(k,`تم إضافة ${fmt(n)} عملة إلى رصيد وكالتك بواسطة المالك`,'shipping');logIt('مالك',`إضافة رصيد ${n} للوكيل ${a.name}`);save();toast('تمت الإضافة');render()});
+  m.querySelectorAll('[data-as]').forEach(b=>b.onclick=async()=>{
+    const k=b.dataset.as,a=DB.users[k],n=Math.floor(+f(b,'stock').value);if(!a||!(n>0))return toast('اكتب مبلغاً صحيحاً');
+    b.disabled=true;
+    try{await ownerCreditUser(k,n,null,'تمويل رصيد وكيل الشحن');DB.tx.unshift({t:Date.now(),k:'st',to:k,amt:n});notify(k,`تم إضافة ${fmt(n)} عملة إلى رصيد وكالتك بواسطة المالك`,'shipping');save();toast('تمت الإضافة وتسجيلها');render()}
+    catch(error){b.disabled=false;toast(error.message||'تعذر إضافة الرصيد')}
+  });
   m.querySelectorAll('[data-ar]').forEach(b=>b.onclick=()=>{const a=DB.users[b.dataset.ar],r=f(b,'rate').value.trim(),l=Math.floor(+f(b,'limit').value)||0;if(!a)return;if(r==='')delete a.rate;else a.rate=Math.min(100,Math.max(0,Math.floor(+r)||0));a.limit=Math.max(0,l);logIt('مالك',`تحديث إعدادات الوكيل ${a.name}`);save();toast('تم الحفظ');render()});
-  m.querySelectorAll('[data-sqo]').forEach(b=>b.onclick=()=>{const q=DB.sreq[b.dataset.sqo],a=q&&DB.users[q.user];if(!a||q.status!=='pending')return;q.status='ok';a.coins+=q.amt;DB.tx.unshift({t:Date.now(),k:'st',to:q.user,amt:q.amt});notifyUserResult(q.user,`وافق المالك على طلب الرصيد وتمت إضافة ${fmt(q.amt)} عملة إلى حسابك`);logIt('مالك',`شحن رصيد ${q.amt} للوكيل ${a.name} (طلب)`);save();render()});
+  m.querySelectorAll('[data-sqo]').forEach(b=>b.onclick=async()=>{
+    const q=DB.sreq[b.dataset.sqo],a=q&&DB.users[q.user];if(!a||q.status!=='pending')return;
+    q.serverCreditKey=q.serverCreditKey||crypto.randomUUID().replace(/-/g,'');if(!save())return toast('تعذر حفظ رقم العملية');
+    b.disabled=true;
+    try{await ownerCreditUser(q.user,q.amt,q.serverCreditKey,'اعتماد طلب تمويل وكيل الشحن');q.status='ok';DB.tx.unshift({t:Date.now(),k:'st',to:q.user,amt:q.amt});notifyUserResult(q.user,`وافق المالك على الطلب وتمت إضافة ${fmt(q.amt)} عملة إلى حسابك`);save();render()}
+    catch(error){b.disabled=false;toast(error.message||'تعذر تنفيذ الطلب')}
+  });
   m.querySelectorAll('[data-sqn]').forEach(b=>b.onclick=()=>{const q=DB.sreq[b.dataset.sqn];if(q&&q.status==='pending'){q.status='no';notifyUserResult(q.user,`تم رفض طلب الرصيد بقيمة ${fmt(q.amt)} عملة`)}save();render()});
 }
 function agencyOwnerHTML(){
@@ -1577,15 +1601,40 @@ function rOwner(m){
   m.querySelectorAll('[data-ub]').forEach(b=>b.onclick=()=>{const a=DB.users[b.dataset.ub];if(!a)return;a.banned=false;a.banUntil=0;logIt('مالك',`رفع حظر ${a.name}`);save();toast('تم رفع الحظر');render()});
   m.querySelectorAll('[data-da]').forEach(b=>b.onclick=()=>{DB.agencies=DB.agencies.filter(a=>a.id!=b.dataset.da);Object.values(DB.users).forEach(x=>{if(x.agency==b.dataset.da)x.agency=null});save();render()});
   bindReqs(m);
-  m.querySelectorAll('[data-tok]').forEach(b=>b.onclick=()=>{const t=DB.topups[b.dataset.tok],x=DB.users[t.user];if(t.status!=='pending'||!x)return;t.status='ok';x.coins+=t.amount;addCharge(t.user,t.amount);notifyUserResult(t.user,`تم تنفيذ شحن ${fmt(t.amount)} عملة بنجاح. رصيدك الآن ${fmt(x.coins)} عملة`);logIt('مالك',`شحن ${t.amount} عملة لـ ${x.name} (إيصال)`);save();toast('تم الشحن');render()});
+  m.querySelectorAll('[data-tok]').forEach(b=>b.onclick=async()=>{
+    const t=DB.topups[b.dataset.tok],x=t&&DB.users[t.user];if(!t||t.status!=='pending'||!x)return;
+    if(!Number.isSafeInteger(Number(x.uid)))return toast('الحساب غير مرتبط بالمحفظة');
+    t.serverCreditKey=t.serverCreditKey||crypto.randomUUID().replace(/-/g,'');
+    if(!save())return toast('تعذر حفظ رقم العملية؛ لم يتم الشحن');
+    b.disabled=true;
+    try{
+      const result=await ownerCreditUser(t.user,t.amount,t.serverCreditKey,'اعتماد طلب شحن بإيصال');
+      t.status='ok';t.serverTransactionId=result.transactionId||'';
+      notifyUserResult(t.user,`تم شحن ${fmt(t.amount)} عملة بنجاح. رصيدك الحالي ${fmt(x.coins)} عملة`);
+      save();toast('تم الشحن وتسجيل العملية');render();
+    }catch(error){b.disabled=false;toast(error.message||'تعذر تنفيذ الشحن');}
+  });
   m.querySelectorAll('[data-tno]').forEach(b=>b.onclick=()=>{const t=DB.topups[b.dataset.tno];if(!t)return;t.status='no';notifyUserResult(t.user,`تم رفض طلب الشحن بقيمة ${fmt(t.amount)} عملة`);save();render()});
   m.querySelectorAll('[data-gi]').forEach(i=>i.onchange=()=>rImg(i.files[0],128,u=>{DB.gIcons=DB.gIcons||{};DB.gIcons[i.dataset.gi]=u;save();toast('تم رفع الأيقونة');render()}));
   if($('#ssw'))$('#ssw').onclick=()=>{DB.settings.wallet=$('#sw').value.trim().slice(0,40);save();toast('تم الحفظ')};
-  const go=$('#go');if(go)go.onclick=()=>{const k=findUser($('#tu').value)||$('#tu').value.trim().toLowerCase(),a=+(($('#am')||{}).value),e=$('#er');
-    if(ot==='coins'){const r=transfer(null,k,a);if(r&&!(a<0&&DB.users[k]))return e.textContent=r;if(a<0){DB.users[k].coins=Math.max(0,DB.users[k].coins+a);logIt('مالك',`خصم ${-a} من ${DB.users[k].name}`)}}
-    else if(ot==='ag'){if(U().role!=='owner')return e.textContent='إنشاء الوكالات متاح للمالك فقط';const t=DB.users[k],n=$('#an').value.trim();if(!n)return e.textContent='اكتب اسم الوكالة';if(!t)return e.textContent='المستخدم غير موجود';if(t.agency&&ag(t.agency))return e.textContent='هذا الحساب مرتبط بوكالة بالفعل';const agencyId=Date.now();DB.agencies.push({id:agencyId,name:n,head:k});t.agency=agencyId;/* رئيس وكالة المضيفين لا يُمنح دور وكيل الشحن أو تحويل العملات */if(t.role==='shipping'||t.role==='agent')t.role='user';logIt('مالك',`إنشاء وكالة ${n}`)}
-    else{const t=DB.users[k];if(!t)return e.textContent='المستخدم غير موجود';t.role='agent';t.locked=false;if(a>0)t.coins+=a;logIt('مالك',`تعيين ${t.name} وكيلاً (+${a||0})`)}
-    save();render()};
+  const go=$('#go');if(go)go.onclick=async()=>{
+    const k=findUser($('#tu').value)||$('#tu').value.trim().toLowerCase(),a=+(($('#am')||{}).value),e=$('#er');
+    if(ot==='coins'){
+      if(!(a>0))return e.textContent='اكتب مبلغ شحن موجب؛ لا يمكن الخصم من هذه الشاشة';
+      go.disabled=true;
+      try{await ownerCreditUser(k,a,null,'شحن يدوي من لوحة المالك');toast('تم شحن المستخدم وتسجيل العملية');render()}
+      catch(error){e.textContent=error.message||'تعذر الشحن';go.disabled=false}
+      return;
+    }
+    if(ot==='ag'){
+      if(U().role!=='owner')return e.textContent='إنشاء الوكالات متاح للمالك فقط';
+      const t=DB.users[k],n=$('#an').value.trim();if(!n)return e.textContent='اكتب اسم الوكالة';if(!t)return e.textContent='المستخدم غير موجود';if(t.agency&&ag(t.agency))return e.textContent='هذا الحساب مرتبط بوكالة بالفعل';
+      const agencyId=Date.now();DB.agencies.push({id:agencyId,name:n,head:k});t.agency=agencyId;if(t.role==='shipping'||t.role==='agent')t.role='user';logIt('مالك',`إنشاء وكالة ${n}`);
+    }else{
+      const t=DB.users[k];if(!t)return e.textContent='المستخدم غير موجود';t.role='agent';t.locked=false;logIt('مالك',`تعيين ${t.name} وكيلاً`);
+    }
+    save();render()
+  };
 }
 
 
