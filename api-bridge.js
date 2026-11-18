@@ -314,6 +314,137 @@
     };
   }
 
+
+  // Remote APK update enforcement. Increment this value for every published APK.
+  const MIGO_APP_VERSION_CODE = Number(window.MIGO_APP_VERSION_CODE || 1);
+  const UPDATE_BLOCK_ID = "migo-forced-update-screen-v1";
+  let updateCheckRunning = false;
+  function showUpdateBlock(data, retry) {
+    let layer = document.getElementById(UPDATE_BLOCK_ID);
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.id = UPDATE_BLOCK_ID;
+      layer.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#171020;color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;direction:rtl;font-family:inherit;text-align:center";
+      document.body.appendChild(layer);
+    }
+    const messageText = String(data && data.message || "هذا الإصدار لم يعد مدعومًا. يُرجى التواصل مع مالك التطبيق للحصول على أحدث إصدار من ميجو لايف.");
+    const apkUrl = String(data && data.apkUrl || "");
+    layer.innerHTML = '<div style="width:min(100%,420px)"><div style="font-size:52px;margin-bottom:16px">🔄</div><h2 style="font-size:23px;margin:0 0 14px">تحديث مطلوب</h2><p style="line-height:1.9;color:#e8dff0;margin:0 0 22px"></p><button type="button" data-contact style="width:100%;padding:15px;border:0;border-radius:14px;background:#a56be8;color:#fff;font-size:16px;font-weight:800">التواصل مع مالك التطبيق</button><button type="button" data-retry style="width:100%;padding:13px;margin-top:10px;border:1px solid #806a91;border-radius:14px;background:transparent;color:#fff">إعادة التحقق</button></div>';
+    layer.querySelector("p").textContent = messageText;
+    layer.querySelector("[data-contact]").onclick = () => {
+      if (apkUrl) window.open(apkUrl, "_blank", "noopener");
+      else if (typeof toast === "function") toast("تواصل مع مالك التطبيق للحصول على ملف APK الجديد");
+    };
+    layer.querySelector("[data-retry]").onclick = retry;
+  }
+  function hideUpdateBlock() {
+    const layer = document.getElementById(UPDATE_BLOCK_ID);
+    if (layer) layer.remove();
+  }
+  async function checkAppUpdatePolicy() {
+    if (!token() || updateCheckRunning) return true;
+    updateCheckRunning = true;
+    try {
+      const data = await api("/app-updates/status?versionCode=" + encodeURIComponent(MIGO_APP_VERSION_CODE), {
+        method: "GET", cache: "no-store",
+        headers: { "X-App-Version-Code": String(MIGO_APP_VERSION_CODE) }
+      });
+      if (data.blocked) {
+        showUpdateBlock(data, () => checkAppUpdatePolicy().catch(() => {}));
+        return false;
+      }
+      hideUpdateBlock();
+      return true;
+    } catch (error) {
+      // Fail closed: if the server cannot confirm the installed APK is allowed,
+      // keep the app locked and let the user retry rather than bypass enforcement.
+      showUpdateBlock({
+        message: "تعذر التحقق من صلاحية إصدار التطبيق. اتصل بالإنترنت ثم أعد المحاولة."
+      }, () => checkAppUpdatePolicy().catch(() => {}));
+      console.warn("MigoLive update policy check failed:", error.message);
+      return false;
+    } finally {
+      updateCheckRunning = false;
+    }
+  }
+  window.__migoCheckAppUpdate = checkAppUpdatePolicy;
+
+  // Owner-only control panel entry. The server independently checks role on save.
+  function installOwnerUpdatePanel() {
+    if (document.getElementById("migo-owner-update-entry") || typeof me === "undefined" || !me) return;
+    const owner = DB && DB.users && DB.users[me] && DB.users[me].role === "owner";
+    if (!owner) return;
+    const entry = document.createElement("button");
+    entry.id = "migo-owner-update-entry";
+    entry.type = "button";
+    entry.textContent = "⚙️ إدارة تحديث التطبيق";
+    entry.style.cssText = "position:fixed;bottom:86px;left:12px;z-index:99990;border:0;border-radius:14px;padding:12px 15px;background:#6f35a5;color:#fff;font-weight:800;box-shadow:0 5px 18px #0003";
+    entry.onclick = openOwnerUpdatePanel;
+    document.body.appendChild(entry);
+  }
+  async function openOwnerUpdatePanel() {
+    let modal = document.getElementById("migo-owner-update-panel");
+    if (modal) { modal.remove(); return; }
+    modal = document.createElement("div");
+    modal.id = "migo-owner-update-panel";
+    modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:#000b;display:flex;align-items:center;justify-content:center;padding:16px;direction:rtl";
+    modal.innerHTML = '<section style="width:min(100%,460px);max-height:90vh;overflow:auto;background:#21182b;color:#fff;border-radius:18px;padding:20px;font-family:inherit"><h3 style="margin:0 0 8px">التحكم في تحديثات ميجو لايف</h3><p style="color:#cbbbd8;font-size:13px;line-height:1.7">يمكنك إيقاف النسخ القديمة وإلزامها بالتواصل مع المالك للحصول على APK جديد.</p><label style="display:block;margin:12px 0 5px">أحدث رقم إصدار</label><input id="migo-up-latest" type="number" min="1" value="' + MIGO_APP_VERSION_CODE + '" style="box-sizing:border-box;width:100%;padding:12px;border-radius:10px"><label style="display:block;margin:12px 0 5px">أقل إصدار مسموح</label><input id="migo-up-min" type="number" min="1" value="' + MIGO_APP_VERSION_CODE + '" style="box-sizing:border-box;width:100%;padding:12px;border-radius:10px"><label style="display:block;margin:12px 0 5px">رابط ملف APK الجديد (اختياري)</label><input id="migo-up-url" type="url" placeholder="https://..." style="box-sizing:border-box;width:100%;padding:12px;border-radius:10px"><label style="display:flex;align-items:center;gap:9px;margin:16px 0"><input id="migo-up-enabled" type="checkbox"> تفعيل إيقاف الإصدارات القديمة</label><div id="migo-up-status" role="status" style="font-size:13px;color:#e8c9ff;margin:8px 0"></div><button id="migo-up-save" type="button" style="width:100%;padding:14px;border:0;border-radius:12px;background:#a56be8;color:#fff;font-weight:900">حفظ وتطبيق الأمر</button><button id="migo-up-close" type="button" style="width:100%;padding:12px;margin-top:8px;border:1px solid #806a91;border-radius:12px;background:transparent;color:#fff">إغلاق</button></section>';
+    document.body.appendChild(modal);
+    modal.querySelector("#migo-up-close").onclick = () => modal.remove();
+    const status = modal.querySelector("#migo-up-status");
+    try {
+      const response = await api("/app-updates/status?versionCode=" + MIGO_APP_VERSION_CODE, { method: "GET", cache: "no-store" });
+      modal.querySelector("#migo-up-latest").value = response.latestVersionCode || MIGO_APP_VERSION_CODE;
+      modal.querySelector("#migo-up-min").value = response.minimumVersionCode || MIGO_APP_VERSION_CODE;
+      modal.querySelector("#migo-up-url").value = response.apkUrl || "";
+      // enabled is intentionally loaded from the dedicated owner policy read below only.
+      const policy = await api("/app-updates/policy", { method: "GET", cache: "no-store" });
+      modal.querySelector("#migo-up-enabled").checked = !!policy.policy.enabled;
+    } catch (error) { status.textContent = error.message || "تعذر تحميل الإعدادات"; }
+    modal.querySelector("#migo-up-save").onclick = async () => {
+      const saveButton = modal.querySelector("#migo-up-save");
+      saveButton.disabled = true;
+      status.textContent = "جارٍ الحفظ...";
+      try {
+        await api("/app-updates/policy", { method: "PUT", body: JSON.stringify({
+          enabled: modal.querySelector("#migo-up-enabled").checked,
+          latestVersionCode: Number(modal.querySelector("#migo-up-latest").value),
+          minimumVersionCode: Number(modal.querySelector("#migo-up-min").value),
+          apkUrl: modal.querySelector("#migo-up-url").value.trim()
+        }) });
+        status.textContent = "تم حفظ إعدادات التحديث على الخادم.";
+        if (modal.querySelector("#migo-up-enabled").checked && MIGO_APP_VERSION_CODE < Number(modal.querySelector("#migo-up-min").value)) {
+          setTimeout(() => checkAppUpdatePolicy().catch(() => {}), 300);
+        }
+      } catch (error) { status.textContent = error.message || "تعذر حفظ الإعدادات"; }
+      finally { saveButton.disabled = false; }
+    };
+  }
+
+  // Recheck on login, app resume and after the server confirms the remembered identity.
+  const originalStartForUpdate = typeof start === "function" ? start : null;
+  if (originalStartForUpdate && $id("bin")) {
+    const loginButton = $id("bin");
+    const previousHandler = loginButton.onclick;
+    if (typeof previousHandler === "function") {
+      loginButton.onclick = async (...args) => {
+        await previousHandler.apply(loginButton, args);
+        if (token()) {
+          const allowed = await checkAppUpdatePolicy();
+          if (!allowed) {
+            if (typeof forceOut === "function") forceOut("هذا الإصدار لم يعد مدعومًا؛ تواصل مع مالك التطبيق للتحديث");
+          } else installOwnerUpdatePanel();
+        }
+      };
+    }
+  }
+  window.addEventListener("focus", () => {
+    if (token()) checkAppUpdatePolicy().then(allowed => { if (allowed) installOwnerUpdatePanel(); }).catch(() => {});
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && token()) checkAppUpdatePolicy().then(allowed => { if (allowed) installOwnerUpdatePanel(); }).catch(() => {});
+  });
+
   // Restore server identity validation for remembered sessions.
   if (token() && typeof me !== 'undefined' && me && DB.users[me]) {
     api('/auth/me').then(async (data) => {
@@ -321,6 +452,8 @@
       migrateLegacyProfile(data.user).catch((e) => console.warn('Legacy profile migration pending:', e.message));
       if (key !== me) { me = key; try { localStorage.setItem('mygo_session', key); } catch (_) {} }
       refreshWallet().catch(() => {});
+      const allowed = await checkAppUpdatePolicy();
+      if (allowed) installOwnerUpdatePanel();
     }).catch(() => {
       saveToken('');
       if (typeof forceOut === 'function') forceOut('انتهت جلسة الدخول؛ سجّل الدخول مرة أخرى');
