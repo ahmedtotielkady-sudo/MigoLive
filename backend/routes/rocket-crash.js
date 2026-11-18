@@ -109,6 +109,10 @@ router.post("/rocket-crash/start", async (req, res) => {
       const user = await User.findOne({ _id: req.auth.sub, status: "active" })
         .session(session).select("coins");
       if (!user) throw fail("الحساب غير موجود أو غير نشط", 404);
+      const activeRound = await GameRound.findOne({
+        userId: user._id, gameId: "rocket-crash", status: "accepted"
+      }).session(session);
+      if (activeRound) throw fail("لديك جولة صاروخ لم تنتهِ بعد", 409);
       if (user.coins < bet) throw fail("رصيدك غير كافٍ", 409);
 
       const now = Date.now();
