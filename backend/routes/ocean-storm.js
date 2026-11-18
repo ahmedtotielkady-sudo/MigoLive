@@ -8,10 +8,11 @@ const Wallet = require("../models/Wallet");
 const WalletTransaction = require("../models/WalletTransaction");
 const GameRound = require("../models/GameRound");
 const requireAuth = require("../middleware/requireAuth");
+const requireGameEnabled = require("../middleware/requireGameEnabled");
 const oceanStorm = require("../game-engines/ocean-storm");
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, requireGameEnabled);
 
 router.post("/ocean-storm/spin", async (req, res) => {
   const bet = Number(req.body && req.body.bet);
