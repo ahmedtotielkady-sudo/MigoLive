@@ -78,7 +78,6 @@ function startTicks(){clearInterval(siv);let last=-1;siv=setInterval(()=>{const 
 function applyRound(k,live){
  const r=resultOf(k),had=k===betRound&&total()>0;let p=0;
  if(had)return{had:true,p:0};
- if(had){bal+=p;bets=A.map(()=>0);betRound=-1;saveP();ui()}
  if(live){
   if(r.i<0){msg('وقف بين الحيوانات — جولة بدون فائز',3500)}
   else{hits[r.i][0].classList.add('win');showWin(r.i,p);
