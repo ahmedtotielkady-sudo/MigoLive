@@ -77,7 +77,7 @@ function setH(fin){const L=[];for(let k=fin;k>fin-40&&L.length<8;k--){const r=re
 function startTicks(){clearInterval(siv);let last=-1;siv=setInterval(()=>{const m=new DOMMatrix(getComputedStyle(nd).transform),a=(Math.atan2(m.b,m.a)*180/Math.PI+360)%360,k=Math.floor(a/22.5);if(k!==last){last=k;snd(500+Math.random()*80,.05,'square',.06)}},30);setTimeout(()=>clearInterval(siv),5200)}
 function applyRound(k,live){
  const r=resultOf(k),had=k===betRound&&total()>0;let p=0;
- if(had&&r.i>=0)p=bets[r.i]*A[r.i][2];
+ if(had)return{had:true,p:0};
  if(had){bal+=p;bets=A.map(()=>0);betRound=-1;saveP();ui()}
  if(live){
   if(r.i<0){msg('وقف بين الحيوانات — جولة بدون فائز',3500)}
