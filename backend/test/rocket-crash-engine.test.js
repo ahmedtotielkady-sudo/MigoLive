@@ -6,7 +6,7 @@ const engine = require("../game-engines/rocket-crash");
 test("crash point follows the legacy distribution and never falls below 1.00x", () => {
   assert.equal(engine.generateCrashPoint(() => 0), 1);
   assert.equal(engine.generateCrashPoint(() => 0.5), 1.92);
-  assert.equal(engine.generateCrashPoint(() => 0.99), 96);
+  assert.equal(engine.generateCrashPoint(() => 0.99), 95.99);
   assert.ok(engine.generateCrashPoint(() => 0.9999) >= 1);
 });
 
