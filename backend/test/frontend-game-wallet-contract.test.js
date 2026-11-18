@@ -107,7 +107,7 @@ test("app wallet uses one canonical no-cache server balance", () => {
   assert.ok(bridge.includes("function syncWalletBalance(value)"));
   assert.ok(bridge.includes("api('/wallet', { method: 'GET', cache: 'no-store' })"));
   assert.ok(bridge.includes("window.__migoSyncWalletBalance = syncWalletBalance"));
-  assert.ok(bridge.includes("await refreshWallet()"));
+  assert.ok(bridge.includes("refreshWallet().catch("), "game result must not wait for a second wallet round-trip");
   assert.ok(bridge.includes("'[data-wallet-balance]'"));
   assert.ok(wallet.includes('Cache-Control", "no-store, no-cache, must-revalidate, private'));
   assert.ok(wallet.includes('User.findById(req.auth.sub).select("uid coins")'));
