@@ -46,9 +46,9 @@ test("Animal Wheel never settles bets or changes the wallet in the browser", () 
   assert.ok(html.includes("path:'/games/wheel-animals/spin'"));
   assert.ok(html.includes("body:{bets:bets.slice()}"));
   assert.ok(html.includes("bal=Number(data.coins)"));
-  assert.ok(html.includes("settleWheel("), "Animal Wheel must request server settlement");
+  assert.ok(html.includes("requestWheelRound("), "Animal Wheel must request server settlement");
   assert.ok(html.includes("d.t==='wallet-error'"), "Animal Wheel must show wallet load failures");
-  assert.ok(html.includes("e.source!==parent"), "Animal Wheel must trust only its parent bridge");
+  assert.ok(html.includes("e.source!==window.parent"), "Animal Wheel must trust only its parent bridge");
   assert.ok(html.includes("ready?"), "Animal Wheel must not display a fake zero before wallet confirmation");
   assert.doesNotMatch(html, /postMessage\(\{t:'set',v:bal/);
 });
