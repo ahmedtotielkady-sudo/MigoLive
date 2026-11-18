@@ -252,7 +252,7 @@ jobs:
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
 
-      - name: Build debug APK
+      - name: Apply Migo Live launcher icon\n        run: python3 scripts/apply-android-app-icon.py\n\n      - name: Build debug APK
         run: |
           cd android
           chmod +x gradlew
