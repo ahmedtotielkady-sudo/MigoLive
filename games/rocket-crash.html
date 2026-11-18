@@ -132,7 +132,7 @@ const cv=$('#cv'),cx=cv.getContext('2d');let W=0,H=0,stars=[];
 function size(){const r=cv.getBoundingClientRect(),d=devicePixelRatio||1;W=r.width;H=r.height;cv.width=W*d;cv.height=H*d;cx.setTransform(d,0,0,d,0,0);initWorld()}
 addEventListener('resize',size);
 function genCP(){const u=Math.random();return Math.max(1,Math.floor(96/(1-u))/100)}
-function startWait(){state='wait';t0=performance.now()+5000;cp=genCP();pts=[];mult=1;if(bet.st=='queued')bet.st='live';else if(bet.st=='cashed'||bet.st=='lost')bet={amt:0,st:'none',win:0};res='';ui()}
+function startWait(){state='wait';t0=performance.now()+5000;cp=genCP();pts=[];mult=1;roundId=null;cashPending=false;if(bet.st=='queued')bet.st='live';else if(bet.st=='cashed'||bet.st=='lost')bet={amt:0,st:'none',win:0};res='';ui()}
 function startFly(){state='fly';t0=performance.now();pts=[[0,1]];beep(110,1.3,'sawtooth',.05,520);ui()}
 function crash(){state='crash';crashT=performance.now();mult=cp;hist.unshift(cp);hist=hist.slice(0,10);beep(170,.55,'sawtooth',.12,40);
  if(bet.st=='live'){res=`💥 انفجر · خسرت ${fmt(bet.amt)}`;bet={amt:0,st:'none',win:0}}
