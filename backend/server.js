@@ -44,7 +44,7 @@ app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/big-warrior"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/wheel-fruit"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/rocket-crash"));
-app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 45, standardHeaders: true, legacyHeaders: false }), require("./routes/server-games"));
+// Legacy experimental wheel/fruit/rocket handlers are intentionally not mounted.
 
 app.use("/api/rooms/ice-config", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ice-config"));
 app.use("/api/rooms/livekit", rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), require("./routes/livekit"));
