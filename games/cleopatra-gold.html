@@ -108,11 +108,11 @@ function init(){
 async function roll(fin){
  const sts=[...document.querySelectorAll('.st')];let mx=0;
  sts.forEach((st,r)=>{
-  const ch=st.parentElement.clientWidth,n=14+r*4;
+  const ch=st.parentElement.clientWidth,n=10+r*2;
   st.style.transition='none';st.style.transform='translateY(0)';
   st.innerHTML=[...grid[r],...Array.from({length:n},()=>rnd(r)),...fin[r]].map(cell).join('');
   st.offsetHeight;
-  const d=.9+r*.28;mx=Math.max(mx,d);
+  const d=.38+r*.10;mx=Math.max(mx,d);
   st.style.transition=`transform ${d}s cubic-bezier(.25,.8,.3,1)`;
   st.style.transform=`translateY(${-(n+4)*ch}px)`;
  });
@@ -152,12 +152,12 @@ async function spin(){
   fsWin+=win;
   msg(win?'مبروك! فزت '+win.toLocaleString('en')+' عملة':'حظ أوفر',win?'win':'lose');
   $('#bal').textContent=bal.toLocaleString('en');
-  if(win>0){for(let i=0;i<15;i++)await sleep(20)}
+  if(win>0){for(let i=0;i<6;i++)await sleep(12)}
   if(!fs){if(fsWin){msg('انتهت اللفات المجانية · إجمالي الربح '+fsWin.toLocaleString('en'),'win')}mult=1;fsWin=0}
   parent.postMessage({t:'refresh'},'*');
  }catch(error){msg(error.message||'تعذر الاتصال بالخادم','lose')}
  busy=false;ui();
- if(fs>0){await sleep(900);spin()}else if(auto){await sleep(800);spin()}
+ if(fs>0){await sleep(250);spin()}else if(auto){await sleep(250);spin()}
 }
 $('#spin').onclick=spin;
 $('#up').onclick=()=>{bi=Math.min(bi+1,BETS.length-1);ui()};
@@ -166,7 +166,7 @@ $('#auto').onclick=e=>{auto=!auto;e.currentTarget.classList.toggle('on',auto);if
 addEventListener('keydown',e=>{if(e.code=='Space'){e.preventDefault();spin()}});
 const rl=$('#rules');$('#rb').onclick=()=>rl.showModal();$('#rc').onclick=()=>rl.close();rl.addEventListener('click',e=>{if(e.target===rl)rl.close()});
 const nf=$('#nf');$('#nc').onclick=()=>nf.close();nf.addEventListener('click',e=>{if(e.target===nf)nf.close()});
-window.addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data;if(d&&d.t==='wallet-error'){walletReady=false;msg(d.message||'تعذر تحميل رصيد المحفظة','lose');ui()}else if(d&&d.t==='bal'&&Number.isSafeInteger(Number(d.v))&&Number(d.v)>=0){bal=Number(d.v);walletReady=true;ui();msg('رصيد المحفظة متصل','win')}});
+window.addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data;if(d&&d.t==='wallet-error'){walletReady=false;msg(d.message||'تعذر تحميل رصيد المحفظة','lose');ui()}else if(d&&d.t==='bal'&&Number.isSafeInteger(Number(d.v))&&Number(d.v)>=0){bal=Number(d.v);walletReady=true;ui()}});
 parent.postMessage({t:'get'},'*');
 init();
 </script>
