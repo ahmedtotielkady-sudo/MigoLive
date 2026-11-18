@@ -452,19 +452,37 @@
   let gameAvailability = Object.fromEntries(GAME_SLUGS.map(id => [id, true]));
   function gameIdFromText(value) {
     const text = String(value || "").toLowerCase();
-    return GAME_SLUGS.find(id => text.includes(id) || (id === "slot-777" && /slot777|slot_777/.test(text))) || "";
+    return GAME_SLUGS.find(id => text.includes(id) || (id === "slot-777" && /slot777|slot_777/.test(text)) || text.includes(MIGO_GAME_LABELS[id].toLowerCase())) || "";
   }
   function applyGameAvailabilityToUI() {
     document.querySelectorAll("[data-game-id],[data-game],[data-gameid],a[href],iframe[src]").forEach(node => {
       const id = gameIdFromText([
         node.getAttribute("data-game-id"), node.getAttribute("data-game"),
-        node.getAttribute("data-gameid"), node.getAttribute("href"), node.getAttribute("src")
+        node.getAttribute("data-gameid"), node.getAttribute("href"), node.getAttribute("src"),
+        node.textContent
       ].filter(Boolean).join(" "));
       if (!id) return;
       const enabled = gameAvailability[id] !== false;
-      const card = node.closest("[data-game-card],.game-card,.game-item,.game-box,.game-card-item") || node;
+      const card = node.closest("[data-game-card],.game-card,.game-item,.game-box,.game-card-item,.migo-game-card") || node;
       card.hidden = !enabled;
       card.setAttribute("data-migo-game-managed", id);
+    });
+    // The in-room game picker is generated dynamically and identifies games by
+    // their Arabic title; hide its exact card as well as Games-tab launch cards.
+    document.querySelectorAll("#migo-game-picker .migo-game-card").forEach(card => {
+      const id = gameIdFromText(card.innerText || card.textContent);
+      if (id) { card.hidden = gameAvailability[id] === false; card.setAttribute("data-migo-game-managed", id); }
+    });
+    document.querySelectorAll("button,a,[role=button],.game-card,.game-item,.game-box").forEach(node => {
+      if (node.closest("#migo-owner-game-control-panel")) return;
+      const id = gameIdFromText(node.innerText || node.textContent);
+      if (!id || node.children.length > 8) return;
+      const label = String(node.innerText || node.textContent || "").trim();
+      if (label.length > 90) return;
+      if (gameAvailability[id] === false && /سلوت 777|عاصفة المحيط|عجلة الحيوانات|ذهب كليوباترا|حظ الفواكه|الصاروخ|المحارب الكبير/.test(label)) {
+        node.hidden = true;
+        node.setAttribute("data-migo-game-managed", id);
+      }
     });
     window.dispatchEvent(new CustomEvent("migo:game-availability-updated", { detail: { ...gameAvailability } }));
   }
