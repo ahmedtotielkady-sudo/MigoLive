@@ -30,14 +30,17 @@ router.get("/status", async (req, res, next) => {
     const versionCode = clientVersion(req);
     const currentUser = await User.findById(req.auth.sub).select("role status").lean();
     const isOwner = !!(currentUser && currentUser.status === "active" && currentUser.role === "owner");
-    const blocked = !isOwner && !!(policy && policy.enabled && versionCode < minimumVersionCode);
+    const maintenanceBlocked = !isOwner && !!(policy && policy.maintenanceEnabled);
+    const updateBlocked = !isOwner && !!(policy && policy.enabled && versionCode < minimumVersionCode);
+    const blocked = maintenanceBlocked || updateBlocked;
     return res.json({
       ok: true,
       blocked,
+      reason: maintenanceBlocked ? "maintenance" : (updateBlocked ? "update" : ""),
       latestVersionCode,
       minimumVersionCode,
       apkUrl: policy ? policy.apkUrl : "",
-      message: policy ? policy.contactMessage : "يتوفر تحديث جديد لميجو لايف"
+      message: maintenanceBlocked ? (policy.maintenanceMessage || "التطبيق متوقف مؤقتًا من مالك التطبيق. يُرجى التواصل مع مالك التطبيق.") : (policy ? policy.contactMessage : "يتوفر تحديث جديد لميجو لايف")
     });
   } catch (error) { return next(error); }
 });
@@ -47,10 +50,11 @@ router.get("/policy", requireOwner, async (_req, res, next) => {
   try {
     const policy = await AppUpdatePolicy.findById("global").lean();
     return res.json({ ok: true, policy: policy ? {
-      enabled: policy.enabled, latestVersionCode: policy.latestVersionCode,
+      enabled: policy.enabled, maintenanceEnabled: !!policy.maintenanceEnabled,
+      maintenanceMessage: policy.maintenanceMessage || "", latestVersionCode: policy.latestVersionCode,
       minimumVersionCode: policy.minimumVersionCode, apkUrl: policy.apkUrl,
       contactMessage: policy.contactMessage, updatedAt: policy.updatedAt
-    } : { enabled: false, latestVersionCode: 1, minimumVersionCode: 1, apkUrl: "", contactMessage: "هذا الإصدار لم يعد مدعومًا. يُرجى التواصل مع مالك التطبيق للحصول على أحدث إصدار من ميجو لايف." } });
+    } : { enabled: false, maintenanceEnabled: false, maintenanceMessage: "التطبيق متوقف مؤقتًا من مالك التطبيق.", latestVersionCode: 1, minimumVersionCode: 1, apkUrl: "", contactMessage: "هذا الإصدار لم يعد مدعومًا. يُرجى التواصل مع مالك التطبيق للحصول على أحدث إصدار من ميجو لايف." } });
   } catch (error) { return next(error); }
 });
 
@@ -60,6 +64,8 @@ router.put("/policy", requireOwner, async (req, res, next) => {
     const latestVersionCode = Number(req.body && req.body.latestVersionCode);
     const minimumVersionCode = Number(req.body && req.body.minimumVersionCode);
     const enabled = req.body && req.body.enabled === true;
+    const maintenanceEnabled = req.body && req.body.maintenanceEnabled === true;
+    const maintenanceMessage = String(req.body && req.body.maintenanceMessage || "التطبيق متوقف مؤقتًا من مالك التطبيق. يُرجى التواصل مع مالك التطبيق.").trim().slice(0, 500);
     const apkUrl = String(req.body && req.body.apkUrl || "").trim();
     const contactMessage = String(req.body && req.body.contactMessage ||
       "هذا الإصدار لم يعد مدعومًا. يُرجى التواصل مع مالك التطبيق للحصول على أحدث إصدار من ميجو لايف.").trim().slice(0, 500);
@@ -74,7 +80,7 @@ router.put("/policy", requireOwner, async (req, res, next) => {
     }
     const policy = await AppUpdatePolicy.findOneAndUpdate(
       { _id: "global" },
-      { $set: { enabled, latestVersionCode, minimumVersionCode, apkUrl, contactMessage, updatedBy: req.auth.sub, updatedAt: new Date() } },
+      { $set: { enabled, maintenanceEnabled, maintenanceMessage, latestVersionCode, minimumVersionCode, apkUrl, contactMessage, updatedBy: req.auth.sub, updatedAt: new Date() } },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     ).lean();
     return res.json({ ok: true, policy: {

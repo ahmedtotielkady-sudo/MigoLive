@@ -368,6 +368,12 @@
     }
   }
   window.__migoCheckAppUpdate = checkAppUpdatePolicy;
+  // Poll maintenance state so owner actions take effect without reinstalling.
+  setInterval(() => {
+    if (token() && document.visibilityState === "visible") {
+      checkAppUpdatePolicy().then(allowed => { if (allowed) installOwnerUpdatePanel(); }).catch(() => {});
+    }
+  }, 15000);
 
   // Owner-only control panel entry. The server independently checks role on save.
   function installOwnerUpdatePanel() {
@@ -514,7 +520,7 @@
     modal = document.createElement("div");
     modal.id = "migo-owner-update-panel";
     modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:#000b;display:flex;align-items:center;justify-content:center;padding:16px;direction:rtl";
-    modal.innerHTML = '<section style="width:min(100%,460px);max-height:90vh;overflow:auto;background:#21182b;color:#fff;border-radius:18px;padding:20px;font-family:inherit"><h3 style="margin:0 0 8px">التحكم في تحديثات ميجو لايف</h3><p style="color:#cbbbd8;font-size:13px;line-height:1.7">يمكنك إيقاف النسخ القديمة وإلزامها بالتواصل مع المالك للحصول على APK جديد.</p><label style="display:block;margin:12px 0 5px">أحدث رقم إصدار</label><input id="migo-up-latest" type="number" min="1" value="' + MIGO_APP_VERSION_CODE + '" style="box-sizing:border-box;width:100%;padding:12px;border-radius:10px"><label style="display:block;margin:12px 0 5px">أقل إصدار مسموح</label><input id="migo-up-min" type="number" min="1" value="' + MIGO_APP_VERSION_CODE + '" style="box-sizing:border-box;width:100%;padding:12px;border-radius:10px"><label style="display:block;margin:12px 0 5px">رابط ملف APK الجديد (اختياري)</label><input id="migo-up-url" type="url" placeholder="https://..." style="box-sizing:border-box;width:100%;padding:12px;border-radius:10px"><label style="display:flex;align-items:center;gap:9px;margin:16px 0"><input id="migo-up-enabled" type="checkbox"> تفعيل إيقاف الإصدارات القديمة</label><div id="migo-up-status" role="status" style="font-size:13px;color:#e8c9ff;margin:8px 0"></div><button id="migo-up-save" type="button" style="width:100%;padding:14px;border:0;border-radius:12px;background:#a56be8;color:#fff;font-weight:900">حفظ وتطبيق الأمر</button><button id="migo-up-close" type="button" style="width:100%;padding:12px;margin-top:8px;border:1px solid #806a91;border-radius:12px;background:transparent;color:#fff">إغلاق</button></section>';
+    modal.innerHTML = '<section style="width:min(100%,460px);max-height:90vh;overflow:auto;background:#21182b;color:#fff;border-radius:18px;padding:20px;font-family:inherit"><h3 style="margin:0 0 8px">التحكم في تحديثات ميجو لايف</h3><p style="color:#cbbbd8;font-size:13px;line-height:1.7">يمكنك إيقاف النسخ القديمة وإلزامها بالتواصل مع المالك للحصول على APK جديد.</p><label style="display:block;margin:12px 0 5px">أحدث رقم إصدار</label><input id="migo-up-latest" type="number" min="1" value="' + MIGO_APP_VERSION_CODE + '" style="box-sizing:border-box;width:100%;padding:12px;border-radius:10px"><label style="display:block;margin:12px 0 5px">أقل إصدار مسموح</label><input id="migo-up-min" type="number" min="1" value="' + MIGO_APP_VERSION_CODE + '" style="box-sizing:border-box;width:100%;padding:12px;border-radius:10px"><label style="display:block;margin:12px 0 5px">رابط ملف APK الجديد (اختياري)</label><input id="migo-up-url" type="url" placeholder="https://..." style="box-sizing:border-box;width:100%;padding:12px;border-radius:10px"><label style="display:flex;align-items:center;gap:9px;margin:16px 0"><input id="migo-up-enabled" type="checkbox"> تفعيل إيقاف الإصدارات القديمة</label><hr style="border:0;border-top:1px solid #493b55;margin:18px 0"><h4 style="margin:0 0 8px">التحكم في تشغيل التطبيق بالكامل</h4><label style="display:flex;align-items:center;gap:9px;margin:12px 0"><input id="migo-maint-enabled" type="checkbox"> إيقاف التطبيق أمام جميع المستخدمين</label><label style="display:block;margin:8px 0 5px">رسالة الإيقاف التي ستظهر للمستخدمين</label><textarea id="migo-maint-message" rows="3" style="box-sizing:border-box;width:100%;padding:12px;border-radius:10px">التطبيق متوقف مؤقتًا من مالك التطبيق. يُرجى التواصل مع مالك التطبيق.</textarea><div id="migo-up-status" role="status" style="font-size:13px;color:#e8c9ff;margin:8px 0"></div><button id="migo-up-save" type="button" style="width:100%;padding:14px;border:0;border-radius:12px;background:#a56be8;color:#fff;font-weight:900">حفظ وتطبيق الأمر</button><button id="migo-up-close" type="button" style="width:100%;padding:12px;margin-top:8px;border:1px solid #806a91;border-radius:12px;background:transparent;color:#fff">إغلاق</button></section>';
     document.body.appendChild(modal);
     modal.querySelector("#migo-up-close").onclick = () => modal.remove();
     const status = modal.querySelector("#migo-up-status");
@@ -526,6 +532,8 @@
       // enabled is intentionally loaded from the dedicated owner policy read below only.
       const policy = await api("/app-updates/policy", { method: "GET", cache: "no-store" });
       modal.querySelector("#migo-up-enabled").checked = !!policy.policy.enabled;
+      modal.querySelector("#migo-maint-enabled").checked = !!policy.policy.maintenanceEnabled;
+      modal.querySelector("#migo-maint-message").value = policy.policy.maintenanceMessage || "التطبيق متوقف مؤقتًا من مالك التطبيق. يُرجى التواصل مع مالك التطبيق.";
     } catch (error) { status.textContent = error.message || "تعذر تحميل الإعدادات"; }
     modal.querySelector("#migo-up-save").onclick = async () => {
       const saveButton = modal.querySelector("#migo-up-save");
@@ -534,11 +542,13 @@
       try {
         await api("/app-updates/policy", { method: "PUT", body: JSON.stringify({
           enabled: modal.querySelector("#migo-up-enabled").checked,
+          maintenanceEnabled: modal.querySelector("#migo-maint-enabled").checked,
+          maintenanceMessage: modal.querySelector("#migo-maint-message").value.trim(),
           latestVersionCode: Number(modal.querySelector("#migo-up-latest").value),
           minimumVersionCode: Number(modal.querySelector("#migo-up-min").value),
           apkUrl: modal.querySelector("#migo-up-url").value.trim()
         }) });
-        status.textContent = "تم حفظ إعدادات التحديث على الخادم.";
+        status.textContent = modal.querySelector("#migo-maint-enabled").checked ? "تم إيقاف التطبيق للمستخدمين. حساب المالك ما زال يعمل ويمكنه إعادة تشغيله من هنا." : "تم حفظ الإعدادات وإتاحة التطبيق للمستخدمين.";
         if (modal.querySelector("#migo-up-enabled").checked && MIGO_APP_VERSION_CODE < Number(modal.querySelector("#migo-up-min").value)) {
           setTimeout(() => checkAppUpdatePolicy().catch(() => {}), 300);
         }

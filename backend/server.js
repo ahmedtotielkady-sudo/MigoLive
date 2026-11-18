@@ -4,6 +4,9 @@ const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
+const requireAuth = require("./middleware/requireAuth");
+const User = require("./models/User");
+const AppUpdatePolicy = require("./models/AppUpdatePolicy");
 const http = require("http");
 const { attachRealtime } = require("./realtime");
 
@@ -33,6 +36,26 @@ app.get("/api/health", (_req, res) => {
     database: connected ? "connected" : "disconnected"
   });
 });
+
+// Owner-controlled maintenance gate. Keep login and status reachable so users can
+// authenticate and see the maintenance screen. Block all other API operations for
+// non-owners while maintenance is enabled; the server-verified owner bypasses it.
+app.use("/api", (req, res, next) => {
+  if (req.path === "/health" || req.path === "/app-updates/status" || req.path === "/auth" || req.path.startsWith("/auth/")) return next();
+  return requireAuth(req, res, async () => {
+    try {
+      const [policy, user] = await Promise.all([
+        AppUpdatePolicy.findById("global").lean(),
+        User.findById(req.auth.sub).select("role status").lean()
+      ]);
+      if (policy && policy.maintenanceEnabled && !(user && user.status === "active" && user.role === "owner")) {
+        return res.status(503).json({ ok: false, blocked: true, code: "APP_MAINTENANCE", message: policy.maintenanceMessage || "التطبيق متوقف مؤقتًا من مالك التطبيق. يُرجى التواصل مع مالك التطبيق." });
+      }
+      return next();
+    } catch (error) { return next(error); }
+  });
+});
+
 
 app.use("/api/gifts", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/gifts"));
 
