@@ -431,9 +431,7 @@
         await previousHandler.apply(loginButton, args);
         if (token()) {
           const allowed = await checkAppUpdatePolicy();
-          if (!allowed) {
-            if (typeof forceOut === "function") forceOut("هذا الإصدار لم يعد مدعومًا؛ تواصل مع مالك التطبيق للتحديث");
-          } else installOwnerUpdatePanel();
+          if (allowed) installOwnerUpdatePanel();
         }
       };
     }
