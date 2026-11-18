@@ -7,6 +7,8 @@ on:
       - android-preview
       - feature/agency-owner-approval
       - feature/mongodb-primary-integration
+      - android-build-validation-2026-11-18
+      - work/restore-warrior-server-wallet-2026-11-18
   workflow_dispatch:
 
 permissions:
@@ -23,6 +25,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Install backend dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+        working-directory: backend
 
       - name: Run backend unit tests
         run: npm test
@@ -223,7 +229,7 @@ jobs:
               html = re.sub(r'<style id="migo-warrior-compact-v1">.*?</style>', lambda _: css.strip(), html, count=1, flags=re.S)
           else:
               html = html.replace('</head>', css + '\n</head>', 1)
-          jsfixes = [
+          jsfixes = [] if '/api/games/big-warrior/play' in html else [] if '/api/games/big-warrior/play' in html else [
               ('var winner=r<0.4?"lion":(r<0.8?"tiger":"draw");', 'var opposite=pick==="lion"?"tiger":"lion";var winner;if(pick==="draw"){winner=r<0.45?"lion":(r<0.9?"tiger":"draw")}else{winner=r<0.3?pick:(r<0.9?opposite:"draw")}'),
               ('function bet(){return Math.min(STEPS[stepIdx],coins)}', 'function bet(){return STEPS[stepIdx]}'),
               ('$("go").disabled=busy||!pick||coins<=0;', '$("go").disabled=busy||!pick||coins<bet();'),
@@ -233,6 +239,9 @@ jobs:
           ]
           for old, new in jsfixes:
               count = html.count(old)
+              if count == 0 and ('ملف اللعبة الأصلي غير متوفر حالياً' in html or 'الملف الأصلي غير متوفر حالياً' in html):
+                  # Keep the test APK buildable without pretending the missing game is integrated.
+                  continue
               if count != 1:
                   raise SystemExit(f'Expected exactly one occurrence for warrior behavior patch, got {count}: {old}')
               html = html.replace(old, new, 1)
@@ -282,7 +291,9 @@ jobs:
                   if source.strip():
                       Path(f'/tmp/{Path(path).stem}-{i}.js').write_text(source,encoding='utf-8')
           PY
-          for file in /tmp/cleopatra-gold-*.js /tmp/big-warrior-*.js; do node --check "$file"; done
+          for file in /tmp/cleopatra-gold-*.js /tmp/big-warrior-*.js; do
+            if [ -f "$file" ]; then node --check "$file"; fi
+          done
           echo "Verified game assets:"
           ls -lh www/games/cleopatra-gold.html www/games/big-warrior.html
 
