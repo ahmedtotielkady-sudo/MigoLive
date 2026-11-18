@@ -374,8 +374,7 @@
     if (typeof me === "undefined" || !me) return;
     const owner = DB && DB.users && DB.users[me] && DB.users[me].role === "owner";
     if (!owner) {
-      const old = document.getElementById("migo-owner-update-entry");
-      if (old) old.remove();
+      for (const id of ["migo-owner-update-entry","migo-owner-games-entry"]) { const old = document.getElementById(id); if (old) old.remove(); }
       return;
     }
     let entry = document.getElementById("migo-owner-update-entry");
@@ -387,7 +386,9 @@
       entry.style.cssText = "border:0;border-radius:12px;padding:12px 15px;background:#6f35a5;color:#fff;font-weight:800;display:block;width:100%;margin:10px 0";
       entry.onclick = openOwnerUpdatePanel;
     }
-    // Prefer placing the control inside an already-open owner/admin panel.
+    let gamesEntry = document.getElementById("migo-owner-games-entry");
+    if (!gamesEntry) { gamesEntry = document.createElement("button"); gamesEntry.id = "migo-owner-games-entry"; gamesEntry.type = "button"; gamesEntry.textContent = "🎮 التحكم في تشغيل الألعاب"; gamesEntry.style.cssText = entry.style.cssText; gamesEntry.onclick = openOwnerGameControlPanel; }
+    // Prefer placing the controls inside an already-open owner/admin panel.
     const candidates = Array.from(document.querySelectorAll('[id*="owner" i],[class*="owner" i],[id*="admin" i],[class*="admin" i],[data-page*="owner" i]'));
     const panel = candidates.find(node => {
       if (!node || node.id === "migo-owner-update-panel" || !node.getClientRects().length) return false;
@@ -396,11 +397,97 @@
     });
     if (panel) {
       if (entry.parentElement !== panel) panel.appendChild(entry);
+      if (gamesEntry.parentElement !== panel) panel.appendChild(gamesEntry);
     } else if (!entry.isConnected) {
       entry.style.cssText = "position:fixed;bottom:86px;left:12px;z-index:99990;border:0;border-radius:14px;padding:12px 15px;background:#6f35a5;color:#fff;font-weight:800;box-shadow:0 5px 18px #0003";
-      document.body.appendChild(entry);
+      document.body.append(entry, gamesEntry);
     }
   }
+  const MIGO_GAME_LABELS = {
+    "slot-777":"سلوت 777","ocean-storm":"عاصفة المحيط","wheel-animals":"عجلة الحيوانات",
+    "cleopatra-gold":"ذهب كليوباترا","fruit-luck":"حظ الفواكه","rocket-crash":"الصاروخ","big-warrior":"المحارب الكبير"
+  };
+  async function openOwnerGameControlPanel() {
+    let modal = document.getElementById("migo-owner-game-control-panel");
+    if (modal) { modal.remove(); return; }
+    modal = document.createElement("div");
+    modal.id = "migo-owner-game-control-panel";
+    modal.style.cssText = "position:fixed;inset:0;z-index:1000000;background:#000b;display:flex;align-items:center;justify-content:center;padding:16px;direction:rtl";
+    modal.innerHTML = '<section style="width:min(100%,460px);max-height:90vh;overflow:auto;background:#21182b;color:#fff;border-radius:18px;padding:20px;font-family:inherit"><h3 style="margin:0 0 8px">التحكم في تشغيل الألعاب</h3><p style="color:#cbbbd8;font-size:13px;line-height:1.8">أوقف أي لعبة لإخفائها من قسم الألعاب والغرف ومنع تشغيلها من الخادم. يمكنك إعادة تشغيلها في أي وقت.</p><div id="migo-game-control-list">جارٍ تحميل الألعاب...</div><div id="migo-game-control-status" role="status" style="font-size:13px;color:#e8c9ff;margin:10px 0"></div><button id="migo-game-control-close" type="button" style="width:100%;padding:12px;border:1px solid #806a91;border-radius:12px;background:transparent;color:#fff">إغلاق</button></section>';
+    document.body.appendChild(modal);
+    modal.querySelector("#migo-game-control-close").onclick = () => modal.remove();
+    const list = modal.querySelector("#migo-game-control-list"), status = modal.querySelector("#migo-game-control-status");
+    try {
+      const data = await api("/game-control/policy", { method: "GET", cache: "no-store" });
+      list.innerHTML = "";
+      (data.games || []).forEach(game => {
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #493b55";
+        const title = document.createElement("strong"); title.textContent = game.name;
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        const paint = () => {
+          toggle.textContent = game.enabled ? "اللعبة تعمل · إيقاف" : "متوقفة · تشغيل";
+          toggle.style.cssText = "border:0;border-radius:10px;padding:10px 12px;background:"+(game.enabled?"#9c3e52":"#287b59")+";color:#fff;font-weight:800";
+        };
+        paint();
+        toggle.onclick = async () => {
+          toggle.disabled = true; status.textContent = "جارٍ تحديث حالة " + game.name + "...";
+          try {
+            const result = await api("/game-control/" + encodeURIComponent(game.id), {
+              method: "PUT", body: JSON.stringify({ enabled: !game.enabled })
+            });
+            game.enabled = result.game.enabled; paint();
+            await refreshGameAvailability();
+            status.textContent = game.enabled ? "تم تشغيل " + game.name : "تم إيقاف " + game.name + " وإخفاؤها عن المستخدمين";
+          } catch (error) { status.textContent = error.message || "تعذر تغيير حالة اللعبة"; }
+          finally { toggle.disabled = false; }
+        };
+        row.append(title, toggle); list.appendChild(row);
+      });
+    } catch (error) { list.textContent = error.message || "تعذر تحميل إعدادات الألعاب"; }
+  }
+
+  const GAME_SLUGS = Object.keys(MIGO_GAME_LABELS);
+  let gameAvailability = Object.fromEntries(GAME_SLUGS.map(id => [id, true]));
+  function gameIdFromText(value) {
+    const text = String(value || "").toLowerCase();
+    return GAME_SLUGS.find(id => text.includes(id) || (id === "slot-777" && /slot777|slot_777/.test(text))) || "";
+  }
+  function applyGameAvailabilityToUI() {
+    document.querySelectorAll("[data-game-id],[data-game],[data-gameid],a[href],iframe[src]").forEach(node => {
+      const id = gameIdFromText([
+        node.getAttribute("data-game-id"), node.getAttribute("data-game"),
+        node.getAttribute("data-gameid"), node.getAttribute("href"), node.getAttribute("src")
+      ].filter(Boolean).join(" "));
+      if (!id) return;
+      const enabled = gameAvailability[id] !== false;
+      const card = node.closest("[data-game-card],.game-card,.game-item,.game-box,.game-card-item") || node;
+      card.hidden = !enabled;
+      card.setAttribute("data-migo-game-managed", id);
+    });
+    window.dispatchEvent(new CustomEvent("migo:game-availability-updated", { detail: { ...gameAvailability } }));
+  }
+  async function refreshGameAvailability() {
+    if (!token()) return;
+    const data = await api("/game-control/status", { method: "GET", cache: "no-store" });
+    gameAvailability = Object.fromEntries((data.games || []).map(game => [game.id, game.enabled !== false]));
+    applyGameAvailabilityToUI();
+    return gameAvailability;
+  }
+  window.__migoRefreshGameAvailability = refreshGameAvailability;
+  const gameUiObserver = new MutationObserver(() => applyGameAvailabilityToUI());
+  if (document.body) gameUiObserver.observe(document.body, { childList: true, subtree: true });
+  document.addEventListener("click", event => {
+    const node = event.target && event.target.closest && event.target.closest("[data-game-id],[data-game],[data-gameid],a[href],iframe[src]");
+    if (!node) return;
+    const id = gameIdFromText([node.getAttribute("data-game-id"),node.getAttribute("data-game"),node.getAttribute("data-gameid"),node.getAttribute("href"),node.getAttribute("src")].filter(Boolean).join(" "));
+    if (id && gameAvailability[id] === false) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      if (typeof toast === "function") toast("هذه اللعبة متوقفة مؤقتًا من مالك التطبيق");
+    }
+  }, true);
+
   async function openOwnerUpdatePanel() {
     let modal = document.getElementById("migo-owner-update-panel");
     if (modal) { modal.remove(); return; }
@@ -450,7 +537,7 @@
         await previousHandler.apply(loginButton, args);
         if (token()) {
           const allowed = await checkAppUpdatePolicy();
-          if (allowed) installOwnerUpdatePanel();
+          if (allowed) { installOwnerUpdatePanel(); refreshGameAvailability().catch(() => {}); }
         }
       };
     }
@@ -473,7 +560,7 @@
       if (key !== me) { me = key; try { localStorage.setItem('mygo_session', key); } catch (_) {} }
       refreshWallet().catch(() => {});
       const allowed = await checkAppUpdatePolicy();
-      if (allowed) installOwnerUpdatePanel();
+      if (allowed) { installOwnerUpdatePanel(); refreshGameAvailability().catch(e => console.warn("Game availability check failed:", e.message)); }
     }).catch(() => {
       saveToken('');
       if (typeof forceOut === 'function') forceOut('انتهت جلسة الدخول؛ سجّل الدخول مرة أخرى');
