@@ -139,7 +139,8 @@ js = r"""
    try{
     const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{name:"",avatar:"",coins:0};
     frame.contentWindow.postMessage({t:"me",name:profile.name||"",avatar:profile.avatar||""},"*");
-    frame.contentWindow.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
+    // Do not seed games with a possibly stale local balance. They request the
+    // canonical wallet through the authenticated bridge after loading.
    }catch(err){console.warn("Migo game profile delivery:",err)}
   };
   frame.src=g.url;overlay.querySelector("b").textContent=g.name;
@@ -165,17 +166,28 @@ js = r"""
   const d=e.data||{};
   try{
    if(d.t==="get"){
-    const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{name:"",avatar:"",coins:0};
-    e.source.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
+    const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{name:"",avatar:""};
     e.source.postMessage({t:"me",name:profile.name||"",avatar:profile.avatar||""},"*");
-   }else if(d.t==="set"&&Number.isFinite(d.v)&&d.v>=0){
-    const u=typeof U==="function"?U():null;
-    if(!u)return;
-    u.coins=Math.floor(d.v);
-    if(typeof save==="function")save();
-    const coinNode=document.querySelector("#mycoins");
-    if(coinNode)coinNode.textContent=u.coins;
-    window.dispatchEvent(new CustomEvent("migo:wallet-updated",{detail:{coins:u.coins}}));
+    if(typeof window.__migoRefreshWallet==="function"){
+     window.__migoRefreshWallet().then(()=>{
+      const current=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{coins:0};
+      e.source.postMessage({t:"bal",v:Number(current.coins)||0},"*");
+     }).catch(err=>e.source.postMessage({t:"wallet-error",message:err.message||"تعذر تحميل المحفظة"},"*"));
+    }else e.source.postMessage({t:"wallet-error",message:"خدمة المحفظة غير جاهزة"},"*");
+   }else if(d.t==="migo:game-request"){
+    const requestId=String(d.requestId||"");
+    const reply=(ok,data,message)=>{
+     try{e.source.postMessage({t:"migo:game-result",requestId,ok,data,message},"*")}catch(_){}
+    };
+    if(!/^[A-Za-z0-9_-]{16,80}$/.test(requestId)){reply(false,null,"معرّف الجولة غير صالح");return}
+    if(typeof window.__migoGameApiRequest!=="function"){reply(false,null,"خدمة الألعاب غير متصلة بالخادم");return}
+    Promise.resolve(window.__migoGameApiRequest(String(d.path||""),d.body||{},requestId))
+     .then(data=>reply(true,data,""))
+     .catch(err=>reply(false,null,err&&err.message?err.message:"تعذر تنفيذ الجولة"));
+   }else if(d.t==="set"){
+    // Ignore all iframe-supplied balances. Only the authenticated server API
+    // may update the app wallet.
+    if(typeof window.__migoRefreshWallet==="function")window.__migoRefreshWallet().catch(()=>{});
    }else if(d.t==="wallet"){
     window.dispatchEvent(new CustomEvent("migo:open-wallet"));
    }
