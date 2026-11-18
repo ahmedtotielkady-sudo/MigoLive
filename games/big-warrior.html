@@ -150,6 +150,7 @@ button:focus-visible,.card:focus-visible{outline:3px solid #fff;outline-offset:2
       });
       const data=await response.json();
       if(!response.ok||!data.ok)throw new Error(data.message||"تعذر تنفيذ الجولة");
+      pendingGameKey=null;
       coins=Number(data.coins)||0;
       const winner=data.winner, won=!!data.won, gain=Number(data.payout)||0;
       const L=$("cLion"),T=$("cTiger");
