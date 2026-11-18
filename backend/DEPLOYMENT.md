@@ -1,4 +1,4 @@
-# MigoLive backend — deployment and game integration
+# MigoLive backend — deployment and seven-game integration
 
 ## Current working branch
 `work/migolive-server-seven-games-mainline-2026-11-18`
@@ -28,26 +28,33 @@ The backend is restored on a branch based on the current `main`. Review PR #27 b
 - `POST /api/wallet/transfer` (Bearer token + Idempotency-Key)
 
 ## Seven game catalog entries
-All seven games are registered in `GET /api/games/catalog` and use the central `User.coins` balance, Wallet mirror, WalletTransaction ledger, and GameRound records.
+All seven games are registered and visible in `GET /api/games/catalog`. Each has a server-side engine and authenticated settlement endpoint. Every game uses the same `User.coins` balance, Wallet mirror, WalletTransaction ledger, and GameRound records.
 
-| Game | Server endpoint | Catalog status |
+| Game | Server endpoint | Current state |
 |---|---|---|
-| Slot 777 | `POST /api/games/slot-777/spin` | Active in catalog |
-| Ocean Storm | `POST /api/games/ocean-storm/spin` | Active in catalog |
-| Animal Wheel | `POST /api/games/wheel-animals/spin` | Disabled pending frontend wiring and DB integration tests |
-| Cleopatra Gold | `POST /api/games/cleopatra-gold/spin` | Active in catalog |
-| Fruit Luck | `POST /api/games/fruit-luck/spin` | Disabled pending frontend wiring and DB integration tests |
-| Rocket Crash | start/state/cashout endpoints below | Disabled pending frontend wiring and DB integration tests |
-| Big Warrior | `POST /api/games/big-warrior/play` | Active in catalog |
+| Slot 777 | `POST /api/games/slot-777/spin` | Server API ready; client wiring pending |
+| Ocean Storm | `POST /api/games/ocean-storm/spin` | Server API ready; client wiring pending |
+| Animal Wheel | `POST /api/games/wheel-animals/spin` | Server API ready; client wiring pending |
+| Cleopatra Gold | `POST /api/games/cleopatra-gold/spin` | Server API ready; client wiring pending |
+| Fruit Luck | `POST /api/games/fruit-luck/spin` | Server API ready; client wiring pending |
+| Rocket Crash | start/state/cashout endpoints below | Server API ready; client wiring pending |
+| Big Warrior | `POST /api/games/big-warrior/play` | Server API ready; client wiring pending |
 
-Every game action requires a Bearer token and a unique `Idempotency-Key`. The server decides outcomes and payouts; never accept client-supplied results, multipliers, balances, or payout amounts.
+The catalog keeps all seven visible but `active:false` until the current game pages call these APIs and database integration tests pass. Do not activate or deploy them yet.
+
+All game actions require a Bearer token and a unique `Idempotency-Key`. The server decides outcomes and payouts; never accept client-supplied results, multipliers, balances, or payout amounts.
+
+### Animal Wheel and Fruit Luck request formats
+- Animal Wheel: `POST /api/games/wheel-animals/spin`, body `{ "bets": [500,0,0,0,0,0,0,0] }`. The array has eight bet positions matching the original animal wheel; chip increments are 500 coins.
+- Fruit Luck: `POST /api/games/fruit-luck/spin`, body `{ "bets": { "m": 100, "77": 0, "o": 100 } }`. Bet increments are 10 coins.
+- Both requests require `Authorization: Bearer <token>` and `Idempotency-Key: <stable-unique-key>`. A retry must reuse the same key and identical bet payload.
 
 ### Rocket Crash
-- `POST /api/games/rocket-crash/start`
+- `POST /api/games/rocket-crash/start` with body `{ "bet": 100 }`
 - `GET /api/games/rocket-crash/:roundId/state`
-- `POST /api/games/rocket-crash/:roundId/cashout`
+- `POST /api/games/rocket-crash/:roundId/cashout` with an Idempotency-Key header
 
-The crash point and elapsed multiplier are server-authoritative. Cashout after the crash is rejected.
+The server enforces the original 5-second pre-launch delay and 0.13 exponential growth rate. The server crash point is capped at 100x for safe, bounded settlement. Cashout after the crash is rejected.
 
 ## Local validation
 From the `backend` directory:
@@ -55,13 +62,14 @@ From the `backend` directory:
 npm install
 npm test
 ```
-GitHub Actions runs the same unit-test suite for this branch and pull requests. Unit tests do not replace MongoDB transaction/integration tests.
+GitHub Actions currently runs the backend unit suite successfully (41 tests). Unit tests do not replace MongoDB transaction/integration tests.
 
 ## Required before production activation
-1. Wire the current seven game pages and the app login/session to the authenticated API. The three pages Animal Wheel, Fruit Luck and Rocket Crash currently contain local/client-side game behavior and must be changed to request server outcomes.
-2. Test all game settlement flows against a dedicated MongoDB Atlas test database, including retries with the same idempotency key, insufficient funds, concurrent requests, and wallet ledger consistency.
-3. Confirm that `User.coins` and the Wallet mirror remain equal after registration, recharge, transfers, game bets and rewards.
-4. Validate game payout tables against the original game rules before activating the three pending catalog entries.
-5. Only then merge and deploy to Railway after review and explicit approval.
+1. Connect the current app login/session to the authenticated API and persist the returned token securely.
+2. Replace local/client-side betting and payout in all seven game pages with the matching server endpoints. The pages must display wallet balances returned by the API only; they must never send a new balance to the parent app.
+3. Test all seven settlement flows against a dedicated MongoDB Atlas test database, including retries with the same idempotency key, insufficient funds, concurrent requests, crash/cashout races, and wallet ledger consistency.
+4. Confirm that `User.coins` and the Wallet mirror remain equal after registration, recharge, transfers, game bets and rewards.
+5. Validate every payout table against the original game rules before activating the catalog.
+6. Only then merge and deploy to Railway after review and explicit approval.
 
 Existing local-only accounts are not automatically migrated. No production balances are changed by this branch.
