@@ -29,7 +29,7 @@ test("public game catalog omits disabled games and app owner controls are wired"
   const catalog = read("routes/games.js");
   const client = fs.readFileSync(path.join(__dirname, "..", "..", "api-bridge.js"), "utf8");
   assert.match(catalog, /AppGamePolicy\.findById/);
-  assert.match(catalog, /game\.enabled === false/);
+  assert.match(catalog, /value && value\.enabled === false/);
   assert.match(client, /openOwnerGameControlPanel/);
   assert.match(client, /game-control\/policy/);
   assert.match(client, /game-control\//);
