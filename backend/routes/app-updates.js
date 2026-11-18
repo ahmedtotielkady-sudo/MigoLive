@@ -28,7 +28,9 @@ router.get("/status", async (req, res, next) => {
     const latestVersionCode = policy ? policy.latestVersionCode : 1;
     const minimumVersionCode = policy ? policy.minimumVersionCode : 1;
     const versionCode = clientVersion(req);
-    const blocked = !!(policy && policy.enabled && versionCode < minimumVersionCode);
+    const currentUser = await User.findById(req.auth.sub).select("role status").lean();
+    const isOwner = !!(currentUser && currentUser.status === "active" && currentUser.role === "owner");
+    const blocked = !isOwner && !!(policy && policy.enabled && versionCode < minimumVersionCode);
     return res.json({
       ok: true,
       blocked,
@@ -37,6 +39,18 @@ router.get("/status", async (req, res, next) => {
       apkUrl: policy ? policy.apkUrl : "",
       message: policy ? policy.contactMessage : "يتوفر تحديث جديد لميجو لايف"
     });
+  } catch (error) { return next(error); }
+});
+
+// Owner-only settings readback for the owner control panel.
+router.get("/policy", requireOwner, async (_req, res, next) => {
+  try {
+    const policy = await AppUpdatePolicy.findById("global").lean();
+    return res.json({ ok: true, policy: policy ? {
+      enabled: policy.enabled, latestVersionCode: policy.latestVersionCode,
+      minimumVersionCode: policy.minimumVersionCode, apkUrl: policy.apkUrl,
+      contactMessage: policy.contactMessage, updatedAt: policy.updatedAt
+    } : { enabled: false, latestVersionCode: 1, minimumVersionCode: 1, apkUrl: "", contactMessage: "هذا الإصدار لم يعد مدعومًا. يُرجى التواصل مع مالك التطبيق للحصول على أحدث إصدار من ميجو لايف." } });
   } catch (error) { return next(error); }
 });
 
