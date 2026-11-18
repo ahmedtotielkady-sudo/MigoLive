@@ -7,11 +7,12 @@ const Wallet = require("../models/Wallet");
 const WalletTransaction = require("../models/WalletTransaction");
 const GameRound = require("../models/GameRound");
 const requireAuth = require("../middleware/requireAuth");
+const requireGameEnabled = require("../middleware/requireGameEnabled");
 const wheel = require("../game-engines/wheel-animals");
 const fruit = require("../game-engines/fruit-luck");
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, requireGameEnabled);
 const validKey = key => /^[A-Za-z0-9_-]{16,80}$/.test(key);
 const fail = (message, status) => Object.assign(new Error(message), { status });
 
