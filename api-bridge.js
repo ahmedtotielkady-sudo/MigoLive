@@ -26,9 +26,11 @@
       name: user.displayName || user.username || ('عضو ' + user.uid),
       username: user.username, phone: user.phone || '', uid: user.uid,
       coins: Number(user.coins) || 0, role: user.role || 'user',
-      avatar: user.avatar || '', pass: password ? await hash(password) : (old.pass || ''),
+      avatar: user.avatar || '',
       serverId: user.id, serverBacked: true, banned: false
     });
+    // Never retain a locally hashed password for server-backed accounts.
+    try { delete DB.users[key].pass; } catch (_) {}
     return key;
   };
   // One-time, authenticated migration of safe profile fields from a matching legacy UID.
