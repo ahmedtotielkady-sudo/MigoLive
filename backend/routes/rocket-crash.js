@@ -37,7 +37,7 @@ router.post("/rocket-crash/start", async (req,res) => {
         const user = await User.findById(req.auth.sub).session(session).select("coins");
         if (!user) throw fail("الحساب غير موجود", 404);
         result = { roundId:prior.roundId, bet:prior.bet, coins:user.coins,
-          status:prior.status, startAt:prior.outcome.startAt, repeated:true };
+          status:prior.status, phase:"wait", startAt:new Date(prior.outcome.startAt).getTime(), repeated:true };
         return;
       }
       const user = await User.findOne({ _id:req.auth.sub, status:"active" })
@@ -62,7 +62,7 @@ router.post("/rocket-crash/start", async (req,res) => {
         outcome:{ requestedBet:bet, startedAt:new Date(now), startAt, crashAtMultiplier }
       }], { session });
       result = { roundId:round.roundId, bet, coins:user.coins, status:round.status,
-        startAt, repeated:false };
+        phase:"wait", startAt:startAt.getTime(), repeated:false };
     });
     return res.json({ ok:true, gameId:"rocket-crash", ...result });
   } catch (error) {
@@ -71,7 +71,7 @@ router.post("/rocket-crash/start", async (req,res) => {
   } finally { await session.endSession(); }
 });
 
-router.get("/rocket-crash/:roundId/state", async (req,res) => {
+router.get("/rocket-crash/state", async (req,res) => {\n  try {\n    const round = await GameRound.findOne({ userId:req.auth.sub, gameId:"rocket-crash", status:"accepted" }).sort({ createdAt:-1 }).lean();\n    if (!round) return res.json({ ok:true, gameId:"rocket-crash", active:false });\n    const now=Date.now(), startAt=new Date(round.outcome.startAt).getTime();\n    const phase=now<startAt ? "wait" : "fly";\n    const multiplier=phase==="wait" ? 1 : currentMultiplier(round);\n    return res.json({ ok:true, gameId:"rocket-crash", active:true, roundId:round.roundId, bet:round.bet, phase, startAt, multiplier });\n  } catch (_) { return res.status(500).json({ ok:false, message:"تعذر قراءة حالة الجولة" }); }\n});\n\nrouter.get("/rocket-crash/:roundId/state", async (req,res) => {
   const session = await mongoose.startSession();
   try {
     let result;
@@ -110,7 +110,7 @@ router.get("/rocket-crash/:roundId/state", async (req,res) => {
   } finally { await session.endSession(); }
 });
 
-router.post("/rocket-crash/:roundId/cashout", async (req,res) => {
+router.post(["/rocket-crash/cashout", "/rocket-crash/:roundId/cashout"], async (req,res) => {
   const cashoutKey = String(req.get("idempotency-key") || "");
   if (!validKey(cashoutKey)) return res.status(400).json({ ok:false, message:"معرّف السحب مطلوب" });
   const session = await mongoose.startSession();
