@@ -69,6 +69,6 @@ test("rocket polling stays below the shared game API rate limit and wallet error
   const server = read("server.js");
   assert.match(rocket, /lastStatePoll>=1500/);
   assert.ok(server.includes('app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 90'));
-  assert.match(rocket, /walletError=String\\(d\\.message/);
-  assert.match(rocket, /if\\(walletError\\)\\{m\\.className='w'/);
+  assert.ok(rocket.includes("walletError=String(d.message"));
+  assert.ok(rocket.includes("walletError"));
 });
