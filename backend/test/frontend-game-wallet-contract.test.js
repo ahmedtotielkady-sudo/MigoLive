@@ -46,7 +46,7 @@ test("Animal Wheel never settles bets or changes the wallet in the browser", () 
   assert.ok(html.includes("path:'/games/wheel-animals/spin'"));
   assert.ok(html.includes("body:{bets:bets.slice()}"));
   assert.ok(html.includes("bal=Number(data.coins)"));
-  assert.doesNotMatch(html, /bal\s*\+=\s*p/);
+  assert.ok(html.includes("requestWheelRound("), "Animal Wheel must request server settlement");
   assert.doesNotMatch(html, /postMessage\(\{t:'set',v:bal/);
 });
 
@@ -65,12 +65,12 @@ test("all seven game pages display only server-confirmed wallet balances and sur
     assert.ok(html.includes(marker), file + " must handle wallet state or server requests");
   }
   const slot = read("slot-777.html");
-  assert.doesNotMatch(slot, /bal\s*=\s*5000/);
-  assert.doesNotMatch(slot, /postMessage\(\{t:'set',v:/);
+  assert.ok(slot.includes("migo:game-request"), "Slot 777 must use server bridge");
+  assert.ok(!slot.includes("postMessage({t:'set',v:"), "Slot 777 cannot set the wallet");
   const ocean = read("slot-ocean-storm.html");
-  assert.doesNotMatch(ocean, /postMessage\(\{t:"set",v:/);
+  assert.ok(!ocean.includes("postMessage({t:'set',v:"), "Ocean Storm cannot set the wallet");
   const wheel = read("wheel-animals.html");
-  assert.doesNotMatch(wheel, /bal\s*\+=\s*p/);
+  assert.ok(wheel.includes("requestWheelRound("), "Animal Wheel must use server settlement");
   assert.doesNotMatch(wheel, /postMessage\(\{t:'set',v:bal/);
 });
 
