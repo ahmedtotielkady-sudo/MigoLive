@@ -116,18 +116,30 @@ function startSpin(o,late){
   var target=-ANG[o.i]+o.off,cur=((rot%360)+360)%360,d=((target-cur)%360+360)%360,rt=$("rot");
   if(late){rot=rot+d;rt.style.transition="none"}else{rot=rot+360*6+d;rt.style.transition="transform 5.5s cubic-bezier(.12,.6,.1,1)"}
   rt.style.transform="rotate("+rot+"deg)"}
-function settle(r){
-  if(settled===r)return null;var o=outcome(r),tot=total(),win=bets[o.res]*MULT[o.res];
-  bal+=win;settled=r;lastInfo={res:o.res,win:win,tot:tot};bets={m:0,"77":0,o:0};upd();return lastInfo}
-function showRes(r){
-  var info=settle(r)||lastInfo||{res:outcome(r).res,win:0,tot:0};
+let settlePromise=null;
+async function settle(r){
+  if(settled===r)return lastInfo;
+  if(settlePromise)return settlePromise;
+  const placed={m:bets.m,"77":bets["77"],o:bets.o},tot=total();
+  if(!tot){settled=r;lastInfo={res:outcome(r).res,win:0,tot:0};return lastInfo}
+  settlePromise=(async()=>{
+    const server=await migoGameCall("fruit-luck","spin",{bets:placed});
+    const res=server.outcome.result,win=Math.max(0,Number(server.payout)||0);
+    bal=Math.max(0,Math.floor(Number(server.coins)||0));settled=r;
+    lastInfo={res,win,tot};bets={m:0,"77":0,o:0};upd();return lastInfo;
+  })();
+  try{return await settlePromise}catch(e){settlePromise=null;msg("تعذر اعتماد الرهان على الخادم: "+(e.message||"خطأ"));return null}
+}
+async function showRes(r){
+  var info=await settle(r)||lastInfo||{res:outcome(r).res,win:0,tot:0};
   $("b_"+info.res).classList.add("win");$("rf").innerHTML=ic(info.res);
   $("rm").textContent=info.tot?(info.win?"مبروك! فزت في هذه الجولة":"حظ أوفر في الجولة القادمة"):"لم تضع رهانك في هذه الجولة بعد، والجائزة الكبرى أمامك مباشرة!";
-  $("rg").textContent=info.tot?"\uD83E\uDE99 "+info.win:"";$("res").classList.add("show")}
+  $("rg").textContent=info.tot?"\uD83E\uDE99 "+info.win:"";$("res").classList.add("show");
+}
 function hideRes(){$("res").classList.remove("show");["m","77","o"].forEach(function(k){$("b_"+k).classList.remove("win")})}
 function tick(){
   var now=Date.now(),r=Math.floor(now/CYC),off=now%CYC;
-  if(r!==rid){if(rid&&settled!==rid&&total()>0)settle(rid);rid=r;lastPh=""}
+  if(r!==rid){if(rid&&settled!==rid&&total()>0)settle(rid).catch(()=>{});rid=r;lastPh=""}
   var ph=off<BET?"bet":off<SPE?"spin":off<RSE?"res":"wait";
   if(ph==="bet"){$("cd").textContent=Math.ceil((BET-off)/1000);
     if(lastPh!=="bet"){phase="bet";hideRes();$("st").textContent="ضع رهانك قبل انتهاء العد";hist=histFor(rid-1);drawHist()}}
@@ -143,5 +155,7 @@ try{var sb=JSON.parse(localStorage.getItem("fh_bets")||"null");if(sb&&sb.b){if(s
 upd();setInterval(tick,250);document.addEventListener("visibilitychange",tick);tick();
 })();
 </script>
+
+<script id="migo-server-game-rpc">(()=>{let n=0;const p=new Map();function key(){const a=new Uint8Array(18);crypto.getRandomValues(a);return 'g'+Array.from(a,x=>x.toString(16).padStart(2,'0')).join('')+(++n)}window.migoGameCall=(gameId,action,payload)=>new Promise((resolve,reject)=>{const requestId=key(),timer=setTimeout(()=>{p.delete(requestId);reject(new Error('انتهت مهلة اتصال اللعبة بالخادم'))},15000);p.set(requestId,{resolve,reject,timer});parent.postMessage({t:'migo:game:request',gameId,action,payload,requestId},'*')});addEventListener('message',e=>{const d=e.data;if(!d||d.t!=='migo:game:response')return;const x=p.get(d.requestId);if(!x)return;clearTimeout(x.timer);p.delete(d.requestId);d.ok?x.resolve(d.result):x.reject(new Error(d.message||'تعذر تنفيذ الجولة'))})})();</script>
 </body>
 </html>
