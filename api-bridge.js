@@ -321,7 +321,7 @@
       }, payload), event.origin || '*'); } catch (_) {}
     };
     const bet = Number(request.bet);
-    if (typeof request.requestId !== 'string' || request.requestId.length > 80 ||
+    if (typeof request.requestId !== 'string' || !/^[A-Za-z0-9_-]{16,80}$/.test(request.requestId) ||
         !Number.isSafeInteger(bet) || bet <= 0) {
       reply({ ok: false, message: 'بيانات الرهان غير صحيحة' });
       return;
@@ -329,7 +329,7 @@
     try {
       const result = await api('/games/slot-777/spin', {
         method: 'POST',
-        headers: { 'Idempotency-Key': gameRequestKey('slot777') },
+        headers: { 'Idempotency-Key': request.requestId },
         body: JSON.stringify({ bet })
       });
       reply({ ok: true, result });
