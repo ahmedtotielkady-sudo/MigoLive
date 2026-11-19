@@ -350,10 +350,17 @@
     const data = await api('/wallet');
     DB.users[me].coins = Number(data.coins) || 0;
     save();
+    const coins = DB.users[me].coins;
     const top = $id('mycoins');
-    if (top) top.textContent = DB.users[me].coins;
-    const walletBalance = document.querySelector('#main [data-server-wallet-balance]');
-    if (walletBalance) walletBalance.textContent = DB.users[me].coins;
+    if (top) top.textContent = coins;
+    const walletBalances = document.querySelectorAll('[data-server-wallet-balance]');
+    walletBalances.forEach(node => { node.textContent = coins.toLocaleString('en-US'); });
+    // Keep any currently open game iframe's balance label in sync with the
+    // canonical server value; never accept a balance written by the game.
+    const gameFrames = [$id('gf'), document.querySelector('#migo-game-overlay iframe')].filter(Boolean);
+    gameFrames.forEach(frame => {
+      try { frame.contentWindow.postMessage({ t: 'bal', v: coins }, '*'); } catch (_) {}
+    });
     return data;
   }
 
@@ -368,7 +375,9 @@
     catch (error) { console.warn('Server wallet sync pending:', error.message); }
     finally { walletRefreshBusy = false; }
   }
-  setInterval(refreshWalletSafely, 10000);
+  // Poll once per second so credits, transfers, wins and losses appear promptly.
+  // refreshWalletSafely serializes requests and skips hidden/backgrounded views.
+  setInterval(refreshWalletSafely, 1000);
   window.addEventListener('focus', refreshWalletSafely);
   document.addEventListener('visibilitychange', refreshWalletSafely);
   window.addEventListener('migo:wallet-updated', refreshWalletSafely);
