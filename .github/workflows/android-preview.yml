@@ -136,9 +136,14 @@ jobs:
               ('$("plus").onclick=function(){if(stepIdx<STEPS.length-1&&STEPS[stepIdx+1]<=coins){stepIdx++;render()}};', '$("plus").onclick=function(){if(!busy&&stepIdx<STEPS.length-1){stepIdx++;render()}};'),
               ('if(!pick||busy||coins<=0)return;', 'if(!pick||busy||coins<bet())return;')
           ]
-          for old, new in jsfixes:
+          server_controlled = 'migoGameCall("big-warrior","fight"' in html
+          for index, (old, new) in enumerate(jsfixes):
               count = html.count(old)
               if count != 1:
+                  # The server-authoritative rewrite already removed the local
+                  # random winner calculation; do not reapply the legacy RNG patch.
+                  if server_controlled and index == 0 and count == 0:
+                      continue
                   raise SystemExit(f'Expected exactly one occurrence for warrior behavior patch, got {count}: {old}')
               html = html.replace(old, new, 1)
           p.write_text(html, encoding='utf-8')
