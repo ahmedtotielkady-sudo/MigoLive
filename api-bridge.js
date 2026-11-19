@@ -44,12 +44,26 @@
     card.append(title,message,version,button);overlay.append(card);document.body.append(overlay);
     document.body.style.overflow='hidden';
   }
+  async function installedAppVersion(){
+    try{
+      const app=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
+      if(app&&typeof app.getInfo==='function'){
+        const info=await app.getInfo();
+        if(info&&info.version)return String(info.version);
+      }
+    }catch(_){}
+    return MIGO_APP_VERSION;
+  }
+  let installedVersionPromise=null;
   async function checkMandatoryUpdate(){
     try{
       const response=await fetch(API+'/app-update/status',{cache:'no-store'});
       if(!response.ok)return;
       const data=await response.json(),policy=data.policy||{};
-      if(policy.enabled&&compareVersions(MIGO_APP_VERSION,policy.minimumVersion)<0)showMandatoryUpdate(policy);
+      if(!policy.enabled)return;
+      if(!installedVersionPromise)installedVersionPromise=installedAppVersion();
+      const installed=await installedVersionPromise;
+      if(compareVersions(installed,policy.minimumVersion)<0)showMandatoryUpdate(policy);
     }catch(_){}
   }
   checkMandatoryUpdate();
