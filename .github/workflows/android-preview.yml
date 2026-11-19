@@ -7,6 +7,7 @@ on:
       - android-preview
       - feature/agency-owner-approval
       - feature/permanent-dark-server-wallet
+      - fix/registration-username-min-3-max-24
   workflow_dispatch:
 
 permissions:
