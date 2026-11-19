@@ -44,7 +44,7 @@ if "migo-server-game-client-v1" not in html:
     srcdoc = "$('#gf').srcdoc=offlineGameHtml;"
     if srcdoc not in html:
         raise SystemExit("Could not find app game srcdoc assignment")
-    inject = "const migoServerGameBridge=" + json.dumps(helper + "</body>") + ";\n  const bridgedGameHtml=offlineGameHtml.replace(/<\\/body>/i,migoServerGameBridge);\n  $('#gf').srcdoc=bridgedGameHtml;"
+    inject = "const migoServerGameBridge=" + json.dumps(helper + "</body>").replace("</script>", "<\\/script>") + ";\n  const bridgedGameHtml=offlineGameHtml.replace(/<\\/body>/i,migoServerGameBridge);\n  $('#gf').srcdoc=bridgedGameHtml;"
     html = html.replace(srcdoc, inject, 1)
 
 index.write_text(html, encoding="utf-8")
@@ -62,7 +62,7 @@ for path in files:
     if "migo-server-game-client-v1" not in source:
         if "</body>" not in source:
             raise SystemExit(f"Missing </body> in {path}")
-        source = source.replace("</body>", helper + "\\n</body>", 1)
+        source = source.replace("</body>", helper + "\n</body>", 1)
         path.write_text(source, encoding="utf-8")
 
 print("Hardened app and room wallet bridges; installed server game client in all seven game assets")
