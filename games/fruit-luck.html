@@ -55,6 +55,10 @@ html,body{height:100%;margin:0;background:#12041f;color:var(--txt);font-family:"
 .hist{margin-top:10px}
 .boxes{margin-top:14px}
 .chips{margin-top:18px}
+
+/* Fast Android/WebView touch response: no delayed double-tap handling. */
+button,[role="button"],.chip,.hit,.box{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+button:active,[role="button"]:active,.chip:active,.hit:active,.box:active{filter:brightness(1.18);}
 </style>
 </head>
 <body>
