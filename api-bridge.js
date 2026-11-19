@@ -524,7 +524,7 @@
     });
 
     // Some room launchers render plain text cards without game-specific classes.
-    document.querySelectorAll("#migo-game-picker *,#room-game-picker *,[data-room-game-picker] *,.room-game-picker *").forEach(node => {
+    document.querySelectorAll("#migo-game-picker .migo-game-card,#migo-game-picker *,#room-game-picker *,[data-room-game-picker] *,.room-game-picker *").forEach(node => {
       if (node.children.length > 3) return;
       const label = String(node.innerText || node.textContent || "").trim();
       if (!label || label.length > 100) return;
