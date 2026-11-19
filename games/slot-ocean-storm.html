@@ -189,7 +189,7 @@ function scCount(){return all().filter(function(d){return d.t==="sc"}).length}
 async function counter(from,to,el){var steps=24;for(var i=1;i<=steps;i++){el.textContent=fmt(from+(to-from)*i/steps);await sleep(25)}}
 async function payout(w){
   if(w<=0){return}
-  bal+=w;upd();addWin(w);$("last").textContent=fmt(w);
+  addWin(w);$("last").textContent=fmt(w);
   showWin(fmt(w));beep(880,.3,"square",.05);beep(1180,.4,"triangle",.05);
   if(w>=bet()*20)say("🔥 فوز ضخم! "+fmt(w/bet())+"× الرهان");else say("فزت بـ "+fmt(w));
   await sleep(w>=bet()*10?1400:800);hideWin();
@@ -206,7 +206,7 @@ async function freeSpins(n){
     if(r.mult){fm+=r.mult;setFm()}
     var w=r.total>0?r.total*(fm>0?fm:1):0;w=Math.min(w,Math.max(0,cap()-sum));
     if(scCount()>=4){left+=15;await banner("+15 لفة مجانية","ظهرت 4 مربعات عاصفة المحيط!",1800)}
-    sum+=w;if(w>0){bal+=w;upd();addWin(w);showWin(fmt(w));await sleep(900);hideWin()}
+    sum+=w;if(w>0){addWin(w);showWin(fmt(w));await sleep(900);hideWin()}
   }
   await banner("إجمالي الربح",fmt(sum),2800);
   fm=0;setFm();$("last").textContent=fmt(sum);say("انتهت اللفات المجانية — ربحت "+fmt(sum));
