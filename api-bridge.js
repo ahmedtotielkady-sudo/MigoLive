@@ -312,7 +312,13 @@
   if ($id('bin') && typeof originalLogin === 'function') {
     $id('bin').onclick = async () => {
       const raw = ($id('u')?.value || '').trim();
-      const phone = ($id('reg-phone')?.value || '').trim();
+      let phone = ($id('reg-phone')?.value || '').trim()
+        .replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+        .replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+        .replace(/[\s\u00a0\u200e\u200f\u202a-\u202e()-]/g,'');
+      if(/^01[0-9]{9}$/.test(phone)) phone='+20'+phone.slice(1);
+      else if(/^00201[0-9]{9}$/.test(phone)) phone='+20'+phone.slice(4);
+      else if(/^201[0-9]{9}$/.test(phone)) phone='+'+phone;
       const password = $id('p')?.value || '';
       const registering = !!(typeof reg !== 'undefined' && reg);
       if (!raw || !password) return message('أدخل بيانات الحساب');
