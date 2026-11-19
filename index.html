@@ -1362,6 +1362,7 @@ const logTable=a=>a.length?`<div class="tbw"><table><tr><th>الوقت</th><th>�
 let ot='tp';
 function rOwner(m){
   if(!isStaff(U())){tab='me';return render()}
+  if(ot==='appupdate'&&(!U()||U().role!=='owner')){ot='dash';toast('التحكم في تحديث التطبيق متاح للمالك فقط')}
   const users=Object.entries(DB.users),agents=users.filter(([,x])=>x.role==='agent');
   const tabsO=staffTabs([['dash','📊 الرئيسية'],['tp','طلبات الشحن'],['set','الإعدادات'],['coins','العملات'],['agents','الوكلاء'],['users','الأعضاء'],['hosts','سجل المضيفين'],['alog','سجل الوكلاء'],['ag','وكالات المضيفين'],['ship','وكالات الشحن'],['ledger','دفاتر الحسابات'],['vip','VIP'],['gifts','الهدايا'],['broadcast','رسائل النظام'],['events','الفعاليات'],['staff','الصلاحيات'],['appupdate','📲 تحديث التطبيق'],['countries','طلبات تغيير البلد'],['support','الدعم']]);
   let body='';
@@ -1440,9 +1441,42 @@ function rOwner(m){
 
 /* ===== Server-controlled application updates ===== */
 function appUpdateOwnerHTML(){
- return '<div class="card"><b>📲 إصدار التطبيق</b><div class="mu">MigoLive يعمل محلياً على هذا الجهاز. تحديث التطبيق يتم ببناء APK جديد وتثبيته يدوياً؛ لا يوجد اتصال بخادم تحديثات.</div></div>';
+ if(!U()||U().role!=='owner')return '<div class="card">هذا القسم متاح لمالك التطبيق فقط.</div>';
+ return `<div class="card"><b>📲 التحكم في تحديث التطبيق لجميع المستخدمين</b>
+ <p class="mu">فعّل التحديث الإجباري بعد تجهيز APK جديد. كل نسخة أقدم من الحد الأدنى ستُمنع من الاستخدام وتظهر لها شاشة التحديث ورابط التنزيل.</p>
+ <div class="sp"></div><label class="row" style="justify-content:space-between"><b>التحديث الإجباري</b><input id="au-enabled" type="checkbox" style="width:22px;height:22px"></label>
+ <div class="sp"></div><label class="mu" for="au-latest">أحدث إصدار</label><input class="in" id="au-latest" dir="ltr" placeholder="1.0.1" value="1.0.1">
+ <label class="mu" for="au-min">الحد الأدنى المسموح به</label><input class="in" id="au-min" dir="ltr" placeholder="1.0.1" value="1.0.1">
+ <label class="mu" for="au-url">رابط تنزيل APK الجديد (HTTPS)</label><input class="in" id="au-url" dir="ltr" inputmode="url" placeholder="https://.../MigoLive.apk">
+ <label class="mu" for="au-msg">رسالة تظهر للمستخدمين</label><textarea class="in" id="au-msg" rows="3" maxlength="500">يتوفر تحديث جديد لتطبيق ميجو لايف. حدّث التطبيق للمتابعة.</textarea>
+ <button class="btn g w" id="au-save">حفظ ونشر إعدادات التحديث</button><div class="err" id="au-error" role="alert"></div>
+ </div><div class="card"><b>تنبيه مهم</b><p class="mu">أندرويد لا يسمح للتطبيق بتثبيت APK بصمت من داخل التطبيق. سيظهر للمستخدم زر تنزيل، ثم يؤكد التثبيت بنفسه. لا تفعّل الإلزام قبل رفع ملف APK صحيح ووضع رابطه.</p><div id="au-state" class="mu">جارٍ تحميل إعدادات الخادم…</div></div>`;
 }
-function appUpdateOwnerBind(m){}
+async function appUpdateOwnerBind(m){
+ if(!U()||U().role!=='owner'){toast('هذا التحكم للمالك فقط');return}
+ const $au=id=>m.querySelector('#'+id),button=$au('au-save'),error=$au('au-error'),state=$au('au-state');
+ try{
+  const data=await fetch('https://migolive-api-production.up.railway.app/api/app-update/status').then(r=>r.json());
+  const p=data.policy||{};
+  $au('au-enabled').checked=!!p.enabled;
+  $au('au-latest').value=p.latestVersion||'1.0.1';
+  $au('au-min').value=p.minimumVersion||'1.0.1';
+  $au('au-url').value=p.downloadUrl||'';
+  $au('au-msg').value=p.message||'يتوفر تحديث جديد لتطبيق ميجو لايف. حدّث التطبيق للمتابعة.';
+  state.textContent=p.enabled?'التحديث الإجباري مفعّل · الحد الأدنى '+p.minimumVersion:'التحديث الإجباري متوقف حالياً';
+ }catch(e){state.textContent='تعذر تحميل إعدادات الخادم';}
+ button.onclick=async()=>{
+  if(!U()||U().role!=='owner')return toast('هذا التحكم للمالك فقط');
+  button.disabled=true;error.textContent='';
+  try{
+   const response=await fetch('https://migolive-api-production.up.railway.app/api/app-update/policy',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.getItem('migolive_api_token_v1')||'')},body:JSON.stringify({enabled:$au('au-enabled').checked,latestVersion:$au('au-latest').value.trim(),minimumVersion:$au('au-min').value.trim(),downloadUrl:$au('au-url').value.trim(),message:$au('au-msg').value.trim()})});
+   const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.message||'تعذر حفظ الإعدادات');
+   state.textContent=result.policy.enabled?'التحديث الإجباري مفعّل · الحد الأدنى '+result.policy.minimumVersion:'التحديث الإجباري متوقف حالياً';
+   toast('تم حفظ إعدادات التحديث على الخادم');
+  }catch(e){error.textContent=e.message||'حدث خطأ أثناء الحفظ';}
+  finally{button.disabled=false}
+ };
+}
 
 /* ===== مركز الإدارة الموسع: شحن، رسائل، فعاليات، دفاتر ===== */
 
