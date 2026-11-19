@@ -9,6 +9,7 @@ on:
       - feature/permanent-dark-server-wallet
       - fix/registration-username-min-3-max-24
       - feature/global-phone-registration-ui-2026-11-20
+      - feature/signup-dark-wallet-integration-2026-11-20
   workflow_dispatch:
 
 permissions:
