@@ -95,7 +95,7 @@ let bal=0,bi=0,fs=0,mult=1,busy=false,auto=false,grid=[],fsWin=0,walletReady=fal
 function rnd(r){const L=SY.filter(s=>!(s[0]=='W'&&(r==0||r==4)));let x=Math.random()*L.reduce((a,s)=>a+s[2],0);for(const s of L){if((x-=s[2])<0)return s[0]}return 'q'}
 const cell=id=>`<div class="c"><i class="i-${id}"></i></div>`;
 const col=r=>[rnd(r),rnd(r),rnd(r),rnd(r)];
-const save=()=>{if(walletReady)parent.postMessage({t:'set',v:Math.max(0,Math.floor(bal))},'*')};
+const save=()=>{};
 const msg=(t,c)=>{const m=$('#msg');m.textContent=t;m.className='info '+(c||'')};
 function ui(){
  $('#bal').textContent=bal.toLocaleString('en');$('#bet').textContent=BETS[bi].toLocaleString('en');
