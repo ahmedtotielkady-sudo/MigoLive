@@ -544,6 +544,7 @@
   // Server-authoritative settlement bridge for every game iframe.
   // Iframes submit bets/choices only; balances and payouts are never client supplied.
   const GAME_ACTIONS = {
+    'slot-777:spin': '/games/slot-777/spin',
     'ocean-storm:spin': '/games/ocean-storm/spin',
     'wheel-animals:spin': '/games/wheel-animals/spin',
     'fruit-luck:spin': '/games/fruit-luck/spin',
