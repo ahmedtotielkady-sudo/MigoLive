@@ -18,7 +18,7 @@ function normalizePhone(value) {
   let phone = String(value || "")
     .replace(/[٠-٩]/g, digit => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
     .replace(/[۰-۹]/g, digit => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
-    .replace(/[\\s()-]/g, "");
+    .replace(/[\s\u00a0\u200e\u200f\u202a-\u202e()-]/g, "");
   if (/^01[0-9]{9}$/.test(phone)) phone = "+2" + phone;
   return phone;
 }
