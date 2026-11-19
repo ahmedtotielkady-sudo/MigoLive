@@ -69,6 +69,10 @@ h1{margin:0;text-align:left;transform:translateY(8px);padding-left:8px;font-size
 .cell .slot-special{box-sizing:border-box;width:95%;height:auto;min-height:42%;padding:2px 1px;border:1px solid #fff9;border-radius:5px;font-size:clamp(8px,2vw,13px);font-size:17cqw;font-weight:900;letter-spacing:-.04em;color:white;text-shadow:0 1px 2px #0009}
 .cell .slot-wild{background:linear-gradient(135deg,#ff9b55,#b80026)}
 .cell .slot-bonus{background:linear-gradient(135deg,#ffe777,#8d3bce)}
+
+/* Fast Android/WebView touch response: no delayed double-tap handling. */
+button,[role="button"],.chip,.hit,.box{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+button:active,[role="button"]:active,.chip:active,.hit:active,.box:active{filter:brightness(1.18);}
 </style>
 </head>
 <body>
@@ -248,8 +252,8 @@ async function spin(){
 }
 
 $('spin').onclick=spin;
-$('up').onclick=()=>{if(!spinning){mi=Math.min(MULT.length-1,mi+1);upd()}};
-$('minus').onclick=()=>{if(!spinning){mi=Math.max(0,mi-1);upd()}};
+$('up').onclick=()=>{mi=Math.min(MULT.length-1,mi+1);upd()};
+$('minus').onclick=()=>{mi=Math.max(0,mi-1);upd()};
 $('auto').onchange=e=>{auto=e.target.checked?10:0;updAuto();if(auto>0&&!spinning){auto--;updAuto();spin()}};
 $('snd').onclick=()=>{sound=!sound;$('snd').textContent=sound?'🔊':'🔇';beep(500)};
 $('plus').onclick=toWallet;
