@@ -119,7 +119,7 @@ var $=function(i){return document.getElementById(i)},board=$("board");
 var fmt=function(n){return Math.round(n).toLocaleString("en-US")};
 var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms*(turbo?.4:1))})};
 var bet=function(){return BETS[bi]},cost=function(){return bet()*(ante?1.25:1)},cap=function(){return bet()===10000?bet()*15:Infinity};
-var ready=false;function save(){if(ready)try{parent.postMessage({t:"set",v:bal},"*")}catch(e){}}
+var ready=false;function save(){/* Wallet changes are accepted only from the server bridge. */}
 function wins(){try{return JSON.parse(localStorage.getItem("st_w")||"[]")}catch(e){return[]}}
 function show24(){var n=Date.now(),t=0;wins().forEach(function(x){if(n-x[0]<864e5)t+=x[1]});$("d24").textContent=fmt(t)}
 function addWin(a){var n=Date.now(),l=wins().filter(function(x){return n-x[0]<864e5});if(a>0)l.push([n,a]);try{localStorage.setItem("st_w",JSON.stringify(l))}catch(e){}show24()}
@@ -211,24 +211,66 @@ async function freeSpins(n){
   await banner("إجمالي الربح",fmt(sum),2800);
   fm=0;setFm();$("last").textContent=fmt(sum);say("انتهت اللفات المجانية — ربحت "+fmt(sum));
 }
-async function press(buy){
-  if(busy)return;busy=true;lock(true);
-  var c=buy?bet()*100:cost();
-  if(bal<c){say("الرصيد لا يكفي");busy=false;lock(false);auto=false;sync();if(bal<10)offerReset();return}
-  bal-=c;upd();$("last").textContent="0";say("حظًا موفقًا!");
-  try{
-    if(buy){await fillAll();var rb=await tumbleRound();await payout(Math.min(rb.mult?rb.total*rb.mult:rb.total,cap()))}
-    else{
-      await fillAll();
-      var r=await tumbleRound(),w=r.mult?r.total*r.mult:r.total;w=Math.min(w,cap());
-      if(r.mult&&r.total>0)say("المضاعف الكلي ×"+r.mult);
-      await payout(w);
-      if(scCount()>=4)await freeSpins(15);
+function renderServerGrid(serverGrid){
+  clear();
+  for(var c=0;c<COLS;c++){
+    g[c]=[];
+    for(var r=0;r<ROWS;r++){
+      var cell=serverGrid[c][r],d=mk(c,r,-(ROWS+2)*S);
+      if(cell.type==="symbol"){d.t="s";d.v=cell.symbol}
+      else if(cell.type==="scatter"){d.t="sc";delete d.v}
+      else{d.t="orb";d.v=cell.value}
+      d.el.innerHTML='<div class="sy">'+(d.t==="s"?ICON[d.v]:d.t==="sc"?'<div class="sc"></div>':'<div class="orb">'+d.v+'x</div>')+'</div>';
+      g[c].push(d);
     }
-  }catch(e){console.error(e)}
-  busy=false;lock(false);
-  if(bal<BETS[0]){offerReset();return}
-  if(auto)setTimeout(function(){press()},400);
+  }
+  void board.offsetWidth;
+  for(var c=0;c<COLS;c++)for(var r=0;r<ROWS;r++)place(g[c][r],c*35+r*18);
+  return sleep(700+COLS*35);
+}
+async function animateServerResult(server){
+  var outcome=server.outcome||{},steps=Array.isArray(server.steps)?server.steps:[];
+  if(!steps.length)await renderServerGrid(server.grid);
+  else{
+    for(var i=0;i<steps.length;i++){
+      var step=steps[i];await renderServerGrid(step.grid);
+      (step.removed||[]).forEach(function(key){var a=String(key).split(":"),d=g[Number(a[0])]&&g[Number(a[0])][Number(a[1])];if(d&&d.el.firstChild)d.el.firstChild.classList.add("hl")});
+      var stepWin=Math.max(0,Number(step.baseWin)||0);
+      showWin("+"+fmt(stepWin)+(Number(step.orbMultiplier)>0?" ×"+Number(step.orbMultiplier):""));
+      beep(620+i*45,.18,"triangle",.07);await sleep(500);hideWin();
+    }
+    await renderServerGrid(server.grid);
+  }
+  var free=Array.isArray(server.freeSpinRounds)?server.freeSpinRounds:[];
+  if(free.length){
+    await banner("🌩️ لفات مجانية!",free.length+" لفة من الخادم");
+    for(var j=0;j<free.length;j++){
+      say("لفة مجانية — "+(j+1)+" / "+free.length);
+      await renderServerGrid(free[j].finalGrid||server.grid);
+      var won=Math.max(0,Number(free[j].awardedPayout)||0);
+      if(won){showWin(fmt(won));await sleep(550);hideWin()}
+    }
+  }
+  return outcome;
+}
+async function press(buy){
+  if(busy)return;
+  if(!ready){say("جارٍ تحميل محفظة الخادم...");return}
+  busy=true;lock(true);$("last").textContent="0";say("جارٍ تنفيذ الجولة على الخادم...");
+  try{
+    var server=await migoGameCall("ocean-storm","spin",{bet:bet(),ante:ante,buyFeature:!!buy});
+    if(!server||!server.outcome||!Array.isArray(server.grid)||!Number.isFinite(Number(server.coins)))throw new Error("رد الجولة من الخادم غير مكتمل");
+    bal=Math.max(0,Math.floor(Number(server.coins)));ready=true;upd();
+    await fillAll();
+    var outcome=await animateServerResult(server);
+    var win=Math.max(0,Math.floor(Number(server.payout)||0));
+    $("last").textContent=fmt(win);addWin(win);
+    if(win>0){showWin(fmt(win));beep(880,.25,"square",.05);say("فزت بـ "+fmt(win)+" عملة · الرصيد مؤكد من الخادم");await sleep(900);hideWin()}
+    else say("حظ أوفر · تم اعتماد خسارة الجولة من الخادم");
+    if(outcome&&outcome.multiplier>0)say("المضاعف المعتمد ×"+Number(outcome.multiplier));
+  }catch(e){say("لم تُعتمد الجولة: "+(e.message||"تعذر الاتصال بالخادم"));auto=false;sync()}
+  busy=false;lock(false);upd();
+  if(auto&&ready&&bal>=cost())setTimeout(function(){press(false)},400);
 }
 function offerReset(){say("رصيدك لا يكفي — اشحن عملات من المحفظة")}
 function lock(b){$("spin").disabled=b;/* Keep bet controls responsive while the current round animates; they affect the next round only. */$("m").disabled=false;$("p").disabled=false;$("maxb").disabled=false}
@@ -238,9 +280,10 @@ $("maxb").onclick=function(){bi=BETS.length-1;upd()};$("m").onclick=function(){i
 $("turbo").onclick=function(){turbo=!turbo;sync()};
 $("auto").onclick=function(){auto=!auto;sync();if(auto&&!busy)press()};
 addEventListener("resize",function(){if(!busy){size();fillAll()}});
-size();upd();sync();show24();setInterval(show24,60000);fillAll();addEventListener("message",function(e){var d=e.data;if(d&&d.t==="bal"){bal=d.v;ready=true;upd();sync()}});try{parent.postMessage({t:"get"},"*")}catch(e){}
+size();upd();sync();show24();setInterval(show24,60000);fillAll();addEventListener("message",function(e){var d=e.data;if(d&&d.t==="bal"&&Number.isFinite(Number(d.v))){bal=Math.max(0,Math.floor(Number(d.v)));ready=true;upd();sync()}});try{parent.postMessage({t:"get"},"*")}catch(e){}
 })();
 </script>
+<script id="migo-server-game-rpc">(()=>{let n=0;const pending=new Map(),retryKeys=new Map();function key(){const a=new Uint8Array(18);crypto.getRandomValues(a);return 'g'+Array.from(a,x=>x.toString(16).padStart(2,'0')).join('')+(++n)}window.migoGameCall=(gameId,action,payload)=>new Promise((resolve,reject)=>{const sig=gameId+':'+action+':'+JSON.stringify(payload||{}),requestId=retryKeys.get(sig)||key(),timer=setTimeout(()=>{pending.delete(requestId);reject(new Error('انتهت مهلة اتصال اللعبة بالخادم'))},20000);retryKeys.set(sig,requestId);pending.set(requestId,{resolve,reject,timer,sig});parent.postMessage({t:'migo:game:request',gameId,action,payload,requestId},'*')});addEventListener('message',e=>{const d=e.data;if(!d||d.t!=='migo:game:response')return;const p=pending.get(d.requestId);if(!p)return;clearTimeout(p.timer);pending.delete(d.requestId);if(d.ok){retryKeys.delete(p.sig);p.resolve(d.result)}else p.reject(new Error(d.message||'تعذر تنفيذ الجولة'))})})();</script>
 <script>(function(){var app=document.getElementById('app'),b=document.getElementById('board'),co=document.getElementById('coins');if(!app||!b||!co)return;var raf=0;
 function c(){b.style.marginTop='0px';var ab=app.getBoundingClientRect(),bb=b.getBoundingClientRect(),pb=parseFloat(getComputedStyle(app).paddingBottom)||0,last=bb.bottom;
 for(var i=0;i<app.children.length;i++){var r=app.children[i].getBoundingClientRect();if(r.height>0&&r.bottom>last)last=r.bottom}
