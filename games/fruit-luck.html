@@ -108,36 +108,42 @@ BX.forEach(function(d){var b=document.createElement("div");b.className="box";b.i
  b.innerHTML='<div class="row">'+'<span class="f">'+ic(d[0])+'</span>'+'<span class="x">'+d[2]+'</span></div><div class="s" id="s_'+d[0]+'">0</div>';
  b.onclick=function(){if(!walletReady){$("st").textContent="جارٍ تحميل رصيد محفظتك...";return}if(phase!=="bet")return;var v=CHIPS[chip];if(bal<v){$("st").textContent="رصيدك غير كافٍ";return}bal-=v;bets[d[0]]+=v;upd()};$("boxes").appendChild(b)});
 CHIPS.forEach(function(v,i){var c=document.createElement("button");c.className="chip"+(i===0?" on":"");c.textContent=LBL[i];c.onclick=function(){chip=i;[].forEach.call($("chips").children,function(x,j){x.className="chip"+(j===i?" on":"")})};$("chips").appendChild(c)});
-function upd(){$("bal").textContent=walletReady?bal.toLocaleString("en-US"):"...";for(var k in bets)$("s_"+k).textContent=bets[k];if(walletReady)window.parent.postMessage({t:"set",v:Math.max(0,Math.floor(bal))},"*");save()}
+function upd(){$("bal").textContent=walletReady?bal.toLocaleString("en-US"):"...";for(var k in bets)$("s_"+k).textContent=bets[k];save()}
 // round (time-based: rounds run continuously on the clock)
 var CYC=30000,BET=20000,SPE=26000,RSE=29000,rid=0,lastPh="",settled=-1,lastInfo=null;
 function rng(seed){var a=seed>>>0;return function(){a=(a+0x6D2B79F5)>>>0;var t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
 function outcome(r){var g=rng(r*7919+13);g();g();var x=g(),res=x<.25?"77":x<.625?"o":"m",idx=[];SEG.forEach(function(s,i){if(s===res)idx.push(i)});return{res:res,i:idx[Math.floor(g()*idx.length)],off:(g()-.5)*16}}
 function histFor(last){var a=[];for(var k=0;k<9;k++)a.push(outcome(last-k).res);return a}
 function total(){return bets.m+bets["77"]+bets.o}
+let spinStarted=-1;
 function startSpin(o,late){
   phase="spin";$("cd").textContent="\uD83C\uDF40";$("st").textContent="العجلة تدور...";
-  var target=-ANG[o.i]+o.off,cur=((rot%360)+360)%360,d=((target-cur)%360+360)%360,rt=$("rot");
+  var target=-ANG[o.i]+(Number(o.off)||0),cur=((rot%360)+360)%360,d=((target-cur)%360+360)%360,rt=$("rot");
   if(late){rot=rot+d;rt.style.transition="none"}else{rot=rot+360*6+d;rt.style.transition="transform 5.5s cubic-bezier(.12,.6,.1,1)"}
   rt.style.transform="rotate("+rot+"deg)"}
+function resultForServer(info){var i=SEG.indexOf(info.res);return{res:info.res,i:i<0?0:i,off:0}}
 let settlePromise=null;
 async function settle(r){
   if(settled===r)return lastInfo;
   if(settlePromise)return settlePromise;
   const placed={m:bets.m,"77":bets["77"],o:bets.o},tot=total();
-  if(!tot){settled=r;lastInfo={res:outcome(r).res,win:0,tot:0};return lastInfo}
+  if(!tot){settled=r;lastInfo=Object.assign(outcome(r),{win:0,tot:0});return lastInfo}
   const task=(async()=>{
     const server=await migoGameCall("fruit-luck","spin",{bets:placed});
-    const res=server.outcome.result,win=Math.max(0,Number(server.payout)||0);
+    const res=server&&server.outcome&&server.outcome.result;
+    if(!["m","77","o"].includes(res)||!Number.isFinite(Number(server.coins)))throw new Error("نتيجة الجولة غير مكتملة من الخادم");
+    const win=Math.max(0,Number(server.payout)||0);
     bal=Math.max(0,Math.floor(Number(server.coins)||0));settled=r;
-    lastInfo={res,win,tot};bets={m:0,"77":0,o:0};upd();return lastInfo;
+    lastInfo={res,win,tot,i:resultForServer({res}).i,off:0};bets={m:0,"77":0,o:0};upd();return lastInfo;
   })();
   settlePromise=task;
   try{return await task}catch(e){msg("تعذر اعتماد الرهان على الخادم: "+(e.message||"خطأ"));return null}
   finally{if(settlePromise===task)settlePromise=null}
 }
 async function showRes(r){
-  var info=await settle(r)||lastInfo||{res:outcome(r).res,win:0,tot:0};
+  var info=await settle(r);
+  if(!info||settled!==r){$("res").classList.remove("show");$("st").textContent="لم تصل نتيجة مؤكدة من الخادم — جاري إعادة المحاولة";return}
+  if(spinStarted!==r){startSpin(resultForServer(info),true);spinStarted=r}
   $("b_"+info.res).classList.add("win");$("rf").innerHTML=ic(info.res);
   $("rm").textContent=info.tot?(info.win?"مبروك! فزت في هذه الجولة":"حظ أوفر في الجولة القادمة"):"لم تضع رهانك في هذه الجولة بعد، والجائزة الكبرى أمامك مباشرة!";
   $("rg").textContent=info.tot?"\uD83E\uDE99 "+info.win:"";$("res").classList.add("show");
@@ -149,7 +155,7 @@ function tick(){
   var ph=off<BET?"bet":off<SPE?"spin":off<RSE?"res":"wait";
   if(ph==="bet"){$("cd").textContent=Math.ceil((BET-off)/1000);
     if(lastPh!=="bet"){phase="bet";hideRes();$("st").textContent="ضع رهانك قبل انتهاء العد";hist=histFor(rid-1);drawHist()}}
-  else if(ph==="spin"){if(lastPh!=="spin"){startSpin(outcome(rid),off-BET>700);hist=histFor(rid-1);drawHist()}}
+  else if(ph==="spin"){if(lastPh!=="spin"){phase="spin";$("cd").textContent="\uD83C\uDF40";$("st").textContent="العجلة تدور...";if(total()>0){settle(rid).then(info=>{if(info&&settled===rid&&spinStarted!==rid){startSpin(resultForServer(info),off-BET>700);spinStarted=rid}}).catch(()=>{})}else{startSpin(outcome(rid),off-BET>700);spinStarted=rid}hist=histFor(rid-1);drawHist()}}
   else if(ph==="res"){if(lastPh!=="res"){phase="res";$("cd").textContent="\uD83C\uDF40";showRes(rid);hist=histFor(rid);drawHist()}}
   else if(lastPh!=="wait"){phase="wait";$("cd").textContent="20";hideRes();$("st").textContent="الجولة القادمة بعد لحظات"}
   lastPh=ph}
