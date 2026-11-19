@@ -226,6 +226,23 @@
     return data;
   }
 
+  // The server is authoritative for incoming transfers and owner/agency credits.
+  // Refresh while the app is foregrounded so a recipient sees newly received coins
+  // without signing out or reopening the wallet. Pause polling while a game is open.
+  let walletRefreshBusy = false;
+  async function refreshWalletSafely() {
+    if (walletRefreshBusy || document.visibilityState === 'hidden' ||
+        document.body.classList.contains('migo-game-open')) return;
+    walletRefreshBusy = true;
+    try { await refreshWallet(); }
+    catch (error) { console.warn('Server wallet sync pending:', error.message); }
+    finally { walletRefreshBusy = false; }
+  }
+  setInterval(refreshWalletSafely, 10000);
+  window.addEventListener('focus', refreshWalletSafely);
+  document.addEventListener('visibilitychange', refreshWalletSafely);
+  window.addEventListener('migo:wallet-updated', refreshWalletSafely);
+
   // Keep the balance display synchronized with the server whenever the wallet opens.
   if (typeof rWallet === 'function') {
     const oldWallet = rWallet;
