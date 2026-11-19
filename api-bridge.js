@@ -238,7 +238,7 @@
     if (button) button.disabled = true;
     try {
       const stableId = String(topup.id || '');
-      if (!/^\\d{10,20}$/.test(stableId)) throw new Error('رقم طلب الشحن غير صالح');
+      if (!/^\d{10,20}$/.test(stableId)) throw new Error('رقم طلب الشحن غير صالح');
       const data = await api('/wallet/admin/adjust', {
         method: 'POST',
         headers: { 'Idempotency-Key': 'topup-approval-' + stableId },
