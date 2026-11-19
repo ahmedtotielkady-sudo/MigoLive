@@ -88,6 +88,72 @@
     return data;
   }
   const message = (text) => { const el = $id('aerr'); if (el) el.textContent = text; else if (typeof toast === 'function') toast(text); };
+
+  // Connect the existing Coins-page "تنفيذ" form to the authoritative wallet API.
+  // The visible form stays unchanged; positive amounts credit and negative amounts debit.
+  const ownerAdjustmentRetries = new WeakMap();
+  function findCoinsAdjustmentForm(node) {
+    let root = node && node.closest && (node.closest('form') || node.closest('[role="form"]'));
+    if (!root && node && node.parentElement) {
+      let current = node.parentElement;
+      for (let depth = 0; depth < 5 && current; depth++, current = current.parentElement) {
+        const fields = Array.from(current.querySelectorAll('input'));
+        if (fields.some(x => /اسم المستخدم/.test(x.placeholder || '')) && fields.some(x => /العدد/.test(x.placeholder || ''))) { root = current; break; }
+      }
+    }
+    if (!root) return null;
+    const inputs = Array.from(root.querySelectorAll('input'));
+    const username = inputs.find(x => /اسم المستخدم/.test(x.placeholder || ''));
+    const amount = inputs.find(x => /العدد/.test(x.placeholder || ''));
+    return username && amount ? { root, username, amount } : null;
+  }
+  async function submitExistingCoinsAdjustment(root) {
+    const form = findCoinsAdjustmentForm(root);
+    if (!form) return false;
+    const username = String(form.username.value || '').trim().toLowerCase();
+    const amount = Number(String(form.amount.value || '').trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/٬/g, '').replace(/٫/g, '.'));
+    if (!/^[a-z0-9_.-]{3,24}$/.test(username) || !Number.isSafeInteger(amount) || amount === 0 || Math.abs(amount) > 1000000000) {
+      if (typeof toast === 'function') toast('اكتب اسم مستخدم صحيحًا وعدد عملات صحيحًا غير صفر');
+      return true;
+    }
+    let pending = ownerAdjustmentRetries.get(form.root);
+    if (!pending || pending.username !== username || pending.amount !== amount) {
+      const bytes = new Uint8Array(20);
+      if (!window.crypto || !window.crypto.getRandomValues) { if (typeof toast === 'function') toast('تعذر تأمين العملية'); return true; }
+      window.crypto.getRandomValues(bytes);
+      pending = { username, amount, key: 'owner-adjust-' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('') };
+      ownerAdjustmentRetries.set(form.root, pending);
+    }
+    const button = Array.from(form.root.querySelectorAll('button,input[type="submit"]')).find(x => /تنفيذ/.test(x.textContent || x.value || ''));
+    if (button) button.disabled = true;
+    try {
+      const data = await api('/wallet/admin/adjust', {
+        method: 'POST', headers: { 'Idempotency-Key': pending.key },
+        body: JSON.stringify({ username, amount, description: amount < 0 ? 'خصم من صفحة العملات' : 'شحن من صفحة العملات' })
+      });
+      ownerAdjustmentRetries.delete(form.root);
+      if (typeof toast === 'function') toast((amount < 0 ? 'تم الخصم بنجاح' : 'تم الشحن بنجاح') + ' · الرصيد الحالي: ' + Number(data.coins).toLocaleString('ar-EG') + ' عملة');
+      if (typeof me !== 'undefined' && me && DB?.users?.[me] && Number(DB.users[me].uid) === Number(data.uid)) refreshWallet().catch(() => {});
+    } catch (error) {
+      if (typeof toast === 'function') toast('لم يتم تأكيد العملية: ' + error.message + ' · أعد المحاولة بنفس البيانات دون تغييرها');
+    } finally { if (button) button.disabled = false; }
+    return true;
+  }
+  document.addEventListener('submit', async event => {
+    const form = findCoinsAdjustmentForm(event.target);
+    if (!form) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    await submitExistingCoinsAdjustment(form.root);
+  }, true);
+  document.addEventListener('click', async event => {
+    const button = event.target && event.target.closest && event.target.closest('button,input[type="submit"]');
+    if (!button || !/تنفيذ/.test(button.textContent || button.value || '')) return;
+    const form = findCoinsAdjustmentForm(button);
+    if (!form) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    await submitExistingCoinsAdjustment(form.root);
+  }, true);
+
   const cacheUser = async (user, password) => {
     const key = 'server-' + String(user.uid);
     const old = DB.users[key] || {};
