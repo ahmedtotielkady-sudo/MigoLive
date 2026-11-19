@@ -6,10 +6,8 @@ const GROWTH_RATE = 0.13;
 const MAX_MULTIPLIER = 22;
 const START_DELAY_MS = 5000;
 
-function generateCrashPoint(random = () => randomInt(0, 1_000_000_000) / 1_000_000_000) {
-  const value = Math.min(0.999999999999, Math.max(0, Number(random())));
-  const sampled = Math.max(1, Math.floor(96 / (1 - value)) / 100);
-  return Math.min(MAX_MULTIPLIER, sampled);
+function generateCrashPoint() {
+  return MAX_MULTIPLIER;
 }
 
 function multiplierAt(startAt, now = Date.now()) {

@@ -3,16 +3,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const engine = require("../game-engines/rocket-crash");
 
-test("crash point is random, never below 1x, and capped at 22x", () => {
-  assert.equal(engine.generateCrashPoint(() => 0), 1);
-  assert.equal(engine.generateCrashPoint(() => 0.5), 1.92);
-  assert.equal(engine.generateCrashPoint(() => 0.99), 22);
-  assert.equal(engine.generateCrashPoint(() => 0.9999), 22);
-  assert.equal(engine.generateCrashPoint(() => 0.9), 9.6);
-  assert.ok(engine.generateCrashPoint(() => 0.7) < engine.generateCrashPoint(() => 0.99));
+test("every rocket round crashes exactly at 22x", () => {
   for (let i = 0; i < 10000; i++) {
-    const point = engine.generateCrashPoint(() => Math.random());
-    assert.ok(point >= 1 && point <= engine.MAX_MULTIPLIER);
+    assert.equal(engine.generateCrashPoint(), 22);
   }
 });
 
