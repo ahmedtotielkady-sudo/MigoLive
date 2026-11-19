@@ -45,13 +45,13 @@ router.post("/register", async (req, res, next) => {
     const phone = String(req.body.phone || "").replace(/[\\s()-]/g, "");
     const password = String(req.body.password || "");
 
-    if (!/^[\\p{L}\\p{N}_.-]{3,24}$/u.test(username)) {
+    if (!/^[\p{L}\p{N}_.-]{3,24}$/u.test(username)) {
       return res.status(400).json({ ok: false, message: "اسم المستخدم يجب أن يكون من 3 إلى 24 حرفًا أو رقمًا" });
     }
     if (password.length < 8 || password.length > 72) {
       return res.status(400).json({ ok: false, message: "كلمة المرور يجب ألا تقل عن 8 أحرف" });
     }
-    if (phone && !/^\\+?[0-9]{7,15}$/.test(phone)) {
+    if (phone && !/^\+?[0-9]{7,15}$/.test(phone)) {
       return res.status(400).json({ ok: false, message: "رقم الهاتف غير صحيح" });
     }
 
