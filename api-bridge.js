@@ -398,9 +398,8 @@
     return prefix + '-' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
   }
   window.addEventListener('message', async event => {
-    const frame = $id('gf');
     const request = event.data;
-    if (!frame || event.source !== frame.contentWindow || !request ||
+    if (!gameFrameFor(event.source) || !request ||
         request.t !== 'migo:game:slot-777:spin') return;
     const reply = (payload) => {
       try { event.source.postMessage(Object.assign({
