@@ -492,33 +492,67 @@
     return GAME_SLUGS.find(id => text.includes(id) || (id === "slot-777" && /slot777|slot_777/.test(text)) || text.includes(MIGO_GAME_LABELS[id].toLowerCase()) || (id === "rocket-crash" && /صاروخ الفضاء/.test(text)) || (id === "fruit-luck" && /فواكه الحظ/.test(text))) || "";
   }
   function applyGameAvailabilityToUI() {
-    document.querySelectorAll("[data-game-id],[data-game],[data-gameid],a[href],iframe[src]").forEach(node => {
+    const selectors = [
+      "[data-game-id]", "[data-game]", "[data-gameid]", "a[href]", "iframe[src]",
+      "button", "[role=button]", ".game-card", ".game-item", ".game-box",
+      ".game-card-item", ".migo-game-card", ".room-game-item", ".game-option",
+      ".game-tile", ".game-entry", ".game-btn", "[onclick]"
+    ];
+    const candidates = new Set();
+    document.querySelectorAll(selectors.join(",")).forEach(node => {
+      if (node.closest("#migo-owner-game-control-panel")) return;
       const id = gameIdFromText([
         node.getAttribute("data-game-id"), node.getAttribute("data-game"),
-        node.getAttribute("data-gameid"), node.getAttribute("href"), node.getAttribute("src"),
-        node.textContent
+        node.getAttribute("data-gameid"), node.getAttribute("href"),
+        node.getAttribute("src"), node.innerText || node.textContent
       ].filter(Boolean).join(" "));
       if (!id) return;
-      const enabled = gameAvailability[id] !== false;
-      const card = node.closest("[data-game-card],.game-card,.game-item,.game-box,.game-card-item,.migo-game-card") || node;
-      card.hidden = !enabled;
-      card.setAttribute("data-migo-game-managed", id);
+      const semanticCard = node.closest(
+        "[data-game-card],.game-card,.game-item,.game-box,.game-card-item," +
+        ".migo-game-card,.room-game-item,.game-option,.game-tile,.game-entry,.game-btn"
+      );
+      let card = semanticCard || node;
+      if (!semanticCard && node.matches("a,button,[role=button],iframe")) {
+        const parent = node.parentElement;
+        const parentText = String(parent && (parent.innerText || parent.textContent) || "").trim();
+        // Use the immediate wrapper only when it represents this one game,
+        // never a section containing multiple game entries.
+        if (parent && parent !== document.body && parentText.length <= 120 &&
+            gameIdFromText(parentText) === id) card = parent;
+      }
+      if (card && card !== document.body) candidates.add({ node: card, id });
     });
-    // The in-room game picker is generated dynamically and identifies games by
-    // their Arabic title; hide its exact card as well as Games-tab launch cards.
-    document.querySelectorAll("#migo-game-picker .migo-game-card").forEach(card => {
-      const id = gameIdFromText(card.innerText || card.textContent);
-      if (id) { card.hidden = gameAvailability[id] === false; card.setAttribute("data-migo-game-managed", id); }
-    });
-    document.querySelectorAll("button,a,[role=button],.game-card,.game-item,.game-box").forEach(node => {
-      if (node.closest("#migo-owner-game-control-panel")) return;
-      const id = gameIdFromText(node.innerText || node.textContent);
-      if (!id || node.children.length > 8) return;
+
+    // Some room launchers render plain text cards without game-specific classes.
+    document.querySelectorAll("#migo-game-picker *,#room-game-picker *,[data-room-game-picker] *,.room-game-picker *").forEach(node => {
+      if (node.children.length > 3) return;
       const label = String(node.innerText || node.textContent || "").trim();
-      if (label.length > 90) return;
-      if (/سلوت 777|عاصفة المحيط|عجلة الحيوانات|ذهب كليوباترا|حظ الفواكه|الصاروخ|المحارب الكبير/.test(label)) {
-        node.hidden = gameAvailability[id] === false;
-        node.setAttribute("data-migo-game-managed", id);
+      if (!label || label.length > 100) return;
+      const id = gameIdFromText(label);
+      if (id) candidates.add({ node, id });
+    });
+
+    candidates.forEach(({ node, id }) => {
+      const enabled = gameAvailability[id] !== false;
+      node.setAttribute("data-migo-game-managed", id);
+      if (!enabled) {
+        if (!node.hasAttribute("data-migo-previous-display")) {
+          node.setAttribute("data-migo-previous-display", node.style.display || "");
+        }
+        node.hidden = true;
+        node.style.setProperty("display", "none", "important");
+        node.setAttribute("aria-hidden", "true");
+      } else if (node.getAttribute("data-migo-game-managed") === id) {
+        node.hidden = false;
+        node.removeAttribute("aria-hidden");
+        const previous = node.getAttribute("data-migo-previous-display");
+        if (previous !== null) {
+          if (previous) node.style.setProperty("display", previous);
+          else node.style.removeProperty("display");
+          node.removeAttribute("data-migo-previous-display");
+        } else {
+          node.style.removeProperty("display");
+        }
       }
     });
     window.dispatchEvent(new CustomEvent("migo:game-availability-updated", { detail: { ...gameAvailability } }));
@@ -526,7 +560,11 @@
   async function refreshGameAvailability() {
     if (!token()) return;
     const data = await api("/game-control/status", { method: "GET", cache: "no-store" });
-    gameAvailability = Object.fromEntries((data.games || []).map(game => [game.id, game.enabled !== false]));
+    const catalog = await api("/games/catalog", { method: "GET", cache: "no-store" });
+    const catalogIds = new Set((catalog.games || []).map(game => game.id));
+    gameAvailability = Object.fromEntries((data.games || []).map(game => [
+      game.id, game.enabled !== false && catalogIds.has(game.id)
+    ]));
     applyGameAvailabilityToUI();
     return gameAvailability;
   }
