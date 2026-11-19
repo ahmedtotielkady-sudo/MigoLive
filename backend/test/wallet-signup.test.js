@@ -48,3 +48,12 @@ test("signup phone validator accepts optional plus and 7-15 digits", () => {
   assert.equal(phonePattern.test("+201131068538"), true);
   assert.equal(phonePattern.test("123"), false);
 });
+
+test("Egyptian local mobile numbers are normalized to canonical +20 format", () => {
+  const authRoute = read("routes/auth.js");
+  assert.match(authRoute, /function normalizePhone\(value\)/);
+  assert.match(authRoute, /\^01\[0-9\]\{9\}\$/);
+  assert.match(authRoute, /phone = "\+2" \+ phone/);
+  assert.match(authRoute, /const phone = normalizePhone\(req\.body\.phone\)/);
+  assert.match(authRoute, /const normalizedPhone = normalizePhone\(identifier\)/);
+});
