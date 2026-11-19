@@ -11,7 +11,7 @@ test("country catalog exposes calling codes for worldwide signup", () => {
   assert.ok(countries.length > 200);
   for (const code of ["EG", "US", "GB", "SA", "AE", "IN", "BR", "JP"]) {
     assert.ok(countries.includes(code), code + " must be available");
-    assert.match(getCountryCallingCode(code), new RegExp("^\\\\d{1,3}$"));
+    assert.match(getCountryCallingCode(code), new RegExp("^\\d{1,3}$"));
   }
 });
 
