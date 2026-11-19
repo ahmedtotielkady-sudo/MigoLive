@@ -78,7 +78,7 @@ router.post("/register", async (req, res, next) => {
     if (password.length < 8 || password.length > 72) {
       return res.status(400).json({ ok: false, message: "كلمة المرور يجب ألا تقل عن 8 أحرف" });
     }
-    if (phone && !/^\+?[0-9]{7,15}$/.test(phone)) {
+    if (phone === null) {
       return res.status(400).json({ ok: false, message: "رقم الهاتف غير صحيح" });
     }
 
