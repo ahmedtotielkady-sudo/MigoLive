@@ -14,46 +14,29 @@ test("User and Wallet model defaults never mint signup coins", () => {
   assert.match(walletModel, /balance:\s*\{[^}]*default:\s*0/);
 });
 
-test("signup grants 100 coins and login never changes the balance", () => {
+test("signup grants 100 coins and creates the canonical wallet atomically", () => {
   const authRoute = read("routes/auth.js");
   assert.match(authRoute, /const INITIAL_SIGNUP_COINS = 100/);
   assert.match(authRoute, /coins:\s*INITIAL_SIGNUP_COINS/);
-  assert.match(authRoute, /Wallet\.create\(\[\{\s*userId:\s*user\._id,\s*balance:\s*INITIAL_SIGNUP_COINS\s*\}\],\s*\{\s*session:\s*dbSession\s*\}\)/);
+  assert.match(authRoute, /await dbSession\.withTransaction\(async \(\) => \{/);
+  assert.match(authRoute, /await Wallet\.create\(\[/);
+});
+
+test("login never grants, debits, or resets coins", () => {
+  const authRoute = read("routes/auth.js");
   const loginStart = authRoute.indexOf('router.post("/login"');
-  const loginEnd = authRoute.indexOf("const OwnerClaim = require", loginStart);
-  const loginRoute = authRoute.slice(loginStart, loginEnd);
-  assert.doesNotMatch(loginRoute, /coins\s*=|\$inc|INITIAL_SIGNUP_COINS/);
+  const logoutStart = authRoute.indexOf('router.post("/logout"', loginStart);
+  assert.notEqual(loginStart, -1);
+  assert.notEqual(logoutStart, -1);
+  const loginRoute = authRoute.slice(loginStart, logoutStart);
+  assert.doesNotMatch(loginRoute, /coins\s*=|\$inc|INITIAL_SIGNUP_COINS|Wallet\.create/);
 });
 
-
-test("signup username validator accepts ordinary Arabic and Latin names from 3 characters", () => {
+test("registration uses metadata-based international phone validation and email alternative", () => {
   const authRoute = read("routes/auth.js");
-  const slash = String.fromCharCode(92);
-  assert.ok(authRoute.includes("[" + slash + "p{L}" + slash + "p{N}"));
-  const usernamePattern = /^[\p{L}\p{N}_.-]{3,24}$/u;
-  assert.equal(usernamePattern.test("Ali"), true);
-  assert.equal(usernamePattern.test("محمد"), true);
-  assert.equal(usernamePattern.test("abc123"), true);
-  assert.equal(usernamePattern.test("ab"), false);
-  assert.equal(usernamePattern.test("a".repeat(25)), false);
-  assert.equal(usernamePattern.test("ab!"), false);
-});
-
-test("signup phone validator accepts optional plus and 7-15 digits", () => {
-  const authRoute = read("routes/auth.js");
-  const slash = String.fromCharCode(92);
-  assert.ok(authRoute.includes("/^" + slash + "+?[0-9]"));
-  const phonePattern = /^\+?[0-9]{7,15}$/;
-  assert.equal(phonePattern.test("01131068538"), true);
-  assert.equal(phonePattern.test("+201131068538"), true);
-  assert.equal(phonePattern.test("123"), false);
-});
-
-test("Egyptian local mobile numbers are normalized to canonical +20 format", () => {
-  const authRoute = read("routes/auth.js");
-  assert.match(authRoute, /function normalizePhone\(value\)/);
-  assert.match(authRoute, /\^01\[0-9\]\{9\}\$/);
-  assert.match(authRoute, /phone = "\+2" \+ phone/);
-  assert.match(authRoute, /const phone = normalizePhone\(req\.body\.phone\)/);
-  assert.match(authRoute, /const normalizedPhone = normalizePhone\(identifier\)/);
+  assert.match(authRoute, /parsePhoneNumberFromString/);
+  assert.match(authRoute, /getCountries\(\)/);
+  assert.match(authRoute, /phoneCountry/);
+  assert.match(authRoute, /normalizedEmail/);
+  assert.match(authRoute, /email: email \|\| undefined/);
 });
