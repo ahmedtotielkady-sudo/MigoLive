@@ -49,6 +49,7 @@ function publicUser(user) {
     username: user.username,
     displayName: user.displayName,
     phone: user.phone || "",
+    email: user.email || "",
     coins: user.coins,
     role: user.role,
     avatar: user.avatar || "",
@@ -70,6 +71,7 @@ router.post("/register", async (req, res, next) => {
     const username = String(req.body.username || "").trim();
     const displayName = String(req.body.displayName || username).trim().slice(0, 40);
     const phone = normalizePhone(req.body.phone, req.body.phoneCountry);
+    const email = String(req.body.email || "").trim().toLowerCase();
     const password = String(req.body.password || "");
 
     if (!/^[\p{L}\p{N}_.-]{3,24}$/u.test(username)) {
@@ -82,9 +84,16 @@ router.post("/register", async (req, res, next) => {
       return res.status(400).json({ ok: false, message: "رقم الهاتف غير صحيح" });
     }
 
+    if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      return res.status(400).json({ ok: false, message: "البريد الإلكتروني غير صحيح" });
+    }
+    if (!phone && !email) {
+      return res.status(400).json({ ok: false, message: "أدخل رقم الهاتف أو البريد الإلكتروني" });
+    }
+
     const normalized = username.toLowerCase();
     const duplicate = await User.findOne({
-      $or: [{ username: normalized }, ...(phone ? [{ phone }] : [])]
+      $or: [{ username: normalized }, ...(phone ? [{ phone }] : []), ...(email ? [{ email }] : [])]
     }).lean();
     if (duplicate) {
       return res.status(409).json({ ok: false, message: "اسم المستخدم أو رقم الهاتف مستخدم بالفعل" });
@@ -114,6 +123,7 @@ router.post("/register", async (req, res, next) => {
         username: normalized,
         displayName,
         phone: phone || undefined,
+        email: email || undefined,
         passwordHash,
         coins: INITIAL_SIGNUP_COINS,
         role: "user"
@@ -146,12 +156,14 @@ router.post("/login", async (req, res, next) => {
       return res.status(400).json({ ok: false, message: "أدخل رقم ID أو الهاتف وكلمة المرور" });
     }
     const normalizedPhone = normalizePhone(identifier, req.body.phoneCountry) || identifier.replace(/[\\s()-]/g, "");
+    const normalizedEmail = identifier.includes("@") ? identifier.toLowerCase() : "";
     const byUid = /^\d{5,10}$/.test(identifier) ? Number(identifier) : -1;
     const user = await User.findOne({
       $or: [
         ...(byUid > 0 ? [{ uid: byUid }] : []),
         { username: identifier.toLowerCase() },
-        { phone: normalizedPhone }
+        { phone: normalizedPhone },
+        ...(normalizedEmail ? [{ email: normalizedEmail }] : [])
       ]
     }).select("+passwordHash");
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
