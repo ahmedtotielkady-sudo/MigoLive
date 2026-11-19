@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1152 1536">
+<defs>
+ <radialGradient id="bg"><stop stop-color="#4b00a8"/><stop offset=".55" stop-color="#28005e"/><stop offset="1" stop-color="#10002c"/></radialGradient>
+ <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff7b2"/><stop offset=".2" stop-color="#ffcf42"/><stop offset=".48" stop-color="#ff8b00"/><stop offset=".72" stop-color="#ffe978"/><stop offset="1" stop-color="#9b3aff"/></linearGradient>
+ <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f6a8ff"/><stop offset=".28" stop-color="#b000ff"/><stop offset=".6" stop-color="#4a00ff"/><stop offset="1" stop-color="#16005a"/></linearGradient>
+ <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#56f4ff"/><stop offset=".45" stop-color="#007bff"/><stop offset="1" stop-color="#8a00ff"/></linearGradient>
+ <filter id="glow"><feGaussianBlur stdDeviation="12" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1152" height="1536" fill="url(#bg)"/>
+<g fill="none" stroke-linecap="round">
+ <path d="M-70 310 C130 180 120 30 390 12 S760 160 1000 80 S1180 0 1240 -80" stroke="#a500ff" stroke-width="150" opacity=".28" filter="url(#glow)"/>
+ <path d="M-60 360 C110 230 120 50 350 40 S720 190 960 110 S1150 35 1220 -40" stroke="url(#violet)" stroke-width="54"/>
+ <path d="M-40 320 C120 160 140 40 360 5 S720 170 930 105 S1130 30 1210 -60" stroke="url(#gold)" stroke-width="13" filter="url(#glow)"/>
+ <path d="M-20 410 C180 260 180 110 420 90 S760 235 990 160 S1150 95 1210 35" stroke="#7a00ff" stroke-width="25" opacity=".75"/>
+ <path d="M-50 1320 C180 1450 270 1460 470 1350 S760 1120 950 1170 S1130 1300 1220 1250" stroke="#8500ff" stroke-width="170" opacity=".24" filter="url(#glow)"/>
+ <path d="M-60 1270 C150 1400 280 1430 480 1320 S770 1100 950 1140 S1130 1260 1230 1210" stroke="url(#violet)" stroke-width="66"/>
+ <path d="M-60 1330 C160 1460 280 1465 500 1350 S780 1160 970 1200 S1130 1310 1220 1270" stroke="url(#gold)" stroke-width="14" filter="url(#glow)"/>
+ <path d="M-70 1190 C120 1280 260 1390 450 1320 S760 1120 950 1080 S1120 1120 1220 1090" stroke="url(#blue)" stroke-width="18" filter="url(#glow)"/>
+ <path d="M-80 1240 C130 1340 260 1440 470 1360 S760 1160 960 1120 S1130 1160 1230 1130" stroke="#18bfff" stroke-width="5"/>
+ <path d="M-40 1400 C160 1510 310 1510 520 1410 S810 1240 1000 1280 S1140 1380 1230 1340" stroke="#7b00ff" stroke-width="26" opacity=".8"/>
+</g>
+<g fill="#fff2a1" filter="url(#glow)"><circle cx="355" cy="40" r="8"/><circle cx="110" cy="255" r="5"/><circle cx="600" cy="1275" r="8"/><circle cx="960" cy="1190" r="6"/></g>
+</svg>
