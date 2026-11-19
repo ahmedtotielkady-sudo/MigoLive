@@ -20,6 +20,13 @@ router.use(rateLimit({
 
 router.get("/", async (req, res, next) => {
   try {
+    // Wallet balances are live account data; never let browsers or WebViews
+    // reuse an ETag/304 response without the JSON balance payload.
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0"
+    });
     const user = await User.findById(req.auth.sub).select("uid coins");
     if (!user) return res.status(404).json({ ok: false, message: "الحساب غير موجود" });
     await Wallet.updateOne(
