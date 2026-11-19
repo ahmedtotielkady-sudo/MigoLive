@@ -13,8 +13,13 @@
     const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
     if (token()) headers.Authorization = 'Bearer ' + token();
     let response;
+    const method = String(options.method || 'GET').toUpperCase();
+    const requestOptions = Object.assign({}, options, { headers });
+    // Wallet polling must bypass browser/WebView ETag caching: a 304 has no JSON
+    // body and the API wrapper correctly treats it as a failed API response.
+    if (method === 'GET') requestOptions.cache = 'no-store';
     try {
-      response = await fetch(API + path, Object.assign({}, options, { headers }));
+      response = await fetch(API + path, requestOptions);
       markNetworkOnline();
     } catch (error) {
       markNetworkOffline();
