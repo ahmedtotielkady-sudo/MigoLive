@@ -18,6 +18,57 @@
     if (!response.ok || data.ok === false) throw new Error(data.message || ('HTTP ' + response.status));
     return data;
   }
+
+  // Server-controlled mandatory update gate. APK installation still requires Android confirmation.
+  const MIGO_APP_VERSION = '1.0.1';
+  let updateGateVisible = false;
+  function compareVersions(a, b) {
+    const pa=String(a||'0').split(/[+-]/)[0].split('.').map(Number);
+    const pb=String(b||'0').split(/[+-]/)[0].split('.');
+    for(let i=0;i<3;i++){const x=pa[i]||0,y=pb[i]||0;if(x!==y)return x<y?-1:1}
+    return 0;
+  }
+  function showMandatoryUpdate(policy) {
+    if(updateGateVisible)return;
+    updateGateVisible=true;
+    const overlay=document.createElement('div');
+    overlay.id='migo-mandatory-update';
+    overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#090516;color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,sans-serif;text-align:center';
+    const card=document.createElement('div');
+    card.style.cssText='width:100%;max-width:420px;background:#1a1035;border:1px solid #7542bb;border-radius:22px;padding:26px;box-shadow:0 12px 50px #0009';
+    const title=document.createElement('h2');title.textContent='📲 تحديث إجباري مطلوب';title.style.cssText='font-size:24px;margin:0 0 14px;color:#ffc24a';
+    const message=document.createElement('p');message.textContent=policy.message||'يتوفر تحديث جديد. حدّث التطبيق للمتابعة.';message.style.cssText='line-height:1.8;margin:0 0 18px';
+    const version=document.createElement('p');version.textContent='الإصدار المطلوب: '+policy.minimumVersion;version.style.cssText='color:#c7b5ee;margin:0 0 20px';
+    const button=document.createElement('button');button.type='button';button.textContent='تنزيل التحديث';button.style.cssText='width:100%;padding:15px;border:0;border-radius:13px;background:linear-gradient(90deg,#7c3aed,#a855f7);color:white;font-weight:800;font-size:16px';
+    button.onclick=()=>{if(/^https:\/\//i.test(policy.downloadUrl||''))location.href=policy.downloadUrl;else alert('رابط التحديث غير متاح حالياً. تواصل مع الإدارة.')};
+    card.append(title,message,version,button);overlay.append(card);document.body.append(overlay);
+    document.body.style.overflow='hidden';
+  }
+  async function installedAppVersion(){
+    try{
+      const app=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
+      if(app&&typeof app.getInfo==='function'){
+        const info=await app.getInfo();
+        if(info&&info.version)return String(info.version);
+      }
+    }catch(_){}
+    return MIGO_APP_VERSION;
+  }
+  let installedVersionPromise=null;
+  async function checkMandatoryUpdate(){
+    try{
+      const response=await fetch(API+'/app-update/status',{cache:'no-store'});
+      if(!response.ok)return;
+      const data=await response.json(),policy=data.policy||{};
+      if(!policy.enabled)return;
+      if(!installedVersionPromise)installedVersionPromise=installedAppVersion();
+      const installed=await installedVersionPromise;
+      if(compareVersions(installed,policy.minimumVersion)<0)showMandatoryUpdate(policy);
+    }catch(_){}
+  }
+  checkMandatoryUpdate();
+  setInterval(checkMandatoryUpdate,60000);
+
   const message = (text) => { const el = $id('aerr'); if (el) el.textContent = text; else if (typeof toast === 'function') toast(text); };
 
   // Bind the existing owner Coins form to the server-authoritative wallet.
