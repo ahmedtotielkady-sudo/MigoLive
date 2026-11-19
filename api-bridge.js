@@ -231,8 +231,7 @@
   // without signing out or reopening the wallet. Pause polling while a game is open.
   let walletRefreshBusy = false;
   async function refreshWalletSafely() {
-    if (walletRefreshBusy || document.visibilityState === 'hidden' ||
-        document.body.classList.contains('migo-game-open')) return;
+    if (walletRefreshBusy || document.visibilityState === 'hidden') return;
     walletRefreshBusy = true;
     try { await refreshWallet(); }
     catch (error) { console.warn('Server wallet sync pending:', error.message); }
