@@ -5,6 +5,75 @@
 (() => {
   'use strict';
   const API = 'https://migolive-api-production.up.railway.app/api';
+
+  // Fail-closed network gate: the app is usable only while the API and database
+  // health endpoint are reachable. A navigator.onLine=true value alone is not trusted.
+  const NETWORK_GATE_ID = 'migo-network-required-gate';
+  let networkGateReady = false;
+  let networkCheckRunning = false;
+  function showNetworkGate() {
+    networkGateReady = false;
+    let gate = document.getElementById(NETWORK_GATE_ID);
+    if (!gate) {
+      gate = document.createElement('div');
+      gate.id = NETWORK_GATE_ID;
+      gate.setAttribute('role', 'alertdialog');
+      gate.setAttribute('aria-live', 'assertive');
+      gate.innerHTML = '<div class="migo-network-card"><div class="migo-network-icon">⌁</div><h1>خدمة الإنترنت لا تعمل</h1><p>التطبيق متوقف حاليًا لعدم وجود اتصال بالإنترنت.</p><p>يرجى التأكد من اتصال الإنترنت، وسيعمل التطبيق تلقائيًا عند عودة الخدمة.</p><div class="migo-network-state">جارٍ التحقق من الاتصال…</div></div>';
+      const style = document.createElement('style');
+      style.textContent = '#' + NETWORK_GATE_ID + '{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(145deg,#100d20,#21133d 58%,#100d20);color:#fff;font-family:Arial,sans-serif;text-align:center;direction:rtl;pointer-events:auto}#' + NETWORK_GATE_ID + ' .migo-network-card{width:min(440px,100%);padding:34px 24px;border:1px solid rgba(255,255,255,.16);border-radius:22px;background:rgba(255,255,255,.07);box-shadow:0 18px 60px rgba(0,0,0,.4)}#' + NETWORK_GATE_ID + ' .migo-network-icon{margin:0 auto 18px;width:72px;height:72px;display:grid;place-items:center;border-radius:50%;background:rgba(255,190,70,.15);color:#ffc65b;font-size:42px}#' + NETWORK_GATE_ID + ' h1{margin:0 0 14px;font-size:25px;color:#ffd27a}#' + NETWORK_GATE_ID + ' p{margin:9px 0;font-size:16px;line-height:1.8;color:#f1edf8}#' + NETWORK_GATE_ID + ' .migo-network-state{margin-top:22px;color:#ffd27a;font-size:14px}';
+      document.head.appendChild(style);
+      document.body.appendChild(gate);
+    }
+    const state = gate.querySelector('.migo-network-state');
+    if (state) state.textContent = navigator.onLine ? 'جارٍ التحقق من خدمة الإنترنت…' : 'لا يوجد اتصال بالإنترنت';
+    gate.style.display = 'flex';
+  }
+  function hideNetworkGate() {
+    networkGateReady = true;
+    const gate = document.getElementById(NETWORK_GATE_ID);
+    if (gate) gate.style.display = 'none';
+  }
+  async function verifyNetworkService() {
+    if (networkCheckRunning) return;
+    networkCheckRunning = true;
+    if (!navigator.onLine) {
+      showNetworkGate();
+      networkCheckRunning = false;
+      return;
+    }
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeout = setTimeout(() => { if (controller) controller.abort(); }, 3500);
+    try {
+      const response = await fetch(API + '/health', {
+        method: 'GET', cache: 'no-store', credentials: 'omit',
+        headers: { 'Accept': 'application/json' },
+        signal: controller ? controller.signal : undefined
+      });
+      const data = await response.json();
+      if (response.ok && data && data.ok === true && data.database === 'connected') {
+        hideNetworkGate();
+      } else {
+        showNetworkGate();
+      }
+    } catch (_) {
+      showNetworkGate();
+    } finally {
+      clearTimeout(timeout);
+      networkCheckRunning = false;
+    }
+  }
+  window.addEventListener('offline', showNetworkGate);
+  window.addEventListener('online', () => {
+    showNetworkGate();
+    verifyNetworkService();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') verifyNetworkService();
+  });
+  showNetworkGate();
+  verifyNetworkService();
+  setInterval(verifyNetworkService, 4000);
   const TOKEN_KEY = 'migolive_api_token_v1';
   const $id = (id) => document.getElementById(id);
   const token = () => { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (_) { return ''; } };
