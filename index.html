@@ -558,7 +558,7 @@ const shippingBalance=a=>Math.max(0,Math.floor(+(shippingWallet(a)?.coins||0)));
 DB.hostApplications=DB.hostApplications||[];DB.referrals=DB.referrals||[];DB.vipSubscriptions=DB.vipSubscriptions||[];DB.securityEvents=DB.securityEvents||[];DB.storeOrders=DB.storeOrders||[];DB.userPrefs=DB.userPrefs||{};DB.vipPlans=DB.vipPlans||Array.from({length:13},(_,i)=>({level:i+1,price:0,days:30,active:true,perks:[]}));Object.values(DB.users).forEach(u=>{if(!u.inviteCode)u.inviteCode='MG'+String(u.uid||Math.floor(1000000+Math.random()*8999999));u.lastSeen=u.lastSeen||Date.now();u.friends=u.friends||[];u.blocked=u.blocked||[];if(u.country)u.countrySetOnce=true;});
 const GFX={none:'بدون تأثير',pop:'ظهور الأيقونة',hearts:'قلوب صاعدة',stars:'نجوم متلألئة',confetti:'قصاصات احتفال',rain:'مطر الأيقونة',fireworks:'ألعاب نارية',royal:'ملكي (شاشة كاملة)'};
 DB.giftCat=DB.giftCat||[{id:1,name:'وردة',icon:'🌹',price:10,fx:'pop'},{id:2,name:'قلب',icon:'❤️',price:50,fx:'hearts'},{id:3,name:'نجمة',icon:'⭐',price:100,fx:'stars'},{id:4,name:'تاج',icon:'👑',price:500,fx:'confetti'},{id:5,name:'سيارة',icon:'🏎️',price:1000,fx:'royal'}];
-DB.packs=DB.packs||[{id:1,coins:1000,bonus:0,price:10,label:''},{id:2,coins:5000,bonus:250,price:45,label:''},{id:3,coins:20000,bonus:2000,price:160,label:'الأوفر'}];
+DB.packs=DB.packs||[{id:1,coins:1000,bonus:0,price:25,label:''},{id:2,coins:5000,bonus:0,price:125,label:''},{id:3,coins:10000,bonus:0,price:250,label:''},{id:4,coins:50000,bonus:0,price:1250,label:'الأكثر طلباً'},{id:5,coins:100000,bonus:0,price:2500,label:'الأكبر'}];
 DB.settings.cur=DB.settings.cur||'ج.م';
 const fmt=n=>Number(n).toLocaleString('en-US');
 function ensureUid(u){if(!u.uid){let n;do{n=1000000+Math.floor(Math.random()*9000000)}while(Object.values(DB.users).some(x=>x.uid===n));u.uid=n}return u}
@@ -574,6 +574,18 @@ if(!DB.ownerResetForNewPrimaryV3){
 }
 DB.ownerUid=DB.ownerUid||null;
 const save=()=>{try{const cutoff=Date.now()-155*86400000;DB.shippingLedger=(DB.shippingLedger||[]).filter(x=>x.t>=cutoff);DB.audit=(DB.audit||[]).slice(0,5000);localStorage.setItem('mygo',JSON.stringify(DB));return true}catch(e){return false}};
+ // Replace legacy recharge options once on existing installs with the fixed MigoLive packages.
+ if(DB.fixedRechargePackagesV1!==true){
+   DB.packs=[
+     {id:1,coins:1000,bonus:0,price:25,label:''},
+     {id:2,coins:5000,bonus:0,price:125,label:''},
+     {id:3,coins:10000,bonus:0,price:250,label:''},
+     {id:4,coins:50000,bonus:0,price:1250,label:'الأكثر طلباً'},
+     {id:5,coins:100000,bonus:0,price:2500,label:'الأكبر'}
+   ];
+   DB.fixedRechargePackagesV1=true;
+   save();
+ }
 /* Seed the room-only lucky category once, using ordinary emoji gifts. */
 if(!DB.luckyGiftSeedV1){
   DB.giftCat=DB.giftCat||[];

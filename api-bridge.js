@@ -12,7 +12,14 @@
   async function api(path, options = {}) {
     const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
     if (token()) headers.Authorization = 'Bearer ' + token();
-    const response = await fetch(API + path, Object.assign({}, options, { headers }));
+    let response;
+    try {
+      response = await fetch(API + path, Object.assign({}, options, { headers }));
+      markNetworkOnline();
+    } catch (error) {
+      markNetworkOffline();
+      throw error;
+    }
     let data = {};
     try { data = await response.json(); } catch (_) {}
     if (!response.ok || data.ok === false) throw new Error(data.message || ('HTTP ' + response.status));
@@ -70,6 +77,54 @@
   setInterval(checkMandatoryUpdate,60000);
 
   const message = (text) => { const el = $id('aerr'); if (el) el.textContent = text; else if (typeof toast === 'function') toast(text); };
+
+  // Graceful offline gate: wait 7 seconds before blocking the app, then resume automatically.
+  let offlineTimer = null;
+  let offlineOverlay = null;
+  function showOfflineGate() {
+    if (offlineOverlay || !document.body) return;
+    offlineOverlay = document.createElement('div');
+    offlineOverlay.id = 'migo-offline-gate';
+    offlineOverlay.setAttribute('role', 'alert');
+    offlineOverlay.setAttribute('aria-live', 'assertive');
+    offlineOverlay.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:rgba(8,5,20,.97);color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,sans-serif;text-align:center';
+    const card = document.createElement('div');
+    card.style.cssText = 'width:100%;max-width:380px;background:#1a1035;border:1px solid #7542bb;border-radius:20px;padding:28px 22px;box-shadow:0 12px 50px #0009';
+    const title = document.createElement('h2');
+    title.textContent = '📡 الإنترنت لا يعمل';
+    title.style.cssText = 'font-size:23px;margin:0 0 12px;color:#ffc24a';
+    const note = document.createElement('p');
+    note.textContent = 'تأكد من اتصالك بالإنترنت. سيعود التطبيق للعمل تلقائياً بمجرد رجوع الاتصال.';
+    note.style.cssText = 'line-height:1.9;margin:0;color:#eee';
+    card.append(title, note);
+    offlineOverlay.append(card);
+    document.body.append(offlineOverlay);
+    document.body.style.overflow = 'hidden';
+  }
+  function clearOfflineGate() {
+    if (offlineTimer) clearTimeout(offlineTimer);
+    offlineTimer = null;
+    if (offlineOverlay) offlineOverlay.remove();
+    offlineOverlay = null;
+    if (!document.getElementById('migo-mandatory-update')) document.body.style.overflow = '';
+  }
+  function markNetworkOffline() {
+    if (offlineTimer || offlineOverlay) return;
+    offlineTimer = setTimeout(() => {
+      offlineTimer = null;
+      showOfflineGate();
+    }, 7000);
+  }
+  function markNetworkOnline() {
+    clearOfflineGate();
+  }
+  window.addEventListener('offline', markNetworkOffline);
+  window.addEventListener('online', () => {
+    markNetworkOnline();
+    if (typeof refreshWalletSafely === 'function') refreshWalletSafely();
+  });
+  if (navigator.onLine === false) markNetworkOffline();
+
 
   // Bind the existing owner Coins form to the server-authoritative wallet.
   // No new controls are added; only the existing username/amount/Execute form is handled.
