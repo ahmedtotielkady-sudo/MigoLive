@@ -391,7 +391,10 @@
   if ($id('bin') && typeof originalLogin === 'function') {
     $id('bin').onclick = async () => {
       const raw = ($id('u')?.value || '').trim();
-      const phone = ($id('reg-phone')?.value || '').trim();
+      const phone = ($id('reg-phone')?.value || '').trim()
+        .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+        .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+        .replace(/[\s\u00a0\u200e\u200f\u202a-\u202e()-]/g, '');
       const phoneCountry = $id('reg-country')?.value || 'EG';
       const email = ($id('reg-email')?.value || '').trim().toLowerCase();
       const password = $id('p')?.value || '';
