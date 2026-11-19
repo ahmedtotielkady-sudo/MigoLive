@@ -14,6 +14,15 @@ const TOKEN_TTL = "7d";
 // Signup bonus is granted only while creating a brand-new account.
 // Login intentionally never changes the persisted User.coins value.
 const INITIAL_SIGNUP_COINS = 100;
+function normalizePhone(value) {
+  let phone = String(value || "")
+    .replace(/[٠-٩]/g, digit => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, digit => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/[\\s()-]/g, "");
+  if (/^01[0-9]{9}$/.test(phone)) phone = "+2" + phone;
+  return phone;
+}
+
 
 function publicUser(user) {
   return {
@@ -42,7 +51,7 @@ router.post("/register", async (req, res, next) => {
   try {
     const username = String(req.body.username || "").trim();
     const displayName = String(req.body.displayName || username).trim().slice(0, 40);
-    const phone = String(req.body.phone || "").replace(/[\\s()-]/g, "");
+    const phone = normalizePhone(req.body.phone);
     const password = String(req.body.password || "");
 
     if (!/^[\p{L}\p{N}_.-]{3,24}$/u.test(username)) {
