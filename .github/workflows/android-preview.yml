@@ -201,7 +201,7 @@ jobs:
 
       - name: Apply MigoLive launcher icon
         run: |
-          curl -fL 'https://sdmntprpolandcentral.oaiusercontent.com/files/00000000-b4d8-820a-afff-bcc9a067896d/raw?se=2026-11-19T01%3A32%3A21Z&sp=r&sv=2026-06-06&sr=b&scid=64ac9bb7-f2cb-5474-b402-a27ad5c78a3d&skoid=b5d2651b-fef3-4bb0-a03b-ca59cc22929b&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-18T20%3A34%3A23Z&ske=2026-11-19T20%3A34%3A23Z&sks=b&skv=2026-06-06&sig=k3U5vd10dJUrdYGgXagbi9z2tGXtL4EX1ALNw758M78%3D' -o /tmp/migo-icon.jpg
+          curl -fL 'https://raw.githubusercontent.com/ahmedtotielkady-sudo/MigoLive/main/assets/migolive-icon.jpg' -o /tmp/migo-icon.jpg
           python3 -m pip install --quiet pillow
           python3 - <<'PY'
           from PIL import Image
