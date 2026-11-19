@@ -11,7 +11,8 @@ test("production wallet exposes authenticated admin adjustment endpoint", () => 
   assert.match(wallet, /router\.post\("\/admin\/adjust"/);
   assert.match(wallet, /\["owner", "admin"\]/);
   assert.match(wallet, /const targetUid = Number\(req\.body\.targetUid\)/);
-  assert.match(wallet, /User\.findOne\(\{ uid: targetUid, status: "active" \}\)/);\n  assert.doesNotMatch(wallet, /User\.findOne\(\{ username, status: "active" \}\)/);
+  assert.match(wallet, /User\.findOne\(\{ uid: targetUid, status: "active" \}\)/);
+  assert.doesNotMatch(wallet, /User\.findOne\(\{ username, status: "active" \}\)/);
 });
 
 test("admin adjustment atomically updates user, wallet and transaction ledger", () => {
