@@ -399,7 +399,8 @@
         const usernameLength = [...raw].length;
         if (usernameLength < 3) return message('اسم المستخدم يجب أن يكون 3 أحرف على الأقل');
         if (usernameLength > 24) return message('اسم المستخدم يجب ألا يزيد عن 24 حرفاً');
-        if (phone && !/^\\+?[0-9٠-٩]{7,15}$/.test(phone.replace(/[\\s()-]/g, ''))) return message('رقم الهاتف غير صحيح');
+        if (!phone && !email) return message('أدخل رقم الهاتف أو البريد الإلكتروني');
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return message('البريد الإلكتروني غير صحيح');
       }
       if (password.length < (registering ? 8 : 1)) return message(registering ? 'كلمة المرور يجب ألا تقل عن 8 أحرف' : 'أدخل كلمة المرور');
       const button = $id('bin');
