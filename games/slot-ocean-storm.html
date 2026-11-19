@@ -59,6 +59,10 @@ button:disabled{opacity:.55}
 #coins .coin{position:absolute;left:-5px;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff0a0,#f5a300 70%);border:2px solid #ffe27a;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:16px;color:#fff;text-shadow:0 1px 3px #8a4a00;box-shadow:0 2px 4px #0008}
 #coins b{font-size:14px;color:#ffe9b0;letter-spacing:.5px}
 #panel{width:94%;margin:0 auto}
+
+/* Fast Android/WebView touch response: no delayed double-tap handling. */
+button,[role="button"],.chip,.hit,.box{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+button:active,[role="button"]:active,.chip:active,.hit:active,.box:active{filter:brightness(1.18);}
 </style>
 <style>#uav,.top .av{display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;color:#fff;overflow:hidden}#uav{position:absolute;left:10px;top:calc(env(safe-area-inset-top,0px) + 10px);width:44px;height:44px;border-radius:50%;border:2px solid #ffd35a;background:radial-gradient(#5a2a7a,#2a0a40);z-index:5}</style><script>(function(){var last=null;function ap(){if(!last)return;var a=document.querySelector('#uav,.top .av');if(!a)return;if(last.avatar){a.style.backgroundImage='url("'+last.avatar+'")';a.style.backgroundSize='cover';a.style.backgroundPosition='center';a.textContent=''}else{a.style.backgroundImage='';a.textContent=(last.name||'?').charAt(0).toUpperCase()}}addEventListener('message',function(e){var d=e.data;if(d&&d.t==='me'){last=d;ap()}});addEventListener('DOMContentLoaded',ap)})();</script></head>
 <body>
@@ -227,7 +231,7 @@ async function press(buy){
   if(auto)setTimeout(function(){press()},400);
 }
 function offerReset(){say("رصيدك لا يكفي — اشحن عملات من المحفظة")}
-function lock(b){$("spin").disabled=b;$("m").disabled=b;$("p").disabled=b;$("maxb").disabled=b}
+function lock(b){$("spin").disabled=b;/* Keep bet controls responsive while the current round animates; they affect the next round only. */$("m").disabled=false;$("p").disabled=false;$("maxb").disabled=false}
 function sync(){$("auto").classList.toggle("on",auto);$("turbo").classList.toggle("on",turbo)}
 $("spin").onclick=function(){press()};
 $("maxb").onclick=function(){bi=BETS.length-1;upd()};$("m").onclick=function(){if(bi>0)bi--;upd()};$("p").onclick=function(){if(bi<BETS.length-1)bi++;upd()};
