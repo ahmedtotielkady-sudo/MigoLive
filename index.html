@@ -490,6 +490,16 @@ body.auth-screen #auth input.in{display:block!important;opacity:1!important;visi
 body.auth-screen #auth .fld input.in{width:100%!important;min-width:0!important}
 body.auth-screen #auth .fld button{z-index:3!important;pointer-events:auto!important}
 </style>
+
+<style id="migo-auth-input-touch-fix-v2">
+/* Android WebView: keep username and optional phone fields directly tappable/editable. */
+body.auth-screen #auth .fld:has(#u){display:flex!important;align-items:center!important;gap:8px!important;min-width:0!important}
+body.auth-screen #auth .fld:has(#u)>i{pointer-events:none!important;z-index:3!important}
+body.auth-screen #auth .fld:has(#u)>#u{display:block!important;position:relative!important;flex:1 1 auto!important;width:0!important;min-width:0!important;max-width:none!important;margin:0!important;padding-inline-start:44px!important;font-size:16px!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;touch-action:auto!important;user-select:text!important;-webkit-user-select:text!important;caret-color:#fff!important}
+body.auth-screen #auth #reg-phone{display:block!important;position:relative!important;z-index:2!important;width:100%!important;min-width:0!important;font-size:16px!important;pointer-events:auto!important;touch-action:auto!important;user-select:text!important;-webkit-user-select:text!important;caret-color:#fff!important}
+body.auth-screen #auth #reg-phone.hide{display:none!important}
+body.auth-screen #auth input:disabled,body.auth-screen #auth input[readonly]{opacity:1!important;pointer-events:auto!important}
+</style>
 </head>
 <body class="auth-screen">
 
