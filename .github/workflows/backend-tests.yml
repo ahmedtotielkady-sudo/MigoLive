@@ -1,0 +1,31 @@
+name: MigoLive backend tests
+
+on:
+  push:
+    branches:
+      - work/migolive-server-seven-games-mainline-2026-11-18
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-audit --no-fund
+      - name: Apply authoritative game wallet bridges before contract tests
+        working-directory: .
+        run: |
+          python3 scripts/apply-secure-game-wallet.py
+          python3 scripts/apply-slot777-server.py
+          python3 scripts/remove-slot777-local-fallback.py
+          python3 scripts/sync-embedded-slot777.py
+      - run: npm test

@@ -1,0 +1,127 @@
+"use strict";
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const root = path.join(__dirname, "..", "..");
+const read = file => fs.readFileSync(path.join(root, file), "utf8");
+
+
+test("app fails closed when internet, API, or database health is unavailable", () => {
+  const bridge = read("api-bridge.js");
+  assert.ok(bridge.includes("NETWORK_GATE_ID"));
+  assert.ok(bridge.includes("خدمة الإنترنت لا تعمل"));
+  assert.ok(bridge.includes("window.addEventListener('offline', showNetworkGate)"));
+  assert.ok(bridge.includes("window.addEventListener('online'"));
+  assert.ok(bridge.includes("setInterval(verifyNetworkService, 4000)"));
+  assert.ok(bridge.includes("data.database === 'connected'"));
+  assert.ok(bridge.includes("showNetworkGate();"));
+  assert.ok(bridge.includes("hideNetworkGate();"));
+});
+
+test("both embedded slot games use their matching server settlement endpoints", () => {
+  const app = read("index.html");
+  const match = app.match(/const GB=\{([\s\S]*?)\};\s*const GM=/);
+  assert.ok(match, "embedded game bundle must exist");
+  for (const [key, endpoint] of [
+    ["slot", "/games/ocean-storm/spin"],
+    ["slot777", "/games/slot-777/spin"]
+  ]) {
+    const encoded = match[1].match(new RegExp(key + ':"([A-Za-z0-9+/=]+)"'));
+    assert.ok(encoded, "missing embedded game " + key);
+    const html = Buffer.from(encoded[1], "base64").toString("utf8");
+    assert.ok(html.includes("migo:game-request"), key + " must request server settlement");
+    assert.ok(html.includes(endpoint), key + " must use its matching server endpoint");
+    assert.ok(!html.includes("bal=5000"), key + " must not mint a local fallback balance");
+  }
+});
+
+test("every game opened by the room launcher uses the matching server API", () => {
+  const pages = [
+    ["wheel-animals.html", "/games/wheel-animals/spin"],
+    ["slot-ocean-storm.html", "/games/ocean-storm/spin"],
+    ["slot-777.html", "/games/slot-777/spin"],
+    ["games/cleopatra-gold.html", "/games/cleopatra-gold/spin"],
+    ["games/fruit-luck.html", "/games/fruit-luck/spin"],
+    ["games/rocket-crash.html", "/games/rocket-crash/start"],
+    ["games/big-warrior.html", "/games/big-warrior/fight"]
+  ];
+  for (const [file, endpoint] of pages) {
+    const html = read(file);
+    assert.ok(html.includes("migo:game-request"), file + " must request server settlement");
+    assert.ok(html.includes(endpoint), file + " must use " + endpoint);
+  }
+});
+
+test("Animal Wheel never settles bets or changes the wallet in the browser", () => {
+  const html = read("wheel-animals.html");
+  assert.ok(html.includes("path:'/games/wheel-animals/spin'"));
+  assert.ok(html.includes("body:{bets:bets.slice()}"));
+  assert.ok(html.includes("bal=Number(data.coins)"));
+  assert.ok(html.includes("settleWheel("), "Animal Wheel must request server settlement");
+  assert.ok(html.includes("d.t==='wallet-error'"), "Animal Wheel must show wallet load failures");
+  assert.ok(html.includes("e.source!==window.parent"), "Animal Wheel must trust only its parent bridge");
+  assert.ok(html.includes("ready?"), "Animal Wheel must not display a fake zero before wallet confirmation");
+  assert.doesNotMatch(html, /postMessage\(\{t:'set',v:bal/);
+});
+
+test("all seven game pages display only server-confirmed wallet balances and surface load errors", () => {
+  const checks = [
+    ["slot-777.html", "wallet-error"],
+    ["slot-ocean-storm.html", "wallet-error"],
+    ["wheel-animals.html", "wallet-error"],
+    ["games/cleopatra-gold.html", "wallet-error"],
+    ["games/fruit-luck.html", "wallet-error"],
+    ["games/rocket-crash.html", "wallet-error"],
+    ["games/big-warrior.html", "migo:game-request"]
+  ];
+  for (const [file, marker] of checks) {
+    const html = read(file);
+    assert.ok(html.includes(marker), file + " must handle wallet state or server requests");
+  }
+  const slot = read("slot-777.html");
+  assert.ok(slot.includes("migo:game-request"), "Slot 777 must use server bridge");
+  assert.ok(!slot.includes("postMessage({t:'set',v:"), "Slot 777 cannot set the wallet");
+  const ocean = read("slot-ocean-storm.html");
+  assert.ok(!ocean.includes("postMessage({t:'set',v:"), "Ocean Storm cannot set the wallet");
+  const wheel = read("wheel-animals.html");
+  assert.ok(wheel.includes("settleWheel("), "Animal Wheel must use server settlement");
+  assert.doesNotMatch(wheel, /postMessage\(\{t:'set',v:bal/);
+});
+
+test("Rocket Crash has a safe request-id fallback and visible wallet failure state", () => {
+  const html = read("games/rocket-crash.html");
+  assert.ok(html.includes("const makeRequestId="));
+  assert.ok(html.includes("e.source!==window.parent"));
+  assert.ok(html.includes("d.t==='wallet-error'"));
+  assert.ok(html.includes("dialog.showModal()"));
+  assert.ok(html.includes("/games/rocket-crash/cashout"));
+  assert.ok(html.includes("/games/rocket-crash/state"));
+});
+
+test("room game launcher forwards authenticated requests and ignores iframe balance writes", () => {
+  const launcher = read("scripts/apply-game-room-launcher.py");
+  const bridge = read("api-bridge.js");
+  assert.ok(launcher.includes('d.t==="migo:game-request"'));
+  assert.ok(launcher.includes("window.__migoGameApiRequest"));
+  assert.ok(launcher.includes('"migo:game-result"'));
+  assert.ok(launcher.includes('"wallet-error"'));
+  assert.ok(bridge.includes("const GAME_POST_PATHS = new Set"));
+  assert.ok(bridge.includes("'Idempotency-Key': String(requestId)"));
+  assert.ok(bridge.includes("window.__migoRefreshWallet = refreshWallet"));
+  assert.ok(!launcher.includes("u.coins=Math.floor(d.v)"));
+  assert.ok(!launcher.includes('postMessage({t:"bal",v:Number(profile.coins)||0}'));
+});
+
+test("app wallet uses one canonical no-cache server balance", () => {
+  const bridge = read("api-bridge.js");
+  const wallet = read("backend/routes/wallet.js");
+  assert.ok(bridge.includes("function syncWalletBalance(value)"));
+  assert.ok(bridge.includes("api('/wallet', { method: 'GET', cache: 'no-store' })"));
+  assert.ok(bridge.includes("window.__migoSyncWalletBalance = syncWalletBalance"));
+  assert.ok(bridge.includes("refreshWallet().catch("), "game result must not wait for a second wallet round-trip");
+  assert.ok(bridge.includes("'[data-wallet-balance]'"));
+  assert.ok(wallet.includes('Cache-Control", "no-store, no-cache, must-revalidate, private'));
+  assert.ok(wallet.includes('User.findById(req.auth.sub).select("uid coins")'));
+});

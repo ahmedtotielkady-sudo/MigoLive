@@ -6,6 +6,7 @@ on:
       - main
       - android-preview
       - feature/agency-owner-approval
+      - work/migolive-server-seven-games-mainline-2026-11-18
   workflow_dispatch:
 
 permissions:
@@ -35,6 +36,18 @@ jobs:
       - name: Apply in-room game launcher and display cleanup
         run: python3 scripts/apply-game-room-launcher.py
 
+      - name: Secure game wallet bridge
+        run: python3 scripts/apply-secure-game-wallet.py
+
+      - name: Connect Slot 777 to server-authoritative wallet
+        run: python3 scripts/apply-slot777-server.py
+
+      - name: Remove local Slot 777 fallback balance
+        run: python3 scripts/remove-slot777-local-fallback.py
+
+      - name: Sync embedded Slot 777 game
+        run: python3 scripts/sync-embedded-slot777.py
+
       - name: Apply local notification center
         run: python3 scripts/apply-notification-center.py
 
@@ -42,6 +55,7 @@ jobs:
         run: |
           mkdir -p www
           cp index.html www/index.html
+          python3 scripts/install-api-bridge.py
           cp migolive-back-navigation.js www/migolive-back-navigation.js
           python3 - <<'PY'
           from pathlib import Path
@@ -94,6 +108,7 @@ jobs:
           cp slot-777.html slot-ocean-storm.html wheel-animals.html www/
           mkdir -p www/games
           if [ -d games ]; then cp -R games/. www/games/; fi
+          python3 scripts/clean-game-ui-and-validate.py
           test -s www/games/cleopatra-gold.html
           test -s www/games/big-warrior.html
           python3 - <<'PY'
@@ -125,19 +140,24 @@ jobs:
               html = re.sub(r'<style id="migo-warrior-compact-v1">.*?</style>', lambda _: css.strip(), html, count=1, flags=re.S)
           else:
               html = html.replace('</head>', css + '\n</head>', 1)
-          jsfixes = [
-              ('var winner=r<0.4?"lion":(r<0.8?"tiger":"draw");', 'var opposite=pick==="lion"?"tiger":"lion";var winner;if(pick==="draw"){winner=r<0.45?"lion":(r<0.9?"tiger":"draw")}else{winner=r<0.3?pick:(r<0.9?opposite:"draw")}'),
-              ('function bet(){return Math.min(STEPS[stepIdx],coins)}', 'function bet(){return STEPS[stepIdx]}'),
-              ('$("go").disabled=busy||!pick||coins<=0;', '$("go").disabled=busy||!pick||coins<bet();'),
-              ('$("plus").disabled=busy||stepIdx>=STEPS.length-1||STEPS[stepIdx+1]>coins;', '$("plus").disabled=busy||stepIdx>=STEPS.length-1;'),
-              ('$("plus").onclick=function(){if(stepIdx<STEPS.length-1&&STEPS[stepIdx+1]<=coins){stepIdx++;render()}};', '$("plus").onclick=function(){if(!busy&&stepIdx<STEPS.length-1){stepIdx++;render()}};'),
-              ('if(!pick||busy||coins<=0)return;', 'if(!pick||busy||coins<bet())return;')
-          ]
-          for old, new in jsfixes:
-              count = html.count(old)
-              if count != 1:
-                  raise SystemExit(f'Expected exactly one occurrence for warrior behavior patch, got {count}: {old}')
-              html = html.replace(old, new, 1)
+          # Big Warrior now receives outcome and balance from the server.
+          # Retain the legacy UI adjustment only for old local-randomness files.
+          if 'migo:game-request' not in html:
+              jsfixes = [
+                  ('var winner=r<0.4?"lion":(r<0.8?"tiger":"draw");', 'var opposite=pick==="lion"?"tiger":"lion";var winner;if(pick==="draw"){winner=r<0.45?"lion":(r<0.9?"tiger":"draw")}else{winner=r<0.3?pick:(r<0.9?opposite:"draw")}'),
+                  ('function bet(){return Math.min(STEPS[stepIdx],coins)}', 'function bet(){return STEPS[stepIdx]}'),
+                  ('$("go").disabled=busy||!pick||coins<=0;', '$("go").disabled=busy||!pick||coins<bet();'),
+                  ('$("plus").disabled=busy||stepIdx>=STEPS.length-1||STEPS[stepIdx+1]>coins;', '$("plus").disabled=busy||stepIdx>=STEPS.length-1;'),
+                  ('$("plus").onclick=function(){if(stepIdx<STEPS.length-1&&STEPS[stepIdx+1]<=coins){stepIdx++;render()}};', '$("plus").onclick=function(){if(!busy&&stepIdx<STEPS.length-1){stepIdx++;render()}};'),
+                  ('if(!pick||busy||coins<=0)return;', 'if(!pick||busy||coins<bet())return;')
+              ]
+              for old, new in jsfixes:
+                  count = html.count(old)
+                  if count != 1:
+                      raise SystemExit(f'Expected exactly one occurrence for legacy warrior behavior patch, got {count}: {old}')
+                  html = html.replace(old, new, 1)
+          else:
+              print('Big Warrior server settlement detected; skipping legacy client-randomness patch')
           p.write_text(html, encoding='utf-8')
           PY
           python3 - <<'PY'
@@ -233,11 +253,37 @@ jobs:
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
 
+      - name: Install image tooling for launcher icon validation
+        run: python3 -m pip install --user Pillow
+
+      - name: Apply Migo Live launcher icon
+        run: python3 scripts/apply-android-app-icon.py
+
+      - name: Enable Gradle dependency cache
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Build debug APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          for attempt in 1 2 3; do
+            if ./gradlew assembleDebug --no-daemon; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Android build failed after 3 attempts"
+              exit 1
+            fi
+            echo "Gradle dependency/build attempt $attempt failed; retrying after 15 seconds"
+            sleep 15
+          done
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          if [ -z "$AAPT" ]; then
+            echo "Android build-tools aapt was not found"
+            exit 1
+          fi
+          "$AAPT" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -E '^application:|^launchable-activity:'
 
       - name: Give APK a unique test filename
         run: cp android/app/build/outputs/apk/debug/app-debug.apk MigoLive_Test_V2_2026.apk

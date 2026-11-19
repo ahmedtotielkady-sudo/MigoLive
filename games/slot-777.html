@@ -105,12 +105,12 @@ const LINES=[[1,1,1,1,1],[0,0,0,0,0],[2,2,2,2,2],[0,1,2,1,0],[2,1,0,1,2],[0,0,1,
 const FREE={3:3,4:6,5:10};
 const MULT=[1,5,50,250],BASE=40;
 let bal=0,pend=0,ready=false,me=null,mi=0,free=0,spinning=false,stopNow=false,auto=0,sound=false,actx=null;
-function save(){if(ready)try{parent.postMessage({t:'set',v:bal+pend},'*')}catch(e){}}
+function save(){} // Balance is server-owned; refresh only after a confirmed round.
 function ap(){const a=$('uav');if(!me)return;if(me.avatar){a.style.backgroundImage='url("'+me.avatar+'")';a.textContent=''}else{a.style.backgroundImage='none';a.textContent=(me.name||'').trim().charAt(0)}}
 const toWallet=()=>{try{parent.postMessage({t:'wallet'},'*')}catch(e){}};
 addEventListener('message',e=>{const d=e.data;if(!d)return;if(d.t==='bal'&&Number.isFinite(d.v)){bal=d.v;ready=true;upd()}else if(d.t==='me'){me=d;ap()}});
 try{parent.postMessage({t:'get'},'*')}catch(e){}
-setTimeout(()=>{if(!ready&&bal===0){bal=5000;upd()}},1500);
+// No local demo balance: the authenticated server wallet is required.
 
 // RNG: single function, easy to tune via WT
 function rnd(nw){const w=WT.map((x,i)=>nw&&i===W?0:x);let r=Math.random()*w.reduce((a,b)=>a+b),i=0;while((r-=w[i])>=0)i++;return i}
@@ -173,32 +173,44 @@ function countUp(to){
 
 async function spin(){
   if(spinning){stopNow=true;return}
-  const bet=BASE*MULT[mi],isFree=free>0;
-  if(!isFree&&bal<bet){auto=0;updAuto();modal('العملة غير كافية',[['إلغاء',null,'g'],['تعبئة رصيد',toWallet]]);return}
+  if(!ready){try{parent.postMessage({t:'get'},'*')}catch(e){}modal('جارٍ الاتصال بمحفظة مايجو لايف',[['حسنًا',null,'g']]);return}
+  const bet=BASE*MULT[mi];
   spinning=true;stopNow=false;
-  if(isFree)free--;else bal-=bet;
-  $('win').textContent='0';clearHit();upd();
-  $('spin').textContent='قف';$('spin').classList.add('stop');
-  const g=makeGrid(isFree);
-  const ev=evaluate(g,bet),win=ev.win;pend=win;save();
-  await Promise.all(cells.map((col,i)=>new Promise(res=>{
-    const t=setInterval(()=>{const p=col.map(c=>c._s);setCell(col[2],p[1]);setCell(col[1],p[0]);setCell(col[0],rnd());col.forEach(c=>c.animate([{transform:'translateY(-100%)'},{transform:'none'}],{duration:90}))},90);
-    const stopAt=Date.now()+500+i*260;
-    const chk=setInterval(()=>{
-      if(Date.now()>=stopAt||stopNow){
-        clearInterval(t);clearInterval(chk);
-        col.forEach((c,r)=>{setCell(c,g[i][r]);c.animate([{transform:'translateY(-140%)'},{transform:'translateY(5%)',offset:.7},{transform:'none'}],{duration:280,easing:'ease-out',delay:(2-r)*60,fill:'backwards'})});beep(300+i*40);setTimeout(res,400);
-      }
-    },30);
-  })));
-  bal+=win;pend=0;
-  ev.hit.forEach(k=>{const[i,r]=k.split(',');cells[i][r].classList.add('hit')});
-  if(win>0){countUp(win);beep(660);setTimeout(()=>beep(880),120)}
-  if(ev.bonus>=3){free+=FREE[Math.min(ev.bonus,5)]}
+  $('win').textContent='0';clearHit();
+  $('spin').textContent='جارٍ التأكيد';$('spin').classList.add('stop');$('spin').disabled=true;
+  let response;
+  try{
+    const key=crypto.randomUUID();
+    response=await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(new Error('انتهت مهلة الاتصال بالخادم')),20000);
+      const listener=e=>{const d=e.data;if(d&&d.t==='migo:game-result'&&d.requestId===key){clearTimeout(timer);removeEventListener('message',listener);d.ok?resolve(d.data):reject(new Error(d.message||'تعذر تنفيذ الجولة'))}};
+      addEventListener('message',listener);
+      parent.postMessage({t:'migo:game-request',requestId:key,path:'/games/slot-777/spin',body:{bet}},'*');
+    });
+    const outcome=response.outcome||{},g=outcome.grid;
+    if(!Array.isArray(g)||g.length!==5||g.some(col=>!Array.isArray(col)||col.length!==3))throw new Error('نتيجة الجولة غير مكتملة');
+    bal=Number(response.coins)||0;free=Number(response.freeSpinsRemaining)||0;pend=0;
+    $('win').textContent='0';upd();
+    await Promise.all(cells.map((col,i)=>new Promise(res=>{
+      const t=setInterval(()=>{const p=col.map(x=>x._s);setCell(col[2],p[1]);setCell(col[1],p[0]);setCell(col[0],rnd(free>0));col.forEach(c=>c.animate([{transform:'translateY(-100%)'},{transform:'none'}],{duration:90}))},110);
+      const stopAt=Date.now()+500+i*260;
+      const chk=setInterval(()=>{
+        if(Date.now()>=stopAt||stopNow){
+          clearInterval(t);clearInterval(chk);
+          col.forEach((cell,row)=>{setCell(cell,g[i][row]);cell.animate([{transform:'translateY(-140%)'},{transform:'translateY(5%)',offset:.7},{transform:'none'}],{duration:280,easing:'ease-out',delay:(2-row)*60,fill:'backwards'})});
+          beep(300+i*40);setTimeout(res,400);
+        }
+      },50);
+    })));
+    (outcome.hits||[]).forEach(k=>{const [i,row]=k.split(',').map(Number);if(cells[i]&&cells[i][row])cells[i][row].classList.add('hit')});
+    const win=Number(response.payout)||0;
+    if(win>0){countUp(win);beep(660);setTimeout(()=>beep(880),120)}
+    $('msg').textContent=win>0?'مبروك! ربحت '+fmt(win):'حظ أوفر';
+    parent.postMessage({t:'refresh'},'*');
+  }catch(error){modal(error.message||'تعذر الاتصال بالخادم',[['حسنًا',null,'g']])}
   spinning=false;stopNow=false;
-  $('spin').textContent='دوران';$('spin').classList.remove('stop');
-  upd();if(ev.bonus>=3)$('msg').textContent='بونص! لفات مجانية: '+free;
-  if(free>0)setTimeout(()=>{if(!spinning)spin()},1400);
+  $('spin').textContent='دوران';$('spin').classList.remove('stop');$('spin').disabled=false;
+  upd();if(free>0)setTimeout(()=>{if(!spinning)spin()},1400);
   else if(auto>0){auto--;updAuto();setTimeout(()=>{if(!spinning)spin()},1000)}
 }
 
