@@ -131,7 +131,7 @@ jobs:
           jsfixes = [
               ('var winner=r<0.4?"lion":(r<0.8?"tiger":"draw");', 'var opposite=pick==="lion"?"tiger":"lion";var winner;if(pick==="draw"){winner=r<0.45?"lion":(r<0.9?"tiger":"draw")}else{winner=r<0.3?pick:(r<0.9?opposite:"draw")}'),
               ('function bet(){return Math.min(STEPS[stepIdx],coins)}', 'function bet(){return STEPS[stepIdx]}'),
-              ('$("go").disabled=busy||!pick||coins<=0;', '$("go").disabled=busy||!pick||coins<bet();'),
+              ('$("go").disabled=busy||!pick||coins<=0||!walletReady;', '$("go").disabled=busy||!pick||coins<bet()||!walletReady;'),
               ('$("plus").disabled=busy||stepIdx>=STEPS.length-1||STEPS[stepIdx+1]>coins;', '$("plus").disabled=busy||stepIdx>=STEPS.length-1;'),
               ('$("plus").onclick=function(){if(stepIdx<STEPS.length-1&&STEPS[stepIdx+1]<=coins){stepIdx++;render()}};', '$("plus").onclick=function(){if(!busy&&stepIdx<STEPS.length-1){stepIdx++;render()}};'),
               ('if(!pick||busy||coins<=0)return;', 'if(!pick||busy||coins<bet())return;')
