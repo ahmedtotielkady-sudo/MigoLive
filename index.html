@@ -1364,7 +1364,7 @@ function rOwner(m){
   if(!isStaff(U())){tab='me';return render()}
   if(ot==='appupdate'&&(!U()||U().role!=='owner')){ot='dash';toast('التحكم في تحديث التطبيق متاح للمالك فقط')}
   const users=Object.entries(DB.users),agents=users.filter(([,x])=>x.role==='agent');
-  const tabsO=staffTabs([['dash','📊 الرئيسية'],['tp','طلبات الشحن'],['set','الإعدادات'],['coins','العملات'],['agents','الوكلاء'],['users','الأعضاء'],['hosts','سجل المضيفين'],['alog','سجل الوكلاء'],['ag','وكالات المضيفين'],['ship','وكالات الشحن'],['ledger','دفاتر الحسابات'],['vip','VIP'],['gifts','الهدايا'],['broadcast','رسائل النظام'],['events','الفعاليات'],['staff','الصلاحيات'],['appupdate','📲 تحديث التطبيق'],['countries','طلبات تغيير البلد'],['support','الدعم']]);.filter(([k])=>k!=='appupdate'||U().role==='owner')
+  const tabsO=staffTabs([['dash','📊 الرئيسية'],['tp','طلبات الشحن'],['set','الإعدادات'],['coins','العملات'],['agents','الوكلاء'],['users','الأعضاء'],['hosts','سجل المضيفين'],['alog','سجل الوكلاء'],['ag','وكالات المضيفين'],['ship','وكالات الشحن'],['ledger','دفاتر الحسابات'],['vip','VIP'],['gifts','الهدايا'],['broadcast','رسائل النظام'],['events','الفعاليات'],['staff','الصلاحيات'],['appupdate','📲 تحديث التطبيق'],['countries','طلبات تغيير البلد'],['support','الدعم']].filter(([k])=>k!=='appupdate'||U().role==='owner'))
   let body='';
   if(ot==='dash')body=ownerDashboardHTML(tabsO);
   if(ot==='ship')body=shippingOwnerHTML();
