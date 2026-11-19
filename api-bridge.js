@@ -461,10 +461,12 @@
     const owner = DB && DB.users && DB.users[me] && DB.users[me].role === "owner";
     const oldUpdate = document.getElementById("migo-owner-update-entry");
     const oldGames = document.getElementById("migo-owner-games-entry");
+    const oldRecharge = document.getElementById("migo-owner-recharge-entry");
     const oldGrid = document.getElementById("migo-owner-admin-controls");
     if (!owner) {
       if (oldUpdate) oldUpdate.remove();
       if (oldGames) oldGames.remove();
+      if (oldRecharge) oldRecharge.remove();
       if (oldGrid) oldGrid.remove();
       return;
     }
@@ -499,15 +501,73 @@
       updateEntry.textContent = "⚙️ التحكم في التحديث";
       updateEntry.onclick = openOwnerUpdatePanel;
     }
+    let rechargeEntry = document.getElementById("migo-owner-recharge-entry");
+    if (!rechargeEntry) {
+      rechargeEntry = document.createElement("button");
+      rechargeEntry.id = "migo-owner-recharge-entry";
+      rechargeEntry.type = "button";
+      rechargeEntry.textContent = "💰 شحن المستخدمين والوكلاء";
+      rechargeEntry.onclick = openOwnerRechargePanel;
+    }
     const buttonStyle = "min-height:58px;border:1px solid #a56be8;border-radius:14px;padding:12px;background:#fff;color:#512477;font-weight:800;font-size:15px;white-space:normal";
     gamesEntry.style.cssText = buttonStyle;
     updateEntry.style.cssText = buttonStyle;
-    grid.append(gamesEntry, updateEntry);
+    rechargeEntry.style.cssText = buttonStyle;
+    grid.append(gamesEntry, updateEntry, rechargeEntry);
     if (grid.parentElement !== section) {
       const heading = Array.from(section.querySelectorAll("h1,h2,h3,h4,[role=heading]")).find(node => /أقسام الإدارة|اقسام الادارة/.test(node.textContent || ""));
       if (heading && heading.nextSibling) section.insertBefore(grid, heading.nextSibling);
       else section.appendChild(grid);
     }
+  }
+
+  // Server-backed owner recharge. Both regular users and charging agents must
+  // have a real server UID; no local balance mutation is ever performed here.
+  async function openOwnerRechargePanel() {
+    const existing = document.getElementById('migo-owner-recharge-panel');
+    if (existing) { existing.remove(); return; }
+    const modal = document.createElement('div');
+    modal.id = 'migo-owner-recharge-panel';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:2147483600;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:16px;direction:rtl';
+    modal.innerHTML = '<div style="width:min(430px,100%);background:#201431;color:#fff;border:1px solid #b98bea;border-radius:18px;padding:22px;font-family:Arial,sans-serif"><h2 style="margin:0 0 12px">شحن حساب من المالك</h2><p style="font-size:13px;line-height:1.7">اشحن المستخدم أو وكيل الشحن باستخدام رقم ID المسجل على الخادم. يتم حفظ العملية في سجل المحفظة.</p><form id="migo-owner-recharge-form"><label style="display:block;margin:10px 0">نوع الحساب<select id="migo-recharge-kind" style="width:100%;padding:11px"><option value="user">مستخدم</option><option value="agent">وكيل شحن</option></select></label><label style="display:block;margin:10px 0">رقم ID<input id="migo-recharge-uid" type="number" min="100000" step="1" required style="width:100%;box-sizing:border-box;padding:11px"></label><label style="display:block;margin:10px 0">عدد العملات<input id="migo-recharge-amount" type="number" min="1" max="1000000000" step="1" required style="width:100%;box-sizing:border-box;padding:11px"></label><p id="migo-recharge-result" role="status" style="min-height:24px;font-size:14px"></p><div style="display:flex;gap:10px"><button id="migo-recharge-submit" type="submit" style="flex:1;padding:12px;background:#d4a14e;color:#171021;border:0;border-radius:10px;font-weight:bold">تأكيد الشحن</button><button id="migo-recharge-close" type="button" style="padding:12px;border:0;border-radius:10px">إغلاق</button></div></form></div>';
+    document.body.appendChild(modal);
+    modal.querySelector('#migo-recharge-close').onclick = () => modal.remove();
+    const form = modal.querySelector('#migo-owner-recharge-form');
+    const result = modal.querySelector('#migo-recharge-result');
+    const submit = modal.querySelector('#migo-recharge-submit');
+    let pending = null;
+    for (const id of ['migo-recharge-kind','migo-recharge-uid','migo-recharge-amount']) {
+      modal.querySelector('#' + id).addEventListener('input', () => { pending = null; result.textContent = ''; });
+    }
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+      const uid = Number(modal.querySelector('#migo-recharge-uid').value);
+      const amount = Number(modal.querySelector('#migo-recharge-amount').value);
+      const kind = modal.querySelector('#migo-recharge-kind').value;
+      if (!Number.isSafeInteger(uid) || uid < 100000 || !Number.isSafeInteger(amount) || amount < 1 || amount > 1000000000) {
+        result.textContent = 'راجع رقم ID وعدد العملات'; return;
+      }
+      if (!pending || pending.uid !== uid || pending.amount !== amount || pending.kind !== kind) {
+        const bytes = new Uint8Array(20);
+        if (!window.crypto || !window.crypto.getRandomValues) { result.textContent = 'تعذر تأمين العملية'; return; }
+        window.crypto.getRandomValues(bytes);
+        pending = { uid, amount, kind, key: 'owner-credit-' + Array.from(bytes, b => b.toString(16).padStart(2,'0')).join('') };
+      }
+      submit.disabled = true;
+      result.textContent = 'جارٍ حفظ الشحن على الخادم…';
+      try {
+        const data = await api('/wallet/admin/credit', {
+          method: 'POST',
+          headers: { 'Idempotency-Key': pending.key },
+          body: JSON.stringify({ targetUid: uid, amount, description: kind === 'agent' ? 'شحن وكيل من المالك' : 'شحن مستخدم من المالك' })
+        });
+        result.textContent = 'تم الشحن بنجاح. الرصيد الحالي: ' + Number(data.coins).toLocaleString('ar-EG') + ' عملة' + (data.repeated ? ' (عملية مؤكدة مسبقًا)' : '');
+        pending = null;
+        if (typeof me !== 'undefined' && DB?.users?.[me] && Number(DB.users[me].uid) === uid) refreshWallet().catch(() => {});
+      } catch (error) {
+        result.textContent = 'لم يتم تأكيد الشحن: ' + error.message + ' — أعد المحاولة بنفس البيانات للتحقق دون تكرار الشحن.';
+      } finally { submit.disabled = false; }
+    };
   }
   const MIGO_GAME_LABELS = {
     "slot-777":"سلوت 777","ocean-storm":"عاصفة المحيط","wheel-animals":"عجلة الحيوانات",
