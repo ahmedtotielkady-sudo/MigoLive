@@ -681,7 +681,7 @@ function toast(m){const d=document.createElement('div');d.className='toast';d.te
 async function hash(s){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return btoa(unescape(encodeURIComponent(s)))}}
 
 let loginMode='id';
-function updateLoginMode(){const phone=loginMode==='phone';$('#u').placeholder=reg?'اسم المستخدم لإنشاء الحساب':(phone?'رقم الهاتف':'رقم ID');$('#u').setAttribute('aria-label',reg?'اسم المستخدم':(phone?'رقم الهاتف':'رقم ID'));$('#u').inputMode=reg?'text':(phone?'tel':'numeric');$('#u').dir=reg?'auto':'ltr';$('#login-mode-toggle').textContent=phone?'هاتف ⇄ ID':'ID ⇄ هاتف';$('#login-mode-toggle').style.display=reg?'none':'inline-flex';$('#reg-phone').classList.toggle('hide',!reg);}
+function updateLoginMode(){const phone=loginMode==='phone';$('#u').placeholder=reg?'اسم المستخدم (3 إلى 24 حرفاً)':(phone?'رقم الهاتف':'رقم ID');$('#u').setAttribute('aria-label',reg?'اسم المستخدم':(phone?'رقم الهاتف':'رقم ID'));$('#u').inputMode=reg?'text':(phone?'tel':'numeric');$('#u').dir=reg?'auto':'ltr';$('#u').minLength=reg?3:0;$('#u').maxLength=reg?24:undefined;$('#u').setAttribute('aria-describedby','aerr');$('#login-mode-toggle').textContent=phone?'هاتف ⇄ ID':'ID ⇄ هاتف';$('#login-mode-toggle').style.display=reg?'none':'inline-flex';$('#reg-phone').classList.toggle('hide',!reg);}
 $('#login-mode-toggle').onclick=()=>{loginMode=loginMode==='id'?'phone':'id';$('#u').value='';updateLoginMode();$('#u').focus()};
 $('#bsw').onclick=()=>{reg=!reg;$('#ic').classList.toggle('hide',!reg);$('#bin').textContent=reg?'إنشاء الحساب':'تسجيل الدخول';$('#bsw').textContent=reg?'لدي حساب بالفعل':'إنشاء حساب جديد';$('#aerr').textContent='';updateLoginMode()};
 updateLoginMode();
@@ -691,7 +691,7 @@ $('#bin').onclick=async()=>{
   const h=await hash(p);
   let k=null,created=false;
   if(reg){
-    if(raw.length<3)return e.textContent='اسم المستخدم 3 أحرف على الأقل';
+    const usernameLength=[...raw].length;if(usernameLength<3)return e.textContent='اسم المستخدم يجب أن يكون 3 أحرف على الأقل';if(usernameLength>24)return e.textContent='اسم المستخدم يجب ألا يزيد عن 24 حرفاً أو رقماً';
     const phone=phoneRaw.replace(/[\s()-]/g,'');if(phone&&(!/^\+?[0-9]{7,15}$/.test(phone)))return e.textContent='رقم الهاتف غير صحيح';if(phone&&Object.values(DB.users).some(x=>x.phone===phone))return e.textContent='رقم الهاتف مستخدم من قبل';
     k=raw.toLowerCase();
     if(DB.users[k])return e.textContent='اسم المستخدم مستخدم من قبل';
