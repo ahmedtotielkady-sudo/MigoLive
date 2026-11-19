@@ -34,9 +34,11 @@ elif "u.coins=Math.floor(d.v);" in html:
 helper = r"""<script id="migo-server-game-client-v1">
 (()=>{if(window.migoServerGame)return;
  const pending=new Map();
+ let retry=null;
  function key(){if(!window.crypto||!crypto.getRandomValues)throw new Error('تعذر تأمين الجولة');const b=new Uint8Array(20);crypto.getRandomValues(b);return 'migo-'+Array.from(b,x=>x.toString(16).padStart(2,'0')).join('')}
- addEventListener('message',e=>{const d=e.data;if(!d||d.t!=='migo:game:response'||typeof d.requestId!=='string')return;const p=pending.get(d.requestId);if(!p)return;pending.delete(d.requestId);clearTimeout(p.timer);if(d.ok)p.resolve(d.result);else p.reject(new Error(d.message||'تعذر تنفيذ الجولة على الخادم'))});
- window.migoServerGame={request(gameId,action,payload){const requestId=key();return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(requestId);reject(new Error('انتهت مهلة الاتصال بالخادم'))},20000);pending.set(requestId,{resolve,reject,timer});try{parent.postMessage({t:'migo:game:request',requestId,gameId,action,payload:payload||{}},'*')}catch(err){clearTimeout(timer);pending.delete(requestId);reject(err)}})}};
+ function signature(gameId,action,payload){return String(gameId)+':'+String(action)+':'+JSON.stringify(payload||{})}
+ addEventListener('message',e=>{const d=e.data;if(!d||d.t!=='migo:game:response'||typeof d.requestId!=='string')return;const p=pending.get(d.requestId);if(!p)return;pending.delete(d.requestId);clearTimeout(p.timer);if(retry&&retry.requestId===d.requestId)retry=null;if(d.ok)p.resolve(d.result);else p.reject(new Error(d.message||'تعذر تنفيذ الجولة على الخادم'))});
+ window.migoServerGame={request(gameId,action,payload){const body=payload||{};const sig=signature(gameId,action,body);if(retry&&retry.signature!==sig)return Promise.reject(new Error('هناك جولة لم يصل تأكيدها بعد؛ أعد المحاولة بنفس الرهان والاختيارات أولاً'));const requestId=retry?retry.requestId:key();return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(requestId);retry={signature:sig,requestId};reject(new Error('لم يصل تأكيد الخادم؛ أعد المحاولة بنفس الرهان والاختيارات لتجنب تكرار الخصم'))},20000);pending.set(requestId,{resolve,reject,timer});try{parent.postMessage({t:'migo:game:request',requestId,gameId,action,payload:body},'*')}catch(err){clearTimeout(timer);pending.delete(requestId);retry={signature:sig,requestId};reject(err)}})}};
 })();
 </script>"""
 
