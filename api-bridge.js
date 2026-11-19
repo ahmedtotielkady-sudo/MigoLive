@@ -297,7 +297,7 @@
     catch (error) { console.warn('Server wallet sync pending:', error.message); }
     finally { walletRefreshBusy = false; }
   }
-  setInterval(refreshWalletSafely, 2000);
+  setInterval(refreshWalletSafely, 10000);
   window.addEventListener('focus', refreshWalletSafely);
   document.addEventListener('visibilitychange', refreshWalletSafely);
   window.addEventListener('migo:wallet-updated', refreshWalletSafely);
