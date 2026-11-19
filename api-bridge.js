@@ -540,4 +540,55 @@
       if (typeof forceOut === 'function') forceOut('انتهت جلسة الدخول؛ سجّل الدخول مرة أخرى');
     });
   }
+
+  // Server-authoritative settlement bridge for every game iframe.
+  // Iframes submit bets/choices only; balances and payouts are never client supplied.
+  const GAME_ACTIONS = {
+    'ocean-storm:spin': '/games/ocean-storm/spin',
+    'wheel-animals:spin': '/games/wheel-animals/spin',
+    'fruit-luck:spin': '/games/fruit-luck/spin',
+    'big-warrior:fight': '/games/big-warrior/fight',
+    'cleopatra-gold:spin': '/games/cleopatra-gold/spin',
+    'rocket-crash:start': '/games/rocket-crash/start',
+    'rocket-crash:state': '/games/rocket-crash/state',
+    'rocket-crash:cashout': '/games/rocket-crash/cashout',
+    'rocket-crash:cancel': '/games/rocket-crash/cancel'
+  };
+  function gameFrameFor(source) {
+    const frames = [$id('gf'), document.querySelector('#migo-game-overlay iframe')].filter(Boolean);
+    return frames.find(frame => frame.contentWindow === source) || null;
+  }
+  window.addEventListener('message', async event => {
+    const request = event.data;
+    if (!request || request.t !== 'migo:game:request' || !gameFrameFor(event.source)) return;
+    const endpoint = GAME_ACTIONS[String(request.gameId || '') + ':' + String(request.action || '')];
+    const requestId = String(request.requestId || '');
+    const reply = payload => {
+      try { event.source.postMessage(Object.assign({ t: 'migo:game:response', requestId }, payload), event.origin || '*'); } catch (_) {}
+    };
+    if (!endpoint || !/^[A-Za-z0-9_-]{16,80}$/.test(requestId)) {
+      reply({ ok: false, message: 'طلب اللعبة غير صالح' });
+      return;
+    }
+    try {
+      const options = {
+        method: 'POST',
+        body: JSON.stringify(request.payload && typeof request.payload === 'object' ? request.payload : {})
+      };
+      if (request.action !== 'state') options.headers = { 'Idempotency-Key': requestId };
+      const result = await api(endpoint, options);
+      if (result && Number.isFinite(Number(result.coins)) && typeof me !== 'undefined' && me && DB.users[me]) {
+        DB.users[me].coins = Math.max(0, Math.floor(Number(result.coins)));
+        if (typeof save === 'function') save();
+        const top = $id('mycoins');
+        if (top) top.textContent = DB.users[me].coins;
+        window.dispatchEvent(new CustomEvent('migo:wallet-updated', { detail: { coins: DB.users[me].coins, source: 'server-game' } }));
+      }
+      reply({ ok: true, result });
+      if (result && Number.isFinite(Number(result.coins))) refreshWalletSafely();
+    } catch (error) {
+      reply({ ok: false, message: error && error.message ? error.message : 'تعذر تنفيذ الجولة على الخادم' });
+    }
+  });
+
 })();
