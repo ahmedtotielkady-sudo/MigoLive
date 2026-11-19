@@ -51,6 +51,10 @@ html,body{height:100%;height:100dvh;overflow:hidden}
 .ctl{flex:0 0 auto;gap:3px;padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(max-height:700px){.hero{max-height:25dvh}.top{margin-top:1dvh}.stage .reels{width:min(100%,calc((100dvh - 145px)*1.25))}.ctl .sm{height:40px}.ctl .spin{height:48px}}
 
+
+/* Fast Android/WebView touch response: no delayed double-tap handling. */
+button,[role="button"],.chip,.hit,.box{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+button:active,[role="button"]:active,.chip:active,.hit:active,.box:active{filter:brightness(1.18);}
 </style>
 </head>
 <body>
@@ -96,7 +100,7 @@ const msg=(t,c)=>{const m=$('#msg');m.textContent=t;m.className='info '+(c||'')}
 function ui(){
  $('#bal').textContent=bal.toLocaleString('en');$('#bet').textContent=BETS[bi].toLocaleString('en');
  const f=$('#fs');f.hidden=!fs;f.textContent=`لفات مجانية: ${fs} · المضاعف ×${mult} · الربح ${fsWin.toLocaleString('en')}`;
- $('#spin').disabled=busy||fs>0;['#up','#dn'].forEach(s=>$(s).disabled=busy||fs>0);
+ $('#spin').disabled=busy||fs>0;['#up','#dn'].forEach(s=>$(s).disabled=fs>0);
 }
 function init(){
  grid=[0,1,2,3,4].map(col);
