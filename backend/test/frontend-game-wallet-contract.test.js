@@ -7,6 +7,19 @@ const path = require("node:path");
 const root = path.join(__dirname, "..", "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
+
+test("app fails closed when internet, API, or database health is unavailable", () => {
+  const bridge = read("api-bridge.js");
+  assert.ok(bridge.includes("NETWORK_GATE_ID"));
+  assert.ok(bridge.includes("خدمة الإنترنت لا تعمل"));
+  assert.ok(bridge.includes("window.addEventListener('offline', showNetworkGate)"));
+  assert.ok(bridge.includes("window.addEventListener('online'"));
+  assert.ok(bridge.includes("setInterval(verifyNetworkService, 4000)"));
+  assert.ok(bridge.includes("data.database === 'connected'"));
+  assert.ok(bridge.includes("showNetworkGate();"));
+  assert.ok(bridge.includes("hideNetworkGate();"));
+});
+
 test("both embedded slot games use their matching server settlement endpoints", () => {
   const app = read("index.html");
   const match = app.match(/const GB=\{([\s\S]*?)\};\s*const GM=/);
