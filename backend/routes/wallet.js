@@ -41,14 +41,35 @@ router.get("/", async (req, res, next) => {
 router.get("/transactions", async (req, res, next) => {
   try {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
-    const rows = await WalletTransaction.find({
-      $or: [{ from: req.auth.sub }, { to: req.auth.sub }]
-    }).sort({ createdAt: -1 }).limit(limit).lean();
-    return res.json({ ok: true, transactions: rows.map(row => ({
+    const userId = new mongoose.Types.ObjectId(req.auth.sub);
+    const [rows, legacyRows] = await Promise.all([
+      WalletTransaction.find({
+        $or: [{ from: userId }, { to: userId }]
+      }).sort({ createdAt: -1 }).limit(limit).lean(),
+      // Read the old ledger collection too: preserve transaction history created
+      // before the wallet API switched to WalletTransaction.
+      mongoose.connection.collection("ledgers")
+        .find({ userId, status: "posted" })
+        .sort({ createdAt: -1 }).limit(limit).toArray()
+    ]);
+    const current = rows.map(row => ({
       id: String(row._id), type: row.type, amount: row.amount,
       direction: String(row.to) === req.auth.sub ? "in" : "out",
       description: row.description, createdAt: row.createdAt
-    })) });
+    }));
+    const legacy = legacyRows.map(row => ({
+      id: "legacy:" + String(row._id),
+      type: row.type,
+      amount: row.amount,
+      direction: row.direction === "credit" ? "in" : "out",
+      description: row.metadata && row.metadata.action === "new_account_registration"
+        ? "مكافأة التسجيل" : String(row.type || "حركة رصيد"),
+      createdAt: row.createdAt
+    }));
+    const transactions = current.concat(legacy)
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      .slice(0, limit);
+    return res.json({ ok: true, transactions });
   } catch (error) { return next(error); }
 });
 
