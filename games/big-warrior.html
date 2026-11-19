@@ -108,18 +108,18 @@ button:focus-visible,.card:focus-visible{outline:3px solid #fff;outline-offset:2
   var $=function(id){return document.getElementById(id)};
   $("ldLion").src=$("cLion").querySelector("img").src;$("ldTiger").src=$("cTiger").querySelector("img").src;
   var STEPS=[100,500,1000,2000,5000,10000], MULT=2, DRAW=8, START=10000;
-  var coins=START, round=1, stepIdx=0, pick=null, busy=false;
+  var coins=START, round=1, stepIdx=0, pick=null, busy=false, walletReady=false;
   try{var s=localStorage.getItem("migo-big-warrior-v1");if(s){var d=JSON.parse(s);if(d&&d.coins>=0){coins=d.coins;round=d.round||1}}}catch(e){}
-  function save(){try{localStorage.setItem("migo-big-warrior-v1",JSON.stringify({coins:coins,round:round}))}catch(e){}if(window.parent!==window){try{window.parent.postMessage({t:"set",v:Math.max(0,Math.floor(coins))},"*")}catch(e){}}}
+  function save(){if(!inMigo){try{localStorage.setItem("migo-big-warrior-v1",JSON.stringify({coins:coins,round:round}))}catch(e){}}}
   var inMigo=window.parent!==window;
-  if(inMigo){window.addEventListener("message",function(e){var d=e.data||{};if(d.t==="bal"&&Number.isFinite(Number(d.v))&&Number(d.v)>=0){coins=Math.floor(Number(d.v));render();}});window.parent.postMessage({t:"get"},"*");}
+  if(inMigo){coins=0;window.addEventListener("message",function(e){var d=e.data||{};if(d.t==="bal"&&Number.isFinite(Number(d.v))&&Number(d.v)>=0){coins=Math.floor(Number(d.v));walletReady=true;render();}});window.parent.postMessage({t:"get"},"*");}else{walletReady=true;}
   function bet(){return Math.min(STEPS[stepIdx],coins)}
   function fmt(n){return Number(n).toLocaleString("en-US")}
   function render(){
     if(coins>0 && STEPS[stepIdx]>coins){stepIdx=0;while(stepIdx<STEPS.length-1&&STEPS[stepIdx+1]<=coins)stepIdx++}
     $("coins").textContent=fmt(coins);$("round").textContent=round;
     $("bet").textContent=fmt(bet());$("payout").textContent=fmt(Math.floor(bet()*(pick==="draw"?DRAW:MULT)));
-    $("go").disabled=busy||!pick||coins<=0;
+    $("go").disabled=busy||!pick||coins<=0||!walletReady;
     $("minus").disabled=busy||stepIdx===0;
     $("plus").disabled=busy||stepIdx>=STEPS.length-1||STEPS[stepIdx+1]>coins;
     $("drawBtn").classList.toggle("picked",pick==="draw");$("drawBtn").disabled=busy;
