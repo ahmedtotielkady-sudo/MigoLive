@@ -315,7 +315,13 @@
       const phone = ($id('reg-phone')?.value || '').trim();
       const password = $id('p')?.value || '';
       const registering = !!(typeof reg !== 'undefined' && reg);
-      if (!raw || !password) return message('أدخل بيانات الحساب');
+      if (!raw || !password) return message('أدخل اسم المستخدم وكلمة المرور');
+      if (registering) {
+        const usernameLength = [...raw].length;
+        if (usernameLength < 3) return message('اسم المستخدم يجب أن يكون 3 أحرف على الأقل');
+        if (usernameLength > 24) return message('اسم المستخدم يجب ألا يزيد عن 24 حرفاً');
+        if (phone && !/^\\+?[0-9٠-٩]{7,15}$/.test(phone.replace(/[\\s()-]/g, ''))) return message('رقم الهاتف غير صحيح');
+      }
       if (password.length < (registering ? 8 : 1)) return message(registering ? 'كلمة المرور يجب ألا تقل عن 8 أحرف' : 'أدخل كلمة المرور');
       const button = $id('bin');
       if (button) button.disabled = true;
