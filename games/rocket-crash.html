@@ -128,7 +128,7 @@ async function go(){
   try{
    const r=await migoGameCall('rocket-crash','start',{bet:a});
    serverRoundId=r.roundId;bal=Math.max(0,Math.floor(Number(r.coins)||0));
-   bet={amt:a,st:'live',win:0};state='wait';t0=performance.now()+Math.max(0,Number(r.startAt)-Date.now());
+   bet={amt:a,st:'live',win:0};state='wait';t0=performance.now()+Math.max(0,Number(r.startAt)-Date.now());lastServerState=0;mult=1;
    beep(520,.08,'triangle');ui();
   }catch(e){charge(true);$('#np').textContent=e.message||'تعذر بدء الرهان من الخادم'}
   finally{$('#go').disabled=false}
@@ -211,7 +211,7 @@ async function pollRocketState(){
  if(serverStateBusy||!serverRoundId||bet.st!=='live')return;serverStateBusy=true;
  try{const s=await migoGameCall('rocket-crash','state',{});if(Number.isFinite(Number(s.coins)))bal=Math.max(0,Math.floor(Number(s.coins)||0));
   if(s.crashed){cp=Number(s.multiplier)||mult;crash();return}
-  if(s.active&&s.phase==='fly'){mult=Number(s.multiplier)||mult;const av=Math.max(1.1,+$('#av').value||2);if($('#ac').checked&&mult>=av){await cash(av);return}}
+  if(s.active&&s.phase==='fly'){mult=Math.max(1,Number(s.multiplier)||mult);const av=Math.max(1.1,+$('#av').value||2);if($('#ac').checked&&mult>=av){await cash(av);return}}
   if(s.active&&s.phase==='wait'&&state!=='wait'){state='wait';t0=performance.now()+500;ui()}
  }catch(e){/* retry on next tick; never settle a round locally */}
  finally{serverStateBusy=false}
@@ -220,7 +220,7 @@ function tick(){
  const n=performance.now();
  if(state=='wait'){if(n>=t0)startFly()}
  else if(state=='fly'){
-  const t=(n-t0)/1000;const local=Math.exp(.13*t);if(!serverStateBusy&&n-lastServerState>450){lastServerState=n;pollRocketState()}
+  const t=(n-t0)/1000;const local=Math.exp(.13*Math.max(0,t));mult=local;if(!serverStateBusy&&n-lastServerState>250){lastServerState=n;pollRocketState()}
   pts.push([t,mult]);const sm=$('#cash small');if(sm&&bet.st=='live')sm.textContent=fmt(bet.amt*mult)+' 🪙';
  }
  ov();draw();requestAnimationFrame(tick);
