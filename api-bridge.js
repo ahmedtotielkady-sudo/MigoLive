@@ -220,6 +220,57 @@
     }
     return true;
   }
+  // Approve receipt-backed package top-ups on the server, not only in localStorage.
+  // The top-up request itself is local in this build; approval is the point where
+  // the canonical server wallet must be credited.
+  async function approveTopupOnServer(button) {
+    const index = Number(button && button.getAttribute('data-tok'));
+    const topup = Number.isInteger(index) && index >= 0 ? DB.topups[index] : null;
+    const user = topup && DB.users[topup.user];
+    const targetUid = Number(user && user.uid);
+    const amount = Number(topup && topup.amount);
+    if (!topup || topup.status !== 'pending' || !user ||
+        !Number.isSafeInteger(targetUid) || targetUid < 100000 ||
+        !Number.isSafeInteger(amount) || amount < 1) {
+      if (typeof toast === 'function') toast('طلب الشحن غير صالح أو تمت معالجته');
+      return;
+    }
+    if (button) button.disabled = true;
+    try {
+      const stableId = String(topup.id || '');
+      if (!/^\\d{10,20}$/.test(stableId)) throw new Error('رقم طلب الشحن غير صالح');
+      const data = await api('/wallet/admin/adjust', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': 'topup-approval-' + stableId },
+        body: JSON.stringify({
+          targetUid,
+          amount,
+          description: 'اعتماد طلب شحن بإيصال' + (topup.pack ? ' · باقة ' + Number(topup.pack.coins || amount) : '')
+        })
+      });
+      // Only mark the receipt approved after the server confirms its atomic ledger write.
+      topup.status = 'ok';
+      user.coins = Number(data.coins);
+      if (typeof addCharge === 'function') addCharge(topup.user, amount);
+      if (typeof notifyUserResult === 'function') {
+        notifyUserResult(topup.user, 'تم تنفيذ شحن ' + amount.toLocaleString('ar-EG') +
+          ' عملة بنجاح. رصيدك الآن ' + Number(data.coins).toLocaleString('ar-EG') + ' عملة');
+      }
+      if (typeof logIt === 'function') logIt('مالك', 'شحن ' + amount + ' عملة لـ ' + (user.name || targetUid) + ' (إيصال)');
+      save();
+      if (typeof toast === 'function') toast('تم الشحن وحفظ الرصيد على الخادم');
+      if (typeof render === 'function') render();
+      window.dispatchEvent(new Event('migo:wallet-updated'));
+    } catch (error) {
+      if (typeof toast === 'function') {
+        toast('لم يتم تأكيد الشحن على الخادم: ' + (error.message || 'خطأ غير معروف') +
+          ' · الطلب لم يُعتمد محلياً، ويمكن إعادة المحاولة بأمان');
+      }
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
   document.addEventListener('submit', async event => {
     const form = findCoinsAdjustmentForm(event.target);
     if (!form) return;
@@ -230,7 +281,14 @@
   document.addEventListener('click', async event => {
     const button = event.target && event.target.closest &&
       event.target.closest('button,input[type="submit"]');
-    if (!button || !/تنفيذ/.test(button.textContent || button.value || '')) return;
+    if (!button) return;
+    if (button.hasAttribute('data-tok')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      await approveTopupOnServer(button);
+      return;
+    }
+    if (!/تنفيذ/.test(button.textContent || button.value || '')) return;
     const form = findCoinsAdjustmentForm(button);
     if (!form) return;
     event.preventDefault();
