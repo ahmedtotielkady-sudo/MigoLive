@@ -106,15 +106,29 @@ function genCP(){const u=Math.random();return Math.max(1,Math.floor(96/(1-u))/10
 function startWait(){state='wait';t0=performance.now()+5000;cp=genCP();pts=[];mult=1;if(bet.st=='queued')bet.st='live';else if(bet.st=='cashed'||bet.st=='lost')bet={amt:0,st:'none',win:0};res='';ui()}
 function startFly(){state='fly';t0=performance.now();pts=[[0,1]];beep(110,1.3,'sawtooth',.05,520);ui()}
 function crash(){state='crash';crashT=performance.now();mult=cp;hist.unshift(cp);hist=hist.slice(0,10);beep(170,.55,'sawtooth',.12,40);
- if(bet.st=='live'){res=`💥 انفجر · خسرت ${fmt(bet.amt)}`;bet={amt:0,st:'none',win:0}}
+ if(bet.st=='live'){res=`💥 انفجر · خسرت ${fmt(bet.amt)}`;bet={amt:0,st:'none',win:0};serverRoundId=''}
  else if(bet.st=='cashed')res=`💥 انفجر · ربحت ${fmt(bet.win)}`;else res='💥 انفجر';
  ui();setTimeout(startWait,2600)}
-function cash(m){if(bet.st!='live')return;const w=Math.floor(bet.amt*m);bal+=w;bet.st='cashed';bet.win=w;cashAt=m;save();beep(660,.12,'triangle');setTimeout(()=>beep(990,.22,'triangle'),110);ui()}
+async function cash(m){if(bet.st!='live'||!serverRoundId)return;$('#cash').disabled=true;try{const r=await migoGameCall('rocket-crash','cashout',{roundId:serverRoundId});bal=Math.max(0,Math.floor(Number(r.coins)||0));if(r.crashed){cp=Number(r.multiplier)||m;crash();return}const w=Math.max(0,Math.floor(Number(r.payout)||0));bet.st='cashed';bet.win=w;cashAt=Number(r.multiplier)||m;save();beep(660,.12,'triangle');setTimeout(()=>beep(990,.22,'triangle'),110);ui()}catch(e){if(/انتهت الجولة|انفجر|crash/i.test(e.message||'')){const s=await migoGameCall('rocket-crash','state',{}).catch(()=>null);if(s&&s.crashed){cp=Number(s.multiplier)||m;crash()}else charge(false)}else charge(false)}finally{$('#cash').disabled=state!=='fly'||bet.st!=='live'}}
 function charge(ins){$('#nt').textContent=ins?'⚠️ رصيدك غير كافٍ':'💰 محفظة مايجو لايف';$('#np').textContent=ins?`رصيد محفظتك الحالي ${fmt(bal)} عملة، وهو أقل من الرهان المختار ${fmt(BETS[bi])}. افتح المتجر من التطبيق لإضافة العملات.`:'رصيد اللعبة مرتبط بمحفظة مايجو لايف المشتركة.';$('#nf').showModal()}
-function go(){
+async function go(){
  if(!walletReady){askWallet();charge(false);return}
- if(bet.st=='queued'||(bet.st=='live'&&state=='wait')){bal+=bet.amt;bet={amt:0,st:'none',win:0};save();ui();return}
- if(bet.st=='none'){const a=BETS[bi];if(bal<a){charge(true);return}bal-=a;bet={amt:a,st:state=='wait'?'live':'queued',win:0};save();beep(520,.08,'triangle');ui()}
+ if(bet.st=='queued'||(bet.st=='live'&&state=='wait')){
+  try{const r=await migoGameCall('rocket-crash','cancel',{roundId:serverRoundId});bal=Math.max(0,Math.floor(Number(r.coins)||0));serverRoundId='';bet={amt:0,st:'none',win:0};save();ui()}
+  catch(e){charge(false);$('#np').textContent=e.message||'تعذر إلغاء الرهان من الخادم'}
+  return;
+ }
+ if(bet.st=='none'){
+  const a=BETS[bi];if(bal<a){charge(true);return}
+  $('#go').disabled=true;
+  try{
+   const r=await migoGameCall('rocket-crash','start',{bet:a});
+   serverRoundId=r.roundId;bal=Math.max(0,Math.floor(Number(r.coins)||0));
+   bet={amt:a,st:'live',win:0};state='wait';t0=performance.now()+Math.max(0,Number(r.startAt)-Date.now());
+   beep(520,.08,'triangle');ui();
+  }catch(e){charge(true);$('#np').textContent=e.message||'تعذر بدء الرهان من الخادم'}
+  finally{$('#go').disabled=false}
+ }
 }
 function ui(){
  $('#bal').textContent=fmt(bal);$('#bet').textContent=fmt(BETS[bi]);
@@ -188,13 +202,22 @@ function ov(){
   else if(bet.st=='cashed')sub=`✓ سحبت ×${cashAt.toFixed(2)} · فوز ${fmt(bet.win)}`;else if(bet.st=='queued')sub='رهانك للجولة القادمة'}
  s.textContent=sub;s.style.color=sub.startsWith('✓')||sub.includes('ربحت')?'#7dffaf':sub.includes('خسرت')?'#ff8aa0':'#f1ecff';
 }
+let lastServerState=0,serverStateBusy=false;
+async function pollRocketState(){
+ if(serverStateBusy||!serverRoundId||bet.st!=='live')return;serverStateBusy=true;
+ try{const s=await migoGameCall('rocket-crash','state',{});if(Number.isFinite(Number(s.coins)))bal=Math.max(0,Math.floor(Number(s.coins)||0));
+  if(s.crashed){cp=Number(s.multiplier)||mult;crash();return}
+  if(s.active&&s.phase==='fly'){mult=Number(s.multiplier)||mult;const av=Math.max(1.1,+$('#av').value||2);if($('#ac').checked&&mult>=av){await cash(av);return}}
+  if(s.active&&s.phase==='wait'&&state!=='wait'){state='wait';t0=performance.now()+500;ui()}
+ }catch(e){/* retry on next tick; never settle a round locally */}
+ finally{serverStateBusy=false}
+}
 function tick(){
  const n=performance.now();
  if(state=='wait'){if(n>=t0)startFly()}
  else if(state=='fly'){
-  const t=(n-t0)/1000;mult=Math.exp(.13*t);const av=Math.max(1.1,+$('#av').value||2);
-  if(bet.st=='live'&&$('#ac').checked&&av<=cp&&mult>=av)cash(av);
-  if(mult>=cp){mult=cp;pts.push([t,cp]);crash()}else{pts.push([t,mult]);const sm=$('#cash small');if(sm&&bet.st=='live')sm.textContent=fmt(bet.amt*mult)+' 🪙'}
+  const t=(n-t0)/1000;const local=Math.exp(.13*t);if(!serverStateBusy&&n-lastServerState>450){lastServerState=n;pollRocketState()}
+  pts.push([t,mult]);const sm=$('#cash small');if(sm&&bet.st=='live')sm.textContent=fmt(bet.amt*mult)+' 🪙';
  }
  ov();draw();requestAnimationFrame(tick);
 }
@@ -210,5 +233,7 @@ $('#nc').onclick=()=>nf.close();nf.addEventListener('click',e=>{if(e.target===nf
 $('#charge').textContent='فتح المحفظة';$('#charge').onclick=()=>{walletPost({t:'wallet'});nf.close()};
 size();startWait();askWallet();requestAnimationFrame(tick);
 </script>
+
+<script id="migo-server-game-rpc">(()=>{let n=0;const p=new Map();function key(){const a=new Uint8Array(18);crypto.getRandomValues(a);return 'g'+Array.from(a,x=>x.toString(16).padStart(2,'0')).join('')+(++n)}window.migoGameCall=(gameId,action,payload)=>new Promise((resolve,reject)=>{const requestId=key(),timer=setTimeout(()=>{p.delete(requestId);reject(new Error('انتهت مهلة اتصال اللعبة بالخادم'))},15000);p.set(requestId,{resolve,reject,timer});parent.postMessage({t:'migo:game:request',gameId,action,payload,requestId},'*')});addEventListener('message',e=>{const d=e.data;if(!d||d.t!=='migo:game:response')return;const x=p.get(d.requestId);if(!x)return;clearTimeout(x.timer);p.delete(d.requestId);d.ok?x.resolve(d.result):x.reject(new Error(d.message||'تعذر تنفيذ الجولة'))})})();</script>
 </body>
 </html>
