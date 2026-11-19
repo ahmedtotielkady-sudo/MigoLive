@@ -8,8 +8,25 @@ out = root / "www" / "assets" / "migo-purple-background.jpg"
 
 if not html_path.is_file() or not encoded_path.is_file():
     raise SystemExit("Missing MigoLive web assets for background integration")
+raw = encoded_path.read_text(encoding="ascii").strip()
+try:
+    image_bytes = base64.b64decode(raw, validate=True)
+except Exception:
+    # Recover a single accidental 3-character insertion in the stored base64 text.
+    image_bytes = None
+    for i in range(max(0, len(raw) - 2)):
+        candidate = raw[:i] + raw[i + 3:]
+        try:
+            decoded = base64.b64decode(candidate, validate=True)
+        except Exception:
+            continue
+        if decoded.startswith(b"\xff\xd8\xff") and decoded.endswith(b"\xff\xd9"):
+            image_bytes = decoded
+            break
+    if image_bytes is None:
+        raise SystemExit("Stored background image data is invalid; refusing to build")
 out.parent.mkdir(parents=True, exist_ok=True)
-out.write_bytes(base64.b64decode(encoded_path.read_text(encoding="ascii").strip(), validate=True))
+out.write_bytes(image_bytes)
 if out.stat().st_size < 1000:
     raise SystemExit("Background image decode failed")
 
