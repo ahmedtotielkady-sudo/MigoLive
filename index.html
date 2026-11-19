@@ -583,6 +583,18 @@ DB.hostApplications=DB.hostApplications||[];DB.referrals=DB.referrals||[];DB.vip
 const GFX={none:'بدون تأثير',pop:'ظهور الأيقونة',hearts:'قلوب صاعدة',stars:'نجوم متلألئة',confetti:'قصاصات احتفال',rain:'مطر الأيقونة',fireworks:'ألعاب نارية',royal:'ملكي (شاشة كاملة)'};
 DB.giftCat=DB.giftCat||[{id:1,name:'وردة',icon:'🌹',price:10,fx:'pop'},{id:2,name:'قلب',icon:'❤️',price:50,fx:'hearts'},{id:3,name:'نجمة',icon:'⭐',price:100,fx:'stars'},{id:4,name:'تاج',icon:'👑',price:500,fx:'confetti'},{id:5,name:'سيارة',icon:'🏎️',price:1000,fx:'royal'}];
 DB.packs=DB.packs||[{id:1,coins:1000,bonus:0,price:10,label:''},{id:2,coins:5000,bonus:250,price:45,label:''},{id:3,coins:20000,bonus:2000,price:160,label:'الأوفر'}];
+// Fixed Egyptian-pound recharge catalog: 25 EGP per 1,000 coins.
+// Apply once to replace any previously saved package list without touching wallets.
+if(!DB.fixedCoinPacksV1){
+  DB.packs=[
+    {id:1,coins:1000,bonus:0,price:25,label:''},
+    {id:2,coins:5000,bonus:0,price:125,label:''},
+    {id:3,coins:10000,bonus:0,price:250,label:'أفضل باقة'}
+  ];
+  DB.settings.cur='ج.م';
+  DB.fixedCoinPacksV1=true;
+  try{localStorage.setItem('mygo',JSON.stringify(DB))}catch(_){}
+}
 DB.settings.cur=DB.settings.cur||'ج.م';
 const fmt=n=>Number(n).toLocaleString('en-US');
 function ensureUid(u){if(!u.uid){let n;do{n=1000000+Math.floor(Math.random()*9000000)}while(Object.values(DB.users).some(x=>x.uid===n));u.uid=n}return u}
@@ -990,18 +1002,13 @@ function giftsOwnerBind(m){gNew='';
 function packsHTML(){const cur=DB.settings.cur||'ج.م';if(!DB.packs.length)return'';
   return `<b>باقات العملات</b><div class="sp"></div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px">${DB.packs.map(p=>{const on=selPack&&selPack.id===p.id;return `<div class="card" style="margin:0;text-align:center;${on?'border-color:var(--gd)':''}">${p.label?`<span class="badge">${esc(p.label)}</span>`:''}<div style="font-size:22px;font-weight:900;color:var(--gd)">🪙 ${fmt(p.coins)}</div>${p.bonus>0?`<div class="mu">+ ${fmt(p.bonus)} هدية</div>`:'<div class="mu">&nbsp;</div>'}<div style="margin:4px 0"><b>${fmt(p.price)} ${esc(cur)}</b></div><button class="btn ${on?'o':'g'} s w" data-pk="${p.id}">${on?'إلغاء':'اختيار'}</button></div>`}).join('')}</div>`}
 function packsBind(m){m.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{const p=DB.packs.find(x=>x.id==b.dataset.pk);selPack=selPack&&p&&selPack.id===p.id?null:p;render()})}
-function packsOwnerHTML(){const cur=DB.settings.cur||'ج.م';
-  return `<div class="card"><b>مكافأة الدعوة</b><div class="mu">تُدفع لصاحب الكود وللمدعو عند أول دخول للمدعو إلى غرفة (حد أقصى 20 دعوة يومياً لكل مستخدم)</div><div class="sp"></div><div class="row" style="gap:6px"><input class="in grow" id="inv-r" type="number" min="0" inputmode="numeric" value="${DB.settings.invReward!=null?DB.settings.invReward:100}" style="margin:0" aria-label="مكافأة الدعوة"><button class="btn s" id="inv-s">حفظ</button></div></div><div class="card"><b>باقات العملات</b><div class="mu">أنت تحدد عدد العملات وسعر كل باقة وتظهر للمستخدمين في المحفظة</div><div class="sp"></div><div class="mu">اسم العملة المستخدمة في الأسعار</div><div class="row" style="gap:6px"><input class="in grow" id="pk-cur" value="${esc(cur)}" aria-label="العملة" style="margin:0" maxlength="10"><button class="btn o s" id="pk-curs">حفظ</button></div></div>
-  <div class="card"><b>إضافة باقة</b><div class="sp"></div><input class="in" id="pk-c" type="number" min="1" inputmode="numeric" placeholder="عدد العملات"><input class="in" id="pk-b" type="number" min="0" inputmode="numeric" placeholder="عملات هدية إضافية (اختياري)"><input class="in" id="pk-p" type="number" min="0" step="any" inputmode="decimal" placeholder="السعر (${esc(cur)})"><input class="in" id="pk-l" maxlength="20" placeholder="وسم العرض (اختياري) مثل: عرض الشتاء"><div class="err" id="pk-e" role="alert"></div><button class="btn g w" id="pk-add">إضافة الباقة</button></div>
-  ${DB.packs.map(p=>`<div class="card" data-pc="${p.id}"><div class="mu">العملات · هدية إضافية</div><div class="row" style="gap:6px"><input class="in grow" data-f="c" type="number" value="${p.coins}" aria-label="العملات" style="margin:0"><input class="in grow" data-f="b" type="number" value="${p.bonus||0}" aria-label="هدية" style="margin:0"></div><div class="sp"></div><div class="mu">السعر (${esc(cur)}) · وسم العرض</div><div class="row" style="gap:6px"><input class="in grow" data-f="p" type="number" step="any" value="${p.price}" aria-label="السعر" style="margin:0"><input class="in grow" data-f="l" value="${esc(p.label||'')}" maxlength="20" aria-label="وسم" style="margin:0"></div><div class="sp"></div><div class="sec"><button class="btn s grow" data-pks="${p.id}">حفظ</button><button class="btn r grow" data-pkd="${p.id}">حذف</button></div></div>`).join('')}`}
+function packsOwnerHTML(){const cur='ج.م';
+  return `<div class="card"><b>باقات الشحن الثابتة</b><div class="mu">سعر موحد: كل 1,000 عملة = 25 جنيهًا. الباقات ثابتة ولا تتغير من هذه الصفحة.</div></div>
+  ${DB.packs.map(p=>`<div class="card row"><div class="grow"><b>🪙 ${fmt(p.coins)} عملة</b><div class="mu">${p.label?esc(p.label):'باقة شحن'}</div></div><b>${fmt(p.price)} ${cur}</b></div>`).join('')}`;
+}
 function packsOwnerBind(m){
-  const ff=(b,n)=>b.closest('[data-pc]').querySelector(`[data-f="${n}"]`),pid=v=>DB.packs.find(x=>x.id==v);
   $('#inv-s').onclick=()=>{DB.settings.invReward=Math.max(0,Math.floor(+$('#inv-r').value)||0);save();toast('تم الحفظ')};
-  $('#pk-curs').onclick=()=>{DB.settings.cur=$('#pk-cur').value.trim().slice(0,10)||'ج.م';save();toast('تم الحفظ');render()};
-  $('#pk-add').onclick=()=>{const c=Math.floor(+$('#pk-c').value),b2=Math.max(0,Math.floor(+$('#pk-b').value)||0),p=+$('#pk-p').value,e=$('#pk-e');if(!(c>0))return e.textContent='اكتب عدد العملات';if(!(p>=0)||$('#pk-p').value==='')return e.textContent='اكتب السعر';
-    DB.packs.push({id:Date.now(),coins:c,bonus:b2,price:p,label:$('#pk-l').value.trim().slice(0,20)});logIt('مالك',`إضافة باقة ${c} عملة بسعر ${p}`);save();toast('تمت الإضافة');render()};
-  m.querySelectorAll('[data-pks]').forEach(b=>b.onclick=()=>{const p=pid(b.dataset.pks);if(!p)return;p.coins=Math.max(1,Math.floor(+ff(b,'c').value)||p.coins);p.bonus=Math.max(0,Math.floor(+ff(b,'b').value)||0);const pr=+ff(b,'p').value;p.price=pr>=0?pr:p.price;p.label=ff(b,'l').value.trim().slice(0,20);logIt('مالك',`تعديل باقة ${p.coins}`);save();toast('تم الحفظ');render()});
-  m.querySelectorAll('[data-pkd]').forEach(b=>b.onclick=()=>{const p=pid(b.dataset.pkd);if(!p)return;dlg('حذف الباقة',`<p>حذف باقة ${fmt(p.coins)} عملة؟</p>`,()=>{DB.packs=DB.packs.filter(x=>x!==p);save();render()},'حذف')})}
+}
 
 /* ===== أصدقاء • إشعارات • دعوات • أمان • صلاحيات ===== */
 let dmTo='',AC=null,dmServerPeer=null,dmServerMessages=[];
