@@ -68,6 +68,10 @@ ol,ul{margin:2px 0;padding-inline-start:20px}
 /* MigoLive spacing adjustment: lower the top icons and lift the bottom controls slightly. */
 .top{position:relative;transform:translateY(7px)}
 .bt2{position:relative;transform:translateY(-8px)}
+
+/* Fast Android/WebView touch response: no delayed double-tap handling. */
+button,[role="button"],.chip,.hit,.box{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+button:active,[role="button"]:active,.chip:active,.hit:active,.box:active{filter:brightness(1.18);}
 </style>
 </head>
 <body>
