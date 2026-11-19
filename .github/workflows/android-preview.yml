@@ -204,10 +204,17 @@ jobs:
           curl -fL 'https://raw.githubusercontent.com/ahmedtotielkady-sudo/MigoLive/main/assets/migolive-icon.jpg' -o /tmp/migo-icon.jpg
           python3 -m pip install --quiet pillow
           python3 - <<'PY'
-          from PIL import Image
+          from PIL import Image, ImageFile
           from pathlib import Path
           import shutil
-          source = Image.open('/tmp/migo-icon.jpg').convert('RGB')
+          # The committed JPEG has a damaged/truncated tail; salvage its readable image data.
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
+          with Image.open('/tmp/migo-icon.jpg') as original:
+              original.load()
+              source = original.convert('RGB')
+          if source.width < 64 or source.height < 64:
+              raise SystemExit(f'Launcher icon is unreadable or too small: {source.size}')
+          print(f'Recovered launcher image: {source.size}')
           sizes = {'mdpi':48,'hdpi':72,'xhdpi':96,'xxhdpi':144,'xxxhdpi':192}
           res = Path('android/app/src/main/res')
           for density, size in sizes.items():
