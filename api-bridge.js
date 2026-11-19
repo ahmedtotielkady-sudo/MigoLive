@@ -302,6 +302,43 @@
   document.addEventListener('visibilitychange', refreshWalletSafely);
   window.addEventListener('migo:wallet-updated', refreshWalletSafely);
 
+  // Secure game-to-server bridge: the game iframe requests a server-settled
+  // round; it never supplies a resulting balance or payout.
+  function gameRequestKey(prefix) {
+    if (!window.crypto || !window.crypto.getRandomValues) throw new Error('تعذر تأمين الجولة');
+    const bytes = new Uint8Array(20);
+    window.crypto.getRandomValues(bytes);
+    return prefix + '-' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  }
+  window.addEventListener('message', async event => {
+    const frame = $id('gf');
+    const request = event.data;
+    if (!frame || event.source !== frame.contentWindow || !request ||
+        request.t !== 'migo:game:slot-777:spin') return;
+    const reply = (payload) => {
+      try { event.source.postMessage(Object.assign({
+        t: 'migo:game:slot-777:result', requestId: request.requestId
+      }, payload), event.origin || '*'); } catch (_) {}
+    };
+    const bet = Number(request.bet);
+    if (typeof request.requestId !== 'string' || request.requestId.length > 80 ||
+        !Number.isSafeInteger(bet) || bet <= 0) {
+      reply({ ok: false, message: 'بيانات الرهان غير صحيحة' });
+      return;
+    }
+    try {
+      const result = await api('/games/slot-777/spin', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': gameRequestKey('slot777') },
+        body: JSON.stringify({ bet })
+      });
+      reply({ ok: true, result });
+      refreshWalletSafely();
+    } catch (error) {
+      reply({ ok: false, message: error.message || 'تعذر تنفيذ الجولة على الخادم' });
+    }
+  });
+
   // Keep the balance display synchronized with the server whenever the wallet opens.
   if (typeof rWallet === 'function') {
     const oldWallet = rWallet;
