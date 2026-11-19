@@ -111,6 +111,27 @@ async function start() {
   const GameRound = require("./models/GameRound");
   const GameState = require("./models/GameState");
   await Promise.all([MicLease.init(), GameRound.init(), GameState.init()]);
+
+  // Settle expired rocket rounds on the server even when every player has left
+  // the game screen. Conditional writes make this safe on multi-instance hosts.
+  const { settleExpiredRocketRounds } = require("./services/rocket-crash-settlement");
+  let rocketSweepRunning = false;
+  const sweepRocketRounds = async () => {
+    if (rocketSweepRunning) return;
+    rocketSweepRunning = true;
+    try {
+      const settled = await settleExpiredRocketRounds(Date.now());
+      if (settled) console.log(`Rocket background settlement closed ${settled} crashed round(s)`);
+    } catch (error) {
+      console.error("Rocket background settlement failed:", error && error.message ? error.message : error);
+    } finally {
+      rocketSweepRunning = false;
+    }
+  };
+  void sweepRocketRounds();
+  const rocketSettlementTimer = setInterval(sweepRocketRounds, 1000);
+  if (rocketSettlementTimer && typeof rocketSettlementTimer.unref === "function") rocketSettlementTimer.unref();
+
   const io = attachRealtime(httpServer, allowedOrigins);
   app.set("io", io);
   httpServer.listen(port, "0.0.0.0", () => console.log(`MigoLive API + realtime listening on port ${port}`));
