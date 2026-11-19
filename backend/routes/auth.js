@@ -155,7 +155,7 @@ router.post("/login", async (req, res, next) => {
     if (!identifier || !password) {
       return res.status(400).json({ ok: false, message: "أدخل رقم ID أو الهاتف وكلمة المرور" });
     }
-    const normalizedPhone = normalizePhone(identifier, req.body.phoneCountry) || identifier.replace(/[\\s()-]/g, "");
+    const normalizedPhone = normalizePhone(identifier, req.body.phoneCountry) || identifier.replace(/[\s()-]/g, "");
     const normalizedEmail = identifier.includes("@") ? identifier.toLowerCase() : "";
     const byUid = /^\d{5,10}$/.test(identifier) ? Number(identifier) : -1;
     const user = await User.findOne({
