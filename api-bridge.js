@@ -86,31 +86,34 @@
     }
     if (!root) return null;
     const inputs = Array.from(root.querySelectorAll('input'));
-    const username = inputs.find(x => /اسم المستخدم/.test(x.placeholder || ''));
+    const username = inputs.find(x => /اسم المستخدم|رقم ID المستخدم|رقم المعرف/i.test(x.placeholder || ''));
     const amount = inputs.find(x => /العدد/.test(x.placeholder || ''));
+    if (username) username.placeholder = 'رقم ID المستخدم';
     return username && amount ? { root, username, amount } : null;
   }
   async function submitExistingCoinsAdjustment(node) {
     const form = findCoinsAdjustmentForm(node);
     if (!form) return false;
-    const username = String(form.username.value || '').trim().toLowerCase();
+    const rawUid = String(form.username.value || '').trim()
+      .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/٬/g, '');
+    const targetUid = Number(rawUid);
     const rawAmount = String(form.amount.value || '').trim()
       .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/٬/g, '').replace(/٫/g, '.');
     const amount = Number(rawAmount);
-    if (!/^[a-z0-9_.-]{3,24}$/.test(username) || !Number.isSafeInteger(amount) ||
+    if (!/^\d{6,10}$/.test(rawUid) || !Number.isSafeInteger(targetUid) || !Number.isSafeInteger(amount) ||
         amount === 0 || Math.abs(amount) > 1000000000) {
-      if (typeof toast === 'function') toast('اكتب اسم مستخدم صحيحًا وعدد عملات صحيحًا غير صفر');
+      if (typeof toast === 'function') toast('اكتب رقم ID صحيحًا (6 إلى 10 أرقام) وعدد عملات صحيحًا غير صفر');
       return true;
     }
     let pending = ownerAdjustmentRetries.get(form.root);
-    if (!pending || pending.username !== username || pending.amount !== amount) {
+    if (!pending || pending.targetUid !== targetUid || pending.amount !== amount) {
       if (!window.crypto || !window.crypto.getRandomValues) {
         if (typeof toast === 'function') toast('تعذر تأمين العملية');
         return true;
       }
       const bytes = new Uint8Array(20);
       window.crypto.getRandomValues(bytes);
-      pending = { username, amount, key: 'owner-adjust-' +
+      pending = { targetUid, amount, key: 'owner-adjust-' +
         Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('') };
       ownerAdjustmentRetries.set(form.root, pending);
     }
@@ -122,7 +125,7 @@
         method: 'POST',
         headers: { 'Idempotency-Key': pending.key },
         body: JSON.stringify({
-          username,
+          targetUid,
           amount,
           description: amount < 0 ? 'خصم من صفحة العملات' : 'شحن من صفحة العملات'
         })
