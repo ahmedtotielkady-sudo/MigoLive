@@ -210,4 +210,62 @@ router.post("/admin/credit", async (req, res) => {
   }
 });
 
+
+// Owner/admin adjustment by username for the existing Coins page form.
+// Positive values credit; negative values debit. Balance, wallet cache and ledger
+// are committed atomically, and retries reuse the same idempotency key.
+router.post("/admin/adjust", async (req, res) => {
+  const username = String(req.body.username || "").trim().toLowerCase();
+  const signedAmount = Number(req.body.amount);
+  const description = String(req.body.description || (signedAmount < 0 ? "خصم من الإدارة" : "شحن من الإدارة")).slice(0, 160);
+  const key = String(req.get("idempotency-key") || "");
+  if (!/^[a-z0-9_.-]{3,24}$/.test(username)) return res.status(400).json({ ok: false, message: "اسم المستخدم غير صحيح" });
+  if (!Number.isSafeInteger(signedAmount) || signedAmount === 0 || Math.abs(signedAmount) > 1000000000) return res.status(400).json({ ok: false, message: "العدد يجب أن يكون صحيحًا وغير صفر" });
+  if (!/^[A-Za-z0-9_-]{16,100}$/.test(key)) return res.status(400).json({ ok: false, message: "معرّف العملية مطلوب" });
+  const session = await mongoose.startSession();
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      const admin = await User.findById(req.auth.sub).session(session).select("role status");
+      if (!admin || admin.status !== "active" || !["owner", "admin"].includes(admin.role)) throw Object.assign(new Error("صلاحية التعديل للإدارة فقط"), { status: 403 });
+      const target = await User.findOne({ username, status: "active" }).session(session).select("_id uid coins username");
+      if (!target) throw Object.assign(new Error("اسم المستخدم غير موجود أو الحساب موقوف"), { status: 404 });
+      const type = signedAmount < 0 ? "admin_deduction" : "admin_adjustment";
+      const amount = Math.abs(signedAmount);
+      const existing = await WalletTransaction.findOne({ idempotencyKey: key }).session(session);
+      if (existing) {
+        if (String(existing.from || "") !== String(admin._id) || String(existing.to || "") !== String(target._id) || existing.amount !== amount || existing.type !== type) throw Object.assign(new Error("معرّف العملية مستخدم لطلب مختلف"), { status: 409 });
+        result = { username: target.username, uid: target.uid, coins: target.coins, transactionId: String(existing._id), repeated: true };
+        return;
+      }
+      const updated = await User.findOneAndUpdate(
+        { _id: target._id, status: "active", ...(signedAmount < 0 ? { coins: { $gte: amount } } : {}) },
+        { $inc: { coins: signedAmount } },
+        { new: true, session, projection: { uid: 1, username: 1, coins: 1 } }
+      );
+      if (!updated) throw Object.assign(new Error("الرصيد غير كافٍ لإتمام الخصم"), { status: 409 });
+      await Wallet.updateOne({ userId: updated._id }, { $set: { balance: updated.coins } }, { upsert: true, session });
+      const [tx] = await WalletTransaction.create([{
+        from: admin._id, to: updated._id, amount, type, description, idempotencyKey: key
+      }], { session });
+      result = { username: updated.username, uid: updated.uid, coins: updated.coins, transactionId: String(tx._id), repeated: false };
+    });
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    if (error && error.code === 11000) {
+      try {
+        const [existing, admin, target] = await Promise.all([
+          WalletTransaction.findOne({ idempotencyKey: key }).lean(),
+          User.findById(req.auth.sub).select("_id role status").lean(),
+          User.findOne({ username }).select("_id uid username coins").lean()
+        ]);
+        const type = signedAmount < 0 ? "admin_deduction" : "admin_adjustment";
+        if (existing && admin && target && admin.status === "active" && ["owner", "admin"].includes(admin.role) && String(existing.from || "") === String(admin._id) && String(existing.to || "") === String(target._id) && existing.amount === Math.abs(signedAmount) && existing.type === type) return res.json({ ok: true, username: target.username, uid: target.uid, coins: target.coins, transactionId: String(existing._id), repeated: true });
+        return res.status(409).json({ ok: false, message: "معرّف العملية مستخدم بالفعل" });
+      } catch (_) { return res.status(503).json({ ok: false, message: "تعذر التحقق من نتيجة العملية؛ أعد المحاولة بنفس المعرّف" }); }
+    }
+    return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر تنفيذ تعديل الرصيد" });
+  } finally { await session.endSession(); }
+});
+
 module.exports = router;
