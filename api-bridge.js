@@ -301,18 +301,97 @@
     const old = DB.users[key] || {};
     DB.users[key] = Object.assign(old, {
       name: user.displayName || user.username || ('عضو ' + user.uid),
-      username: user.username, phone: user.phone || '', uid: user.uid,
+      username: user.username, phone: user.phone || '', email: user.email || '', uid: user.uid,
       coins: Number(user.coins) || 0, role: user.role || 'user',
       avatar: user.avatar || '', pass: password ? await hash(password) : (old.pass || ''),
       serverId: user.id, serverBacked: true, banned: false
     });
     return key;
   };
+  // Add a country-aware registration contact form without replacing the existing auth screen.
+  function installInternationalContactFields() {
+    const phoneInput = $id('reg-phone');
+    if (!phoneInput || $id('reg-country')) return;
+    const countryWrap = document.createElement('div');
+    countryWrap.id = 'reg-phone-country-wrap';
+    countryWrap.style.cssText = 'display:flex;gap:8px;align-items:center;margin:8px 0;width:100%';
+    const countrySearch = document.createElement('input');
+    countrySearch.id = 'reg-country-search';
+    countrySearch.type = 'search';
+    countrySearch.className = 'in';
+    countrySearch.placeholder = 'ابحث عن الدولة أو مفتاح الاتصال';
+    countrySearch.setAttribute('aria-label', countrySearch.placeholder);
+    countrySearch.style.cssText = 'width:100%;margin:0 0 6px;box-sizing:border-box';
+    const countrySelect = document.createElement('select');
+    countrySelect.id = 'reg-country';
+    countrySelect.className = 'in';
+    countrySelect.setAttribute('aria-label', 'دولة رقم الهاتف');
+    countrySelect.style.cssText = 'flex:1;min-width:0;margin:0;direction:rtl';
+    countrySelect.innerHTML = '<option value="EG">🇪🇬 مصر (+20)</option>';
+    countryWrap.append(countrySelect);
+    phoneInput.insertAdjacentElement('beforebegin', countrySearch);
+    phoneInput.insertAdjacentElement('beforebegin', countryWrap);
+
+    const emailInput = document.createElement('input');
+    emailInput.id = 'reg-email';
+    emailInput.type = 'email';
+    emailInput.className = 'in hide';
+    emailInput.autocomplete = 'email';
+    emailInput.inputMode = 'email';
+    emailInput.placeholder = 'البريد الإلكتروني (بديل رقم الهاتف)';
+    emailInput.setAttribute('aria-label', 'البريد الإلكتروني');
+    emailInput.style.cssText = 'width:100%;box-sizing:border-box';
+    phoneInput.insertAdjacentElement('afterend', emailInput);
+
+    let allCountries = [{ country: 'EG', callingCode: '+20', name: 'مصر' }];
+    const flagFor = code => String(code || '').toUpperCase().replace(/[A-Z]/g, c => String.fromCodePoint(127397 + c.charCodeAt(0)));
+    const renderCountries = filter => {
+      const q = String(filter || '').trim().toLocaleLowerCase();
+      const list = allCountries.filter(c => !q || (c.name + ' ' + c.country + ' ' + c.callingCode).toLocaleLowerCase().includes(q));
+      countrySelect.innerHTML = '';
+      list.forEach(c => {
+        const option = document.createElement('option');
+        option.value = c.country;
+        option.textContent = flagFor(c.country) + ' ' + c.name + ' (' + c.callingCode + ')';
+        countrySelect.append(option);
+      });
+      if (list.some(c => c.country === 'EG')) countrySelect.value = 'EG';
+      else if (list.length) countrySelect.value = list[0].country;
+    };
+    countrySearch.addEventListener('input', () => renderCountries(countrySearch.value));
+    api('/auth/phone-countries').then(data => {
+      if (Array.isArray(data.countries) && data.countries.length) {
+        allCountries = data.countries;
+        renderCountries(countrySearch.value);
+      }
+    }).catch(error => console.warn('Country list unavailable:', error.message));
+
+    const syncVisibility = () => {
+      const registering = !!(typeof reg !== 'undefined' && reg);
+      countrySearch.classList.toggle('hide', !registering);
+      countryWrap.classList.toggle('hide', !registering);
+      emailInput.classList.toggle('hide', !registering);
+    };
+    const switchButton = $id('bsw');
+    if (switchButton && !switchButton.dataset.migoContactWrapped) {
+      const prior = switchButton.onclick;
+      switchButton.onclick = function () {
+        if (typeof prior === 'function') prior.apply(this, arguments);
+        syncVisibility();
+      };
+      switchButton.dataset.migoContactWrapped = '1';
+    }
+    syncVisibility();
+  }
+  installInternationalContactFields();
+
   const originalLogin = $id('bin') && $id('bin').onclick;
   if ($id('bin') && typeof originalLogin === 'function') {
     $id('bin').onclick = async () => {
       const raw = ($id('u')?.value || '').trim();
       const phone = ($id('reg-phone')?.value || '').trim();
+      const phoneCountry = $id('reg-country')?.value || 'EG';
+      const email = ($id('reg-email')?.value || '').trim().toLowerCase();
       const password = $id('p')?.value || '';
       const registering = !!(typeof reg !== 'undefined' && reg);
       if (!raw || !password) return message('أدخل اسم المستخدم وكلمة المرور');
@@ -329,7 +408,7 @@
         let data;
         if (registering) {
           data = await api('/auth/register', { method: 'POST', body: JSON.stringify({
-            username: raw, displayName: raw, phone, password
+            username: raw, displayName: raw, phone, phoneCountry, email, password
           }) });
         } else {
           data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ identifier: raw, password }) });
