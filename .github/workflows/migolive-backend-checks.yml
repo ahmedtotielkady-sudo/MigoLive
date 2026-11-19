@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/mongodb-primary-integration
+      - hotfix/game-control-api-production-2026-11-19
     paths:
       - "backend/**"
       - "functions/api/**"
