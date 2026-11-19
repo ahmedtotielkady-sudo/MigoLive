@@ -386,15 +386,17 @@
     syncVisibility();
   }
   installInternationalContactFields();
-
   const originalLogin = $id('bin') && $id('bin').onclick;
   if ($id('bin') && typeof originalLogin === 'function') {
     $id('bin').onclick = async () => {
       const raw = ($id('u')?.value || '').trim();
-      const phone = ($id('reg-phone')?.value || '').trim()
-        .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
-        .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
-        .replace(/[\s\u00a0\u200e\u200f\u202a-\u202e()-]/g, '');
+      let phone = ($id('reg-phone')?.value || '').trim()
+        .replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+        .replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+        .replace(/[\s\u00a0\u200e\u200f\u202a-\u202e()-]/g,'');
+      if(/^01[0-9]{9}$/.test(phone)) phone='+20'+phone.slice(1);
+      else if(/^00201[0-9]{9}$/.test(phone)) phone='+20'+phone.slice(4);
+      else if(/^201[0-9]{9}$/.test(phone)) phone='+'+phone;
       const phoneCountry = $id('reg-country')?.value || 'EG';
       const email = ($id('reg-email')?.value || '').trim().toLowerCase();
       const password = $id('p')?.value || '';
@@ -405,7 +407,7 @@
         if (usernameLength < 3) return message('اسم المستخدم يجب أن يكون 3 أحرف على الأقل');
         if (usernameLength > 24) return message('اسم المستخدم يجب ألا يزيد عن 24 حرفاً');
         if (!phone && !email) return message('أدخل رقم الهاتف أو البريد الإلكتروني');
-        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return message('البريد الإلكتروني غير صحيح');
+        if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return message('البريد الإلكتروني غير صحيح');
       }
       if (password.length < (registering ? 8 : 1)) return message(registering ? 'كلمة المرور يجب ألا تقل عن 8 أحرف' : 'أدخل كلمة المرور');
       const button = $id('bin');
