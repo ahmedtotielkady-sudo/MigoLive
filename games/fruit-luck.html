@@ -122,13 +122,15 @@ async function settle(r){
   if(settlePromise)return settlePromise;
   const placed={m:bets.m,"77":bets["77"],o:bets.o},tot=total();
   if(!tot){settled=r;lastInfo={res:outcome(r).res,win:0,tot:0};return lastInfo}
-  settlePromise=(async()=>{
+  const task=(async()=>{
     const server=await migoGameCall("fruit-luck","spin",{bets:placed});
     const res=server.outcome.result,win=Math.max(0,Number(server.payout)||0);
     bal=Math.max(0,Math.floor(Number(server.coins)||0));settled=r;
     lastInfo={res,win,tot};bets={m:0,"77":0,o:0};upd();return lastInfo;
   })();
-  try{return await settlePromise}catch(e){settlePromise=null;msg("تعذر اعتماد الرهان على الخادم: "+(e.message||"خطأ"));return null}
+  settlePromise=task;
+  try{return await task}catch(e){msg("تعذر اعتماد الرهان على الخادم: "+(e.message||"خطأ"));return null}
+  finally{if(settlePromise===task)settlePromise=null}
 }
 async function showRes(r){
   var info=await settle(r)||lastInfo||{res:outcome(r).res,win:0,tot:0};
