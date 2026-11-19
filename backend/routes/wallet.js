@@ -27,6 +27,10 @@ router.get("/", async (req, res, next) => {
       "Pragma": "no-cache",
       "Expires": "0"
     });
+    // Express can still emit 304 from If-None-Match even with no-store.
+    // Wallet reads must always return the current JSON balance.
+    delete req.headers["if-none-match"];
+    delete req.headers["if-modified-since"];
     const user = await User.findById(req.auth.sub).select("uid coins");
     if (!user) return res.status(404).json({ ok: false, message: "الحساب غير موجود" });
     await Wallet.updateOne(
