@@ -346,6 +346,7 @@
     let allCountries = [{ country: 'EG', callingCode: '+20', name: 'مصر' }];
     const flagFor = code => String(code || '').toUpperCase().replace(/[A-Z]/g, c => String.fromCodePoint(127397 + c.charCodeAt(0)));
     const renderCountries = filter => {
+      const previous = countrySelect.value || 'EG';
       const q = String(filter || '').trim().toLocaleLowerCase();
       const list = allCountries.filter(c => !q || (c.name + ' ' + c.country + ' ' + c.callingCode).toLocaleLowerCase().includes(q));
       countrySelect.innerHTML = '';
@@ -355,7 +356,8 @@
         option.textContent = flagFor(c.country) + ' ' + c.name + ' (' + c.callingCode + ')';
         countrySelect.append(option);
       });
-      if (list.some(c => c.country === 'EG')) countrySelect.value = 'EG';
+      if (list.some(c => c.country === previous)) countrySelect.value = previous;
+      else if (list.some(c => c.country === 'EG')) countrySelect.value = 'EG';
       else if (list.length) countrySelect.value = list[0].country;
     };
     countrySearch.addEventListener('input', () => renderCountries(countrySearch.value));
