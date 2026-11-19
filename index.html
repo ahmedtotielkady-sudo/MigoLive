@@ -550,9 +550,13 @@ function applyServerUser(serverUser,passwordHash='') {
   try { localStorage.setItem('mygo_session',key);localStorage.setItem('mygo_remember_login','1'); } catch(_) {}
 }
 function normalizeEgyptPhone(value) {
-  let phone=String(value||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
-  phone=phone.replace(/[\s()-]/g,'');
-  if(/^01[0-9]{9}$/.test(phone)) phone='+2'+phone;
+  let phone=String(value||'')
+    .replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+    .replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+    .replace(/[\s\u00a0\u200e\u200f\u202a-\u202e()-]/g,'');
+  if(/^01[0-9]{9}$/.test(phone)) phone='+20'+phone.slice(1);
+  else if(/^00201[0-9]{9}$/.test(phone)) phone='+20'+phone.slice(4);
+  else if(/^201[0-9]{9}$/.test(phone)) phone='+'+phone;
   return phone;
 }
 
