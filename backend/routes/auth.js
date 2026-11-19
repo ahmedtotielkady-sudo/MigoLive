@@ -84,7 +84,7 @@ router.post("/register", async (req, res, next) => {
       return res.status(400).json({ ok: false, message: "رقم الهاتف غير صحيح" });
     }
 
-    if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ ok: false, message: "البريد الإلكتروني غير صحيح" });
     }
     if (!phone && !email) {
