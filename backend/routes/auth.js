@@ -7,6 +7,7 @@ const Counter = require("../models/Counter");
 const requireAuth = require("../middleware/requireAuth");
 const rateLimit = require("express-rate-limit");
 const crypto = require("crypto");
+const { getCountries, getCountryCallingCode, parsePhoneNumberFromString } = require("libphonenumber-js/max");
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const router = express.Router();
@@ -14,15 +15,32 @@ const TOKEN_TTL = "7d";
 // Signup bonus is granted only while creating a brand-new account.
 // Login intentionally never changes the persisted User.coins value.
 const INITIAL_SIGNUP_COINS = 100;
-function normalizePhone(value) {
-  let phone = String(value || "")
+function normalizePhone(value, country) {
+  let input = String(value || "")
     .replace(/[٠-٩]/g, digit => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
     .replace(/[۰-۹]/g, digit => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
-    .replace(/[\s\u00a0\u200e\u200f\u202a-\u202e()-]/g, "");
-  if (/^01[0-9]{9}$/.test(phone)) phone = "+2" + phone;
-  return phone;
+    .replace(/[\\s\\u00a0\\u200e\\u200f\\u202a-\\u202e()-]/g, "");
+  if (!input) return "";
+  if (input.startsWith("00")) input = "+" + input.slice(2);
+  try {
+    const parsed = input.startsWith("+")
+      ? parsePhoneNumberFromString(input)
+      : parsePhoneNumberFromString(input, String(country || "EG").toUpperCase());
+    return parsed && parsed.isValid() ? parsed.number : null;
+  } catch (_) {
+    return null;
+  }
 }
 
+router.get("/phone-countries", (_req, res) => {
+  const names = new Intl.DisplayNames(["ar"], { type: "region" });
+  const countries = getCountries().map(country => ({
+    country,
+    callingCode: "+" + getCountryCallingCode(country),
+    name: names.of(country) || country
+  })).sort((a, b) => a.name.localeCompare(b.name, "ar"));
+  return res.json({ ok: true, countries });
+});
 
 function publicUser(user) {
   return {
@@ -51,7 +69,7 @@ router.post("/register", async (req, res, next) => {
   try {
     const username = String(req.body.username || "").trim();
     const displayName = String(req.body.displayName || username).trim().slice(0, 40);
-    const phone = normalizePhone(req.body.phone);
+    const phone = normalizePhone(req.body.phone, req.body.phoneCountry);
     const password = String(req.body.password || "");
 
     if (!/^[\p{L}\p{N}_.-]{3,24}$/u.test(username)) {
@@ -127,7 +145,7 @@ router.post("/login", async (req, res, next) => {
     if (!identifier || !password) {
       return res.status(400).json({ ok: false, message: "أدخل رقم ID أو الهاتف وكلمة المرور" });
     }
-    const normalizedPhone = normalizePhone(identifier);
+    const normalizedPhone = normalizePhone(identifier, req.body.phoneCountry) || identifier.replace(/[\\s()-]/g, "");
     const byUid = /^\d{5,10}$/.test(identifier) ? Number(identifier) : -1;
     const user = await User.findOne({
       $or: [
