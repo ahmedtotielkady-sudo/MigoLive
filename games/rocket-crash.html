@@ -97,7 +97,7 @@ const $=s=>document.querySelector(s),BETS=[10,100,200,500,1000,2000,5000,10000],
 let bal=0,walletReady=false,bi=1,state='wait',t0=0,cp=1,mult=1,pts=[],hist=[],res='',cashAt=1,bet={amt:0,st:'none',win:0},snd=true;
 try{snd=localStorage.getItem('cr-snd')!='0'}catch(e){}
 const walletPost=d=>{try{if(window.parent&&window.parent!==window)window.parent.postMessage(d,'*')}catch(e){}};
-const save=()=>walletPost({t:'set',v:Math.max(0,Math.floor(Number(bal)||0))});
+const save=()=>{}; // Wallet balance and settlement are server-authoritative; never send client balance writes.
 const askWallet=()=>walletPost({t:'get'});
 const openWallet=()=>{walletPost({t:'wallet'});$('#nt').textContent='💰 محفظة مايجو لايف';$('#np').textContent='رصيد اللعبة مرتبط بمحفظة حسابك. افتح المتجر من التطبيق لإضافة العملات ثم ارجع للعبة.';$('#nf').showModal()};
 window.addEventListener('message',e=>{const d=e.data||{};if(d.t==='me'){const a=$('#userAvatar');if(a&&typeof d.avatar==='string'&&d.avatar.trim()){a.src=d.avatar.trim();a.style.display='block'}else if(a){a.removeAttribute('src');a.style.display='none'}}if(d.t==='bal'&&Number.isFinite(Number(d.v))){bal=Math.max(0,Math.floor(Number(d.v)));walletReady=true;ui()}});
