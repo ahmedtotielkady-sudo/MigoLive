@@ -136,7 +136,7 @@ jobs:
               ('$("plus").onclick=function(){if(stepIdx<STEPS.length-1&&STEPS[stepIdx+1]<=coins){stepIdx++;render()}};', '$("plus").onclick=function(){if(!busy&&stepIdx<STEPS.length-1){stepIdx++;render()}};'),
               ('if(!pick||busy||coins<=0)return;', 'if(!pick||busy||coins<bet())return;')
           ]
-          server_controlled = 'migoGameCall("big-warrior","fight"' in html
+          server_controlled = ('migoGameCall("big-warrior","fight"' in html or "migoGameCall('big-warrior','fight'" in html)
           for index, (old, new) in enumerate(jsfixes):
               count = html.count(old)
               if count != 1:
