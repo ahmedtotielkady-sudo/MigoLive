@@ -140,7 +140,10 @@
       let current = node.parentElement;
       for (let depth = 0; depth < 5 && current; depth++, current = current.parentElement) {
         const fields = Array.from(current.querySelectorAll('input'));
-        if (fields.some(x => /اسم المستخدم/.test(x.placeholder || '')) &&
+        // Accept both the original placeholder and the normalized ID placeholder.
+        // The first server-backed adjustment changes the placeholder, so matching
+        // only "اسم المستخدم" made later clicks fall through to the local handler.
+        if (fields.some(x => /اسم المستخدم|رقم ID المستخدم|رقم المعرف/i.test(x.placeholder || '')) &&
             fields.some(x => /العدد/.test(x.placeholder || ''))) { root = current; break; }
       }
     }
@@ -191,6 +194,16 @@
         })
       });
       ownerAdjustmentRetries.delete(form.root);
+      // Keep the owner's local user list in step with the committed server balance.
+      // The API remains authoritative; this only refreshes the presentation cache.
+      if (data && Number.isSafeInteger(Number(data.uid)) && Number.isFinite(Number(data.coins))) {
+        const targetKey = Object.keys(DB.users || {}).find(key =>
+          Number(DB.users[key] && DB.users[key].uid) === Number(data.uid));
+        if (targetKey) {
+          DB.users[targetKey].coins = Number(data.coins);
+          save();
+        }
+      }
       if (typeof toast === 'function') {
         toast((amount < 0 ? 'تم الخصم بنجاح' : 'تم الشحن بنجاح') +
           ' · الرصيد الحالي: ' + Number(data.coins).toLocaleString('ar-EG') + ' عملة');
