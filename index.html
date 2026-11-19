@@ -527,6 +527,35 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 // تفعيل المالك محلياً عبر كود المالك المضمّن في نسخة التطبيق.
 try{if(window.Lenis){window.lenis=new Lenis();const raf=t=>{lenis.raf(t);requestAnimationFrame(raf)};requestAnimationFrame(raf)}}catch(e){}
 const $=s=>document.querySelector(s);
+const API_BASE='https://migolive-api-production.up.railway.app/api';
+async function apiRequest(path, options={}) {
+  const headers=new Headers(options.headers||{});
+  headers.set('content-type','application/json');
+  const token=localStorage.getItem('migolive_token');
+  if(token) headers.set('authorization','Bearer '+token);
+  let response;
+  try { response=await fetch(API_BASE+path,{...options,headers,cache:'no-store'}); }
+  catch(_) { throw new Error('تعذر الاتصال الآن. تحقق من الإنترنت وحاول مرة أخرى'); }
+  let data={}; try { data=await response.json(); } catch(_) {}
+  if(!response.ok) throw new Error(data.message||'تعذر تنفيذ الطلب');
+  return data;
+}
+function applyServerUser(serverUser,passwordHash='') {
+  const key=String(serverUser.username||'').toLowerCase(), old=DB.users[key]||{};
+  DB.users[key]={...old,name:serverUser.displayName||serverUser.username,uid:serverUser.uid,
+    phone:serverUser.phone||'',coins:Number(serverUser.coins)||0,role:serverUser.role||'user',
+    pass:passwordHash||old.pass||'',serverId:serverUser.id,banned:false,locked:false,
+    avatar:serverUser.avatar||old.avatar||'',sent:Number(old.sent)||0};
+  me=key; save();
+  try { localStorage.setItem('mygo_session',key);localStorage.setItem('mygo_remember_login','1'); } catch(_) {}
+}
+function normalizeEgyptPhone(value) {
+  let phone=String(value||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+  phone=phone.replace(/[\s()-]/g,'');
+  if(/^01[0-9]{9}$/.test(phone)) phone='+2'+phone;
+  return phone;
+}
+
 addEventListener('focusin',e=>{if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)&&e.target.type!=='file')document.body.classList.add('kb')});
 addEventListener('focusout',()=>setTimeout(()=>{const a=document.activeElement;if(!a||!/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))document.body.classList.remove('kb')},150));
 
@@ -686,24 +715,30 @@ $('#login-mode-toggle').onclick=()=>{loginMode=loginMode==='id'?'phone':'id';$('
 $('#bsw').onclick=()=>{reg=!reg;$('#ic').classList.toggle('hide',!reg);$('#bin').textContent=reg?'إنشاء الحساب':'تسجيل الدخول';$('#bsw').textContent=reg?'لدي حساب بالفعل':'إنشاء حساب جديد';$('#aerr').textContent='';updateLoginMode()};
 updateLoginMode();
 $('#bin').onclick=async()=>{
-  const raw=$('#u').value.trim(),phoneRaw=($('#reg-phone').value||'').trim(),p=$('#p').value,e=$('#aerr');
-  if(p.length<6)return e.textContent='كلمة المرور 6 أحرف على الأقل';
-  const h=await hash(p);
-  let k=null,created=false;
+  const raw=$('#u').value.trim(),phone=normalizeEgyptPhone($('#reg-phone').value),password=$('#p').value,e=$('#aerr');
+  e.textContent='';
+  if(password.length<8)return e.textContent='كلمة المرور يجب ألا تقل عن 8 أحرف';
   if(reg){
-    if(raw.length<3)return e.textContent='اسم المستخدم 3 أحرف على الأقل';
-    const phone=phoneRaw.replace(/[\s()-]/g,'');if(phone&&(!/^\+?[0-9]{7,15}$/.test(phone)))return e.textContent='رقم الهاتف غير صحيح';if(phone&&Object.values(DB.users).some(x=>x.phone===phone))return e.textContent='رقم الهاتف مستخدم من قبل';
-    k=raw.toLowerCase();
-    if(DB.users[k])return e.textContent='اسم المستخدم مستخدم من قبل';
-    const icv=($('#ic').value||'').trim().toUpperCase();let ik=null;if(icv){ik=Object.keys(DB.users).find(x=>invCode(DB.users[x])===icv);if(!ik)return e.textContent='كود الدعوة غير صحيح'}
-    const ownerPending=sessionStorage.getItem('mygo_owner_code_pending')==='1';DB.users[k]={name:raw,pass:h,phone:phone||'',coins:100,role:ownerPending?'owner':'user',banned:false,locked:false,sent:0};if(ownerPending)sessionStorage.removeItem('mygo_owner_code_pending');ensureUid(DB.users[k]);if(ik)DB.users[k].invBy=ik;created=true;
-    logIt('حساب',`تسجيل حساب جديد: ${raw} · ID ${DB.users[k].uid}`);
-  }else{
-    if(loginMode==='phone'){const phone=raw.replace(/[\s()-]/g,'');if(!/^\+?[0-9]{7,15}$/.test(phone))return e.textContent='أدخل رقم هاتف صحيحاً مع مفتاح الدولة عند الحاجة';k=Object.keys(DB.users).find(x=>String(DB.users[x].phone||'').replace(/[\s()-]/g,'')===phone)}else{if(!/^\d{5,10}$/.test(raw))return e.textContent='أدخل رقم ID الصحيح فقط';k=Object.keys(DB.users).find(x=>String(DB.users[x].uid)===raw)}
-    const x=k?DB.users[k]:null;if(!x||x.pass!==h)return e.textContent=loginMode==='phone'?'رقم الهاتف أو كلمة المرور غير صحيحة':'رقم ID أو كلمة المرور غير صحيحة';
+    if(!/^[\p{L}\p{N}_.-]{3,24}$/u.test(raw))return e.textContent='اسم المستخدم يجب أن يكون من 3 إلى 24 حرفًا أو رقمًا';
+    if(phone&&!/^\+?[0-9]{7,15}$/.test(phone))return e.textContent='رقم الهاتف غير صحيح';
+  } else {
+    if(loginMode==='phone'&&!/^\+?[0-9]{7,15}$/.test(normalizeEgyptPhone(raw)))return e.textContent='أدخل رقم هاتف صحيحاً';
+    if(loginMode==='id'&&!/^\d{5,10}$/.test(raw))return e.textContent='أدخل رقم ID الصحيح فقط';
   }
-  if(isBanned(DB.users[k]))return e.textContent='هذا الحساب '+banTxt(DB.users[k]);
-  me=k;save();try{localStorage.setItem('mygo_session',k);localStorage.setItem('mygo_remember_login','1')}catch(_){}e.textContent='';start();if(created)toast(`تم إنشاء الحساب · رقم ID الخاص بك: ${DB.users[k].uid}`);
+  $('#bin').disabled=true;
+  const oldLabel=$('#bin').textContent; $('#bin').textContent='جارٍ الاتصال بالخادم...';
+  try {
+    const result=reg
+      ? await apiRequest('/auth/register',{method:'POST',body:JSON.stringify({username:raw,displayName:raw,phone,password})})
+      : await apiRequest('/auth/login',{method:'POST',body:JSON.stringify({identifier:loginMode==='phone'?normalizeEgyptPhone(raw):raw,password})});
+    if(!result.token||!result.user)throw new Error('تعذر إكمال تسجيل الدخول');
+    localStorage.setItem('migolive_token',result.token);
+    applyServerUser(result.user,await hash(password));
+    try { sessionStorage.removeItem('mygo_owner_code_pending'); } catch(_) {}
+    e.textContent=''; start();
+    if(reg)toast('تم إنشاء حسابك على خادم MigoLive · رقم ID: '+result.user.uid);
+  } catch(error) { e.textContent=error.message||'تعذر تسجيل الدخول'; }
+  finally { $('#bin').disabled=false; $('#bin').textContent=oldLabel; }
 };
 function U(){return DB.users[me]}
 const DAY=86400000;
