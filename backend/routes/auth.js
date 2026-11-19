@@ -19,7 +19,7 @@ function normalizePhone(value, country) {
   let input = String(value || "")
     .replace(/[٠-٩]/g, digit => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
     .replace(/[۰-۹]/g, digit => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
-    .replace(/[\\s\\u00a0\\u200e\\u200f\\u202a-\\u202e()-]/g, "");
+    .replace(/[\s\u00a0\u200e\u200f\u202a-\u202e()-]/g, "");
   if (!input) return "";
   if (input.startsWith("00")) input = "+" + input.slice(2);
   try {
