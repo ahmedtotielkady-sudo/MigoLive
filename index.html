@@ -483,6 +483,13 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
 </style>
 
 <style id="mygo-owner-pending-badges-v1">.owner-menu-pending{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;margin-inline-start:6px;border-radius:999px;background:#dc2626;color:#fff;font-size:11px;font-weight:900;line-height:1;box-shadow:0 0 0 2px #dc262633;animation:migoPendingPulse 1.8s ease-in-out infinite}.owner-pending-summary{border:1px solid #dc262655!important;border-radius:10px;padding:8px;background:#dc262610}.owner-pending-summary b{color:#ef4444!important}@keyframes migoPendingPulse{0%,100%{box-shadow:0 0 0 2px #dc262622}50%{box-shadow:0 0 0 5px #dc262622}}@media(prefers-reduced-motion:reduce){.owner-menu-pending{animation:none}}</style>
+
+<style id="migo-auth-input-touch-fix-v1">
+body.auth-screen #auth input.in,body.auth-screen #auth .fld{position:relative!important;z-index:2!important;pointer-events:auto!important;touch-action:manipulation!important;user-select:text!important;-webkit-user-select:text!important}
+body.auth-screen #auth input.in{display:block!important;opacity:1!important;visibility:visible!important;caret-color:#fff!important;-webkit-appearance:none!important}
+body.auth-screen #auth .fld input.in{width:100%!important;min-width:0!important}
+body.auth-screen #auth .fld button{z-index:3!important;pointer-events:auto!important}
+</style>
 </head>
 <body class="auth-screen">
 
@@ -490,8 +497,8 @@ body.tabs-hidden #main{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px
   <div class="logo"><span id="login-owner-eagle" role="button" tabindex="0" aria-label="تفعيل المالك" title="">🦅</span></div>
   <h1 class="t">مايجو لايف</h1>
   <p class="sub">حيث تلتقي الأصوات.. وتُصنع الصداقات</p>
-  <div class="fld"><i>👤</i><input id="u" class="in" placeholder="رقم ID" autocomplete="username" aria-label="رقم ID" inputmode="numeric" dir="ltr"><button type="button" id="login-mode-toggle" class="eye" style="position:static;flex:0 0 auto;width:auto;min-width:48px;padding:0 9px;font-size:11px;white-space:nowrap" aria-label="التبديل بين ID والهاتف">ID ⇄ هاتف</button></div>
-  <input id="reg-phone" class="in hide" dir="ltr" inputmode="tel" autocomplete="tel" placeholder="رقم الهاتف (اختياري لتسجيل الدخول به)" aria-label="رقم الهاتف">
+  <div class="fld"><i aria-hidden="true">👤</i><input id="u" class="in" type="text" placeholder="رقم ID" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="رقم ID" inputmode="numeric" dir="ltr"><button type="button" id="login-mode-toggle" class="eye" style="position:static;flex:0 0 auto;width:auto;min-width:48px;padding:0 9px;font-size:11px;white-space:nowrap" aria-label="التبديل بين ID والهاتف">ID ⇄ هاتف</button></div>
+  <input id="reg-phone" class="in hide" type="tel" dir="ltr" inputmode="tel" autocomplete="off" placeholder="رقم الهاتف (اختياري)" aria-label="رقم الهاتف">
   <div class="fld"><i>🔒</i><input id="p" class="in" type="password" placeholder="كلمة المرور" autocomplete="current-password" aria-label="كلمة المرور"><button type="button" class="eye" id="eye" aria-label="إظهار كلمة المرور">👁</button></div>
   <input id="ic" class="in hide" dir="ltr" placeholder="كود دعوة (اختياري)" aria-label="كود الدعوة" autocomplete="off" autocapitalize="characters" spellcheck="false">
   <div class="err" id="aerr" role="alert"></div>
@@ -681,9 +688,9 @@ function toast(m){const d=document.createElement('div');d.className='toast';d.te
 async function hash(s){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return btoa(unescape(encodeURIComponent(s)))}}
 
 let loginMode='id';
-function updateLoginMode(){const phone=loginMode==='phone';$('#u').placeholder=reg?'اسم المستخدم (3 إلى 24 حرفاً)':(phone?'رقم الهاتف':'رقم ID');$('#u').setAttribute('aria-label',reg?'اسم المستخدم':(phone?'رقم الهاتف':'رقم ID'));$('#u').inputMode=reg?'text':(phone?'tel':'numeric');$('#u').dir=reg?'auto':'ltr';if(reg){$('#u').setAttribute('minlength','3');$('#u').setAttribute('maxlength','24')}else{$('#u').removeAttribute('minlength');$('#u').removeAttribute('maxlength')}$('#u').setAttribute('aria-describedby','aerr');$('#login-mode-toggle').textContent=phone?'هاتف ⇄ ID':'ID ⇄ هاتف';$('#login-mode-toggle').style.display=reg?'none':'inline-flex';$('#reg-phone').classList.toggle('hide',!reg);}
+function updateLoginMode(){const phone=loginMode==='phone',user=$('#u'),regPhone=$('#reg-phone');user.disabled=false;user.readOnly=false;user.type='text';user.placeholder=reg?'اسم المستخدم (3 إلى 24 حرفاً)':(phone?'رقم الهاتف':'رقم ID');user.setAttribute('aria-label',reg?'اسم المستخدم':(phone?'رقم الهاتف':'رقم ID'));user.inputMode=reg?'text':(phone?'tel':'numeric');user.dir=reg?'auto':'ltr';user.autocomplete='off';user.setAttribute('autocapitalize','none');user.spellcheck=false;if(reg){user.setAttribute('minlength','3');user.setAttribute('maxlength','24')}else{user.removeAttribute('minlength');user.removeAttribute('maxlength')}user.setAttribute('aria-describedby','aerr');regPhone.disabled=false;regPhone.readOnly=false;regPhone.type='tel';regPhone.autocomplete='off';$('#login-mode-toggle').textContent=phone?'هاتف ⇄ ID':'ID ⇄ هاتف';$('#login-mode-toggle').style.display=reg?'none':'inline-flex';regPhone.classList.toggle('hide',!reg);}
 $('#login-mode-toggle').onclick=()=>{loginMode=loginMode==='id'?'phone':'id';$('#u').value='';updateLoginMode();$('#u').focus()};
-$('#bsw').onclick=()=>{reg=!reg;$('#ic').classList.toggle('hide',!reg);$('#bin').textContent=reg?'إنشاء الحساب':'تسجيل الدخول';$('#bsw').textContent=reg?'لدي حساب بالفعل':'إنشاء حساب جديد';$('#aerr').textContent='';updateLoginMode()};
+$('#bsw').onclick=()=>{reg=!reg;$('#ic').classList.toggle('hide',!reg);$('#bin').textContent=reg?'إنشاء الحساب':'تسجيل الدخول';$('#bsw').textContent=reg?'لدي حساب بالفعل':'إنشاء حساب جديد';$('#aerr').textContent='';if(reg){$('#u').value='';$('#reg-phone').value='';$('#p').value='';loginMode='id'}updateLoginMode();if(reg)setTimeout(()=>$('#u').focus(),80)};
 updateLoginMode();
 $('#bin').onclick=async()=>{
   const raw=$('#u').value.trim(),phoneRaw=($('#reg-phone').value||'').trim(),p=$('#p').value,e=$('#aerr');
