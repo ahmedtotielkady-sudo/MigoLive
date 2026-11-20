@@ -694,4 +694,31 @@
     }
   });
 
+
+  function openMemberManagement() {
+    if (document.getElementById('migo-member-admin')) return;
+    const root=document.createElement('section'); root.id='migo-member-admin'; root.dir='rtl';
+    root.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#100827;color:#fff;overflow:auto;padding:18px 14px 36px;font-family:system-ui,sans-serif';
+    root.innerHTML='<style>#migo-member-admin *{box-sizing:border-box}#migo-member-admin .h{display:flex;justify-content:space-between;align-items:center;margin:5px 0 18px}#migo-member-admin .t{font-size:22px;font-weight:900;color:#f4d48b}#migo-member-admin button,#migo-member-admin input,#migo-member-admin select{border:1px solid #6940a6;background:#28134b;color:#fff;border-radius:11px;padding:11px;font-weight:700}#migo-member-admin input{width:100%;background:#1c1038;margin-bottom:9px}#migo-member-admin .filters{display:grid;grid-template-columns:1fr 120px;gap:8px}#migo-member-admin .card{background:linear-gradient(135deg,#241044,#180b32);border:1px solid #55328a;border-radius:16px;padding:13px;margin:10px 0}#migo-member-admin .meta{font-size:12px;color:#c7b5e9;line-height:1.8}#migo-member-admin .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}#migo-member-admin .bad{background:#5b1736}#migo-member-admin .good{background:#174b3d}#migo-member-admin .stats{color:#d8c8f5;font-size:13px;margin:8px 0}</style><header class="h"><b class="t">إدارة الأعضاء</b><button id="ma-close">إغلاق ✕</button></header><div class="filters"><input id="ma-q" placeholder="ابحث بالاسم أو رقم ID"><select id="ma-status"><option value="">كل الأعضاء</option><option value="active">النشطون</option><option value="banned">المحظورون</option></select></div><div class="stats" id="ma-stats">جارٍ التحميل…</div><div id="ma-list"></div><button id="ma-more" style="width:100%;display:none">عرض المزيد</button>';
+    document.body.append(root);
+    const list=root.querySelector('#ma-list'),stats=root.querySelector('#ma-stats'),more=root.querySelector('#ma-more');
+    let page=1,total=0,busy=false,q='';
+    const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const fmt=n=>Number(n||0).toLocaleString('ar-EG');
+    async function load(reset){if(busy)return;busy=true;more.disabled=true;if(reset){page=1;list.innerHTML='';stats.textContent='جارٍ تحميل الأعضاء…'}
+      try{const p=new URLSearchParams({page:String(page),limit:'30',q,status:root.querySelector('#ma-status').value});const d=await api('/admin/users?'+p);
+        total=Number(d.total||0);(d.users||[]).forEach(u=>{const c=document.createElement('article');c.className='card';c.innerHTML='<b>'+esc(u.displayName)+'</b><div class="meta">ID: '+esc(u.uid)+' · @'+esc(u.username)+'<br>الرصيد: '+fmt(u.coins)+' عملة · '+(u.status==='banned'?'محظور':'نشط')+' · '+(u.role==='admin'?'مشرف':'عضو')+'</div>';
+          if(u.role!=='owner'){const a=document.createElement('div');a.className='actions';const add=(label,fn,cl='')=>{const b=document.createElement('button');b.textContent=label;if(cl)b.classList.add(cl);b.onclick=fn;a.append(b)};
+            add('تعديل الاسم',async()=>{const v=prompt('اسم العرض الجديد:',u.displayName||'');if(v===null)return;try{await api('/admin/users/'+u.uid,{method:'PATCH',body:JSON.stringify({displayName:v})});load(true)}catch(e){alert(e.message)}});
+            add(u.role==='admin'?'إلغاء المشرف':'جعله مشرفاً',async()=>{if(!confirm('تأكيد تغيير صلاحية العضو؟'))return;try{await api('/admin/users/'+u.uid,{method:'PATCH',body:JSON.stringify({role:u.role==='admin'?'user':'admin'})});load(true)}catch(e){alert(e.message)}});
+            add('تسجيل خروج',async()=>{if(!confirm('إنهاء جلسة العضو على جميع الأجهزة؟'))return;try{await api('/admin/users/'+u.uid+'/logout',{method:'POST',body:'{}'});alert('تم إنهاء الجلسة')}catch(e){alert(e.message)}});
+            add(u.status==='banned'?'فك الحظر':'حظر العضو',async()=>{if(!confirm('تأكيد '+(u.status==='banned'?'فك حظر':'حظر')+' العضو؟'))return;try{await api('/admin/users/'+u.uid+'/'+(u.status==='banned'?'unban':'ban'),{method:'POST',body:'{}'});load(true)}catch(e){alert(e.message)}},u.status==='banned'?'good':'bad');c.append(a)}
+          list.append(c)});
+        stats.textContent='إجمالي الأعضاء: '+fmt(total)+' · المعروض: '+fmt(list.children.length);more.style.display=list.children.length<total?'block':'none';page++;
+      }catch(e){stats.textContent=e.message||'تعذر تحميل الأعضاء';if(!list.children.length)list.textContent='تأكد من تسجيل الدخول بحساب المالك ونشر تحديث إدارة الأعضاء.';more.style.display='none'}finally{busy=false;more.disabled=false}}
+    root.querySelector('#ma-close').onclick=()=>root.remove();more.onclick=()=>load(false);root.querySelector('#ma-status').onchange=()=>load(true);
+    let timer;root.querySelector('#ma-q').oninput=e=>{clearTimeout(timer);timer=setTimeout(()=>{q=e.target.value.trim();load(true)},300)};load(true);
+  }
+  document.addEventListener('click',event=>{if(event.target.closest('#migo-member-admin'))return;let n=event.target;for(let i=0;n&&i<7;i++,n=n.parentElement){const t=String(n.innerText||n.textContent||'').replace(/[›❯>]/g,'').trim();if(t==='الأعضاء'||(t.startsWith('الأعضاء')&&t.length<45)){event.preventDefault();event.stopImmediatePropagation();openMemberManagement();return}}},true);
+
 })();
