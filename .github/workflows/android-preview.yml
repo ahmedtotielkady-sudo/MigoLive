@@ -300,7 +300,7 @@ jobs:
           else:
               raise SystemExit('versionCode not found; refusing to produce a non-upgradeable APK')
           if re.search(r'versionName\s+"[^"]+"', s):
-              s = re.sub(r'versionName\s+"[^"]+"', f'versionName "1.0.{code}"', s, count=1)
+              s = re.sub(r'versionName\s+"[^"]+"', 'versionName "1.0.0"', s, count=1)
           p.write_text(s)
           print(f'Android versionCode={code}, versionName=1.0.{code}')
           PY
