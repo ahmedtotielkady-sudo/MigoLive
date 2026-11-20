@@ -7,7 +7,7 @@ test("rocket crash points vary within the supported 1.10x–22x range", () => {
   const points = Array.from({ length: 10000 }, () => engine.generateCrashPoint());
   for (const point of points) {
     assert.ok(point >= 1.1 && point <= engine.MAX_MULTIPLIER);
-    assert.equal(Math.round(point * 100), point * 100);
+    assert.equal(Math.round(point * 100) / 100, point);
   }
   assert.ok(new Set(points).size > 100, "rounds should not all use one fixed crash point");
   assert.ok(points.some(point => point < 10), "some rounds should crash below 10x");
