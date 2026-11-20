@@ -315,13 +315,6 @@
     const countryWrap = document.createElement('div');
     countryWrap.id = 'reg-phone-country-wrap';
     countryWrap.style.cssText = 'display:flex;gap:8px;align-items:center;margin:8px 0;width:100%';
-    const countrySearch = document.createElement('input');
-    countrySearch.id = 'reg-country-search';
-    countrySearch.type = 'search';
-    countrySearch.className = 'in';
-    countrySearch.placeholder = 'ابحث عن الدولة أو مفتاح الاتصال';
-    countrySearch.setAttribute('aria-label', countrySearch.placeholder);
-    countrySearch.style.cssText = 'width:100%;margin:0 0 6px;box-sizing:border-box';
     const countrySelect = document.createElement('select');
     countrySelect.id = 'reg-country';
     countrySelect.className = 'in';
@@ -329,7 +322,6 @@
     countrySelect.style.cssText = 'flex:1;min-width:0;margin:0;direction:rtl';
     countrySelect.innerHTML = '<option value="EG">🇪🇬 مصر (+20)</option>';
     countryWrap.append(countrySelect);
-    phoneInput.insertAdjacentElement('beforebegin', countrySearch);
     phoneInput.insertAdjacentElement('beforebegin', countryWrap);
 
     const emailInput = document.createElement('input');
@@ -345,10 +337,9 @@
 
     let allCountries = [{ country: 'EG', callingCode: '+20', name: 'مصر' }];
     const flagFor = code => String(code || '').toUpperCase().replace(/[A-Z]/g, c => String.fromCodePoint(127397 + c.charCodeAt(0)));
-    const renderCountries = filter => {
+    const renderCountries = () => {
       const previous = countrySelect.value || 'EG';
-      const q = String(filter || '').trim().toLocaleLowerCase();
-      const list = allCountries.filter(c => !q || (c.name + ' ' + c.country + ' ' + c.callingCode).toLocaleLowerCase().includes(q));
+      const list = allCountries;
       countrySelect.innerHTML = '';
       list.forEach(c => {
         const option = document.createElement('option');
@@ -360,17 +351,15 @@
       else if (list.some(c => c.country === 'EG')) countrySelect.value = 'EG';
       else if (list.length) countrySelect.value = list[0].country;
     };
-    countrySearch.addEventListener('input', () => renderCountries(countrySearch.value));
     api('/auth/phone-countries').then(data => {
       if (Array.isArray(data.countries) && data.countries.length) {
         allCountries = data.countries;
-        renderCountries(countrySearch.value);
+        renderCountries();
       }
     }).catch(error => console.warn('Country list unavailable:', error.message));
 
     const syncVisibility = () => {
       const registering = !!(typeof reg !== 'undefined' && reg);
-      countrySearch.classList.toggle('hide', !registering);
       countryWrap.classList.toggle('hide', !registering);
       emailInput.classList.toggle('hide', !registering);
     };
