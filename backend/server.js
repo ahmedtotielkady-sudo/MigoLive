@@ -40,6 +40,7 @@ app.use("/api/gifts", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 
 
 app.use("/api/wallet", require("./routes/wallet"));
 app.use("/api/app-update", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/app-update"));
+app.use("/api/app-settings", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/app-settings"));
 
 // Owner-managed game policy is persisted in MongoDB. All game API requests pass
 // through the policy gate before reaching individual game routers.
