@@ -774,6 +774,54 @@
   document.addEventListener('click',event=>{if(event.target.closest('#migo-member-admin'))return;let n=event.target;for(let i=0;n&&i<7;i++,n=n.parentElement){const t=String(n.innerText||n.textContent||'').replace(/[›❯>]/g,'').trim();if(t==='الأعضاء'||(t.startsWith('الأعضاء')&&t.length<45)){event.preventDefault();event.stopImmediatePropagation();openMemberManagement();return}}},true);
 
 
+  // Shared owner settings: persisted centrally and pushed to every connected app.
+  let sharedPublicSettings = {};
+  let sharedSettingsRevision = 0;
+  function applySharedSettings(payload, source) {
+    if (!payload || !payload.settings || typeof payload.settings !== 'object') return;
+    sharedPublicSettings = payload.settings;
+    sharedSettingsRevision = Number(payload.revision || sharedSettingsRevision || 0);
+    try {
+      localStorage.setItem('migo_public_settings_v1', JSON.stringify({
+        settings: sharedPublicSettings, revision: sharedSettingsRevision,
+        updatedAt: payload.updatedAt || null
+      }));
+    } catch (_) {}
+    window.dispatchEvent(new CustomEvent('migo:settings-updated', {
+      detail: { settings: sharedPublicSettings, revision: sharedSettingsRevision,
+        updatedAt: payload.updatedAt || null, source: source || 'server' }
+    }));
+  }
+  async function refreshSharedSettings() {
+    try {
+      const payload = await api('/app-settings/public');
+      applySharedSettings(payload, 'server');
+      return sharedPublicSettings;
+    } catch (error) {
+      // Keep the last server-confirmed cache visible during temporary outages.
+      try {
+        const cached = JSON.parse(localStorage.getItem('migo_public_settings_v1') || '{}');
+        if (cached.settings && typeof cached.settings === 'object') {
+          sharedPublicSettings = cached.settings;
+          sharedSettingsRevision = Number(cached.revision || 0);
+        }
+      } catch (_) {}
+      throw error;
+    }
+  }
+  window.MigoSettings = Object.freeze({
+    get: () => sharedPublicSettings,
+    refresh: refreshSharedSettings,
+    update: async patch => {
+      if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('بيانات الإعدادات غير صالحة');
+      const payload = await api('/app-settings/owner', {
+        method: 'PUT', body: JSON.stringify({ settings: patch })
+      });
+      applySharedSettings(payload, 'owner-save');
+      return payload;
+    }
+  });
+
   // Authenticated live updates from the API. Reconnects re-read canonical data.
   (function installOwnerLiveSync(){
     if(window.__migoLiveSyncInstalled)return;window.__migoLiveSyncInstalled=true;
@@ -786,7 +834,7 @@
         if(socket||!token())return;
         socket=window.io(API.replace(/\/api$/,''),{transports:['websocket','polling'],auth:{token:token()},reconnection:true,reconnectionDelay:1000,reconnectionDelayMax:10000,timeout:15000});
         window.migoLiveSocket=socket;
-        const resync=()=>{if(typeof refreshWalletSafely==='function')refreshWalletSafely();window.dispatchEvent(new Event('migo:live-sync'));};
+        const resync=()=>{if(typeof refreshWalletSafely==='function')refreshWalletSafely();refreshSharedSettings().catch(()=>{});window.dispatchEvent(new Event('migo:live-sync'));};
         socket.on('connect',resync);
         socket.on('wallet:updated',payload=>{
           if(payload&&Number.isFinite(Number(payload.coins))){
@@ -795,6 +843,7 @@
             window.dispatchEvent(new CustomEvent('migo:wallet-updated',{detail:payload}));
           }
         });
+        socket.on('owner:settings-updated',payload=>applySharedSettings(payload,'realtime'));
         socket.on('owner:announcement',payload=>{const msg=String(payload&&payload.message||'').trim();if(msg&&typeof toast==='function')toast(msg);window.dispatchEvent(new CustomEvent('migo:announcement',{detail:payload||{}}));});
         socket.on('owner:policy-updated',payload=>{window.dispatchEvent(new CustomEvent('migo:policy-updated',{detail:payload||{}}));if(payload&&payload.kind==='app-update'&&typeof checkMandatoryUpdate==='function')checkMandatoryUpdate();if(payload&&payload.kind==='game-control')window.dispatchEvent(new Event('migo:games-updated'));});
         socket.on('owner:member-updated',payload=>window.dispatchEvent(new CustomEvent('migo:member-updated',{detail:payload||{}})));
