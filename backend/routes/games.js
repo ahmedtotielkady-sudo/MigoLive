@@ -163,7 +163,8 @@ router.post("/wheel-animals/spin", async (req, res) => {
     return res.json({ ok: true, gameId: "wheel-animals", ...result });
   } catch (error) {
     return res.status(error.status || 500).json({
-      ok: false, message: error.status ? error.message : "تعذر تنفيذ الجولة"
+      ok: false, message: error.status ? error.message : "تعذر تنفيذ الجولة",
+      ...(Number.isSafeInteger(error.currentCoins) ? { coins: error.currentCoins } : {})
     });
   } finally { await session.endSession(); }
 });
