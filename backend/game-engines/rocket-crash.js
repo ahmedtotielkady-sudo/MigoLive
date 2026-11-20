@@ -7,10 +7,10 @@ const MAX_MULTIPLIER = 22;
 const START_DELAY_MS = 5000;
 
 function generateCrashPoint() {
-  // Cryptographically random crash point, rounded to 0.01x.
-  // Squared distribution creates frequent low crashes and occasional long flights.
-  const draw = randomInt(0, 10000) / 10000;
-  const multiplier = 1.1 + (draw * draw * (MAX_MULTIPLIER - 1.1));
+  // Secure random crash point from 1.00x through 22.00x, rounded to 0.01x.
+  // Squared distribution favors lower crash points while allowing long rounds.
+  const draw = randomInt(0, 10001) / 10000;
+  const multiplier = 1 + (draw * draw * (MAX_MULTIPLIER - 1));
   return Math.min(MAX_MULTIPLIER, Math.round(multiplier * 100) / 100);
 }
 
