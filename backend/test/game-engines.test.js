@@ -23,12 +23,14 @@ test("Animal wheel settles the same indexed animal and multiplier", () => {
   const result = wheel.play([0, 0, 0, 0, 0, 0, 500, 0], () => {
     const bytes = Buffer.alloc(4);
     // Pick a value in the goat interval of the weighted distribution.
-    bytes.writeUInt32BE(0x90000000);
+    bytes.writeUInt32BE(0xB0000000);
     return bytes;
   });
   assert.ok(Number.isInteger(result.index) && result.index >= 0 && result.index < wheel.ANIMALS.length);
   assert.equal(result.animal, wheel.ANIMALS[result.index].name);
-  assert.equal(result.payout, result.totalBet === 500 && result.index === 6 ? 2500 : result.payout);
+  assert.equal(result.index, 6);
+  assert.equal(result.animal, "ماعز");
+  assert.equal(result.payout, 2500);
   assert.equal(result.net, result.payout - result.totalBet);
 });
 
