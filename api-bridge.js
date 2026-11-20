@@ -721,4 +721,32 @@
   }
   document.addEventListener('click',event=>{if(event.target.closest('#migo-member-admin'))return;let n=event.target;for(let i=0;n&&i<7;i++,n=n.parentElement){const t=String(n.innerText||n.textContent||'').replace(/[›❯>]/g,'').trim();if(t==='الأعضاء'||(t.startsWith('الأعضاء')&&t.length<45)){event.preventDefault();event.stopImmediatePropagation();openMemberManagement();return}}},true);
 
+
+  // Authenticated live updates from the API. Reconnects re-read canonical data.
+  (function installOwnerLiveSync(){
+    if(window.__migoLiveSyncInstalled)return;window.__migoLiveSyncInstalled=true;
+    const script=document.createElement('script');
+    script.src=API.replace(/\\/api$/,'')+'/socket.io/socket.io.js';script.async=true;
+    script.onload=()=>{
+      if(typeof window.io!=='function'||!token())return;
+      const socket=window.io(API.replace(/\\/api$/,''),{transports:['websocket','polling'],auth:{token:token()},reconnection:true,reconnectionDelay:1000,reconnectionDelayMax:10000,timeout:15000});
+      window.migoLiveSocket=socket;
+      const resync=()=>{if(typeof refreshWalletSafely==='function')refreshWalletSafely();window.dispatchEvent(new Event('migo:live-sync'));};
+      socket.on('connect',resync);
+      socket.on('wallet:updated',payload=>{
+        if(payload&&Number.isFinite(Number(payload.coins))){
+          try{const uid=Number(payload.uid),key=Object.keys(DB.users||{}).find(k=>Number(DB.users[k]&&DB.users[k].uid)===uid);if(key){DB.users[key].coins=Number(payload.coins);if(typeof save==='function')save();}}catch(_){}
+          if(typeof refreshWalletSafely==='function')refreshWalletSafely();
+          window.dispatchEvent(new CustomEvent('migo:wallet-updated',{detail:payload}));
+        }
+      });
+      socket.on('owner:announcement',payload=>{const msg=String(payload&&payload.message||'').trim();if(msg&&typeof toast==='function')toast(msg);window.dispatchEvent(new CustomEvent('migo:announcement',{detail:payload||{}}));});
+      socket.on('owner:policy-updated',payload=>{window.dispatchEvent(new CustomEvent('migo:policy-updated',{detail:payload||{}}));if(payload&&payload.kind==='app-update'&&typeof checkMandatoryUpdate==='function')checkMandatoryUpdate();if(payload&&payload.kind==='game-control')window.dispatchEvent(new Event('migo:games-updated'));});
+      socket.on('owner:member-updated',payload=>window.dispatchEvent(new CustomEvent('migo:member-updated',{detail:payload||{}})));
+      socket.on('auth:revoked',payload=>{alert(String(payload&&payload.message||'تم إيقاف هذا الحساب'));if(typeof logout==='function')logout();});
+      socket.on('auth:session-replaced',payload=>{alert(String(payload&&payload.message||'تم إنهاء جلسة الحساب'));if(typeof logout==='function')logout();});
+    };
+    script.onerror=()=>{window.__migoLiveSyncInstalled=false;};document.head.append(script);
+  })();
+
 })();
