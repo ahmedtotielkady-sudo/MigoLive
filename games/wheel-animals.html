@@ -68,7 +68,7 @@ function add(i){if(busy||!ready)return;hits.forEach(([h])=>h.classList.remove('w
 let H=[];
 function renderH(){const hs=document.getElementById('hs'),bg=BG;hs.innerHTML='';for(let k=0;k<8;k++){const e=document.createElement('i'),a=A[H[k]];if(a){e.style.backgroundImage=bg;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%'}hs.appendChild(e)}}
 const GAP=[22,65,108.7,155.5,205,251.7,294.5,337.7];
-function showWin(i,p){let w=document.getElementById('wv');if(!w){w=document.createElement('div');w.id='wv';w.className='wv';w.innerHTML='<i id="wi"></i><b id="wn"></b><span id="wa"></span>';document.body.appendChild(w)}const a=A[i],e=document.getElementById('wi');e.style.backgroundImage=BG;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%';document.getElementById('wn').textContent=a[0]+' ×'+a[2];document.getElementById('wa').textContent=p>0?'ربحت '+F(p):(p<0?'آخر نتيجة':'حظ أوفر');e.style.animation='none';void e.offsetWidth;e.style.animation='';w.classList.add('s');clearTimeout(showWin.t);showWin.t=setTimeout(()=>w.classList.remove('s'),3000)}
+function showWin(i,p){let w=document.getElementById('wv');if(!w){w=document.createElement('div');w.id='wv';w.className='wv';w.innerHTML='<i id="wi"></i><b id="wn"></b><span id="wa"></span>';document.body.appendChild(w)}const a=A[i],e=document.getElementById('wi');e.style.backgroundImage=BG;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%';document.getElementById('wn').textContent='الفائز: '+a[0]+' ×'+a[2];document.getElementById('wa').textContent=p>0?'ربحت '+F(p):(p<0?'آخر نتيجة':'حظ أوفر');e.style.animation='none';void e.offsetWidth;e.style.animation='';w.classList.add('s');clearTimeout(showWin.t);showWin.t=setTimeout(()=>w.classList.remove('s'),3000)}
 const CYC=34000,BET=25000,SEND=30200;
 function rng(n){let a=(n*2654435761)>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function resultOf(n){const r=rng(n);const w=A.map(a=>1/a[2]),s=w.reduce((a,b)=>a+b);let x=r()*s,k=0;for(;k<7;k++){x-=w[k];if(x<=0)break}return{i:k,tg:A[k][1]+(r()*16-8)}}
@@ -78,6 +78,19 @@ try{localStorage.removeItem('wheelP')}catch(e){}
 function setH(fin){const L=[];for(let k=fin;k>fin-40&&L.length<8;k--){const r=resultOf(k);if(r.i>=0)L.push(r.i)}H=L;renderH()}
 function startTicks(){clearInterval(siv);let last=-1;siv=setInterval(()=>{const m=new DOMMatrix(getComputedStyle(nd).transform),a=(Math.atan2(m.b,m.a)*180/Math.PI+360)%360,k=Math.floor(a/22.5);if(k!==last){last=k;snd(500+Math.random()*80,.05,'square',.06)}},30);setTimeout(()=>clearInterval(siv),5200)}
 const serverWheelResults=new Map(),serverWheelRequests=new Map();
+function resolveAnimalIndex(outcome){
+ const raw=outcome&&(outcome.animal??outcome.name??outcome.symbol??outcome.label);
+ if(raw!=null){
+  const value=String(raw).trim().toLowerCase();
+  const aliases={'نمر':'نمر','tiger':'نمر','أسد':'أسد','اسد':'أسد','lion':'أسد','فهد':'فهد','cheetah':'فهد','ذئب':'ذئب','ذيب':'ذئب','wolf':'ذئب','جمل':'جمل','camel':'جمل','حصان':'حصان','horse':'حصان','ماعز':'ماعز','goat':'ماعز','بقرة':'بقرة','cow':'بقرة'};
+  const name=aliases[value]||value;
+  const found=A.findIndex(a=>a[0]===name);
+  if(found>=0)return found;
+ }
+ const index=Number(outcome&&outcome.index);
+ if(Number.isInteger(index)&&index>=0&&index<A.length)return index;
+ throw new Error('اسم الحيوان الفائز غير معروف');
+}
 function wheelTarget(index){return A[index][1]+(Math.random()*16-8)}
 function requestWheelResult(k){
  if(serverWheelResults.has(k))return Promise.resolve(serverWheelResults.get(k));
@@ -86,8 +99,7 @@ function requestWheelResult(k){
  const placed=bets.slice();
  const task=migoGameCall('wheel-animals','spin',{bets:placed}).then(server=>{
   const outcome=server&&server.outcome||{};
-  const index=Number(outcome.index);
-  if(!Number.isInteger(index)||index<0||index>=A.length)throw new Error('نتيجة عجلة الحيوانات من الخادم غير صحيحة');
+  const index=resolveAnimalIndex(outcome);
   const result={i:index,tg:wheelTarget(index),payout:Math.max(0,Math.floor(Number(server.payout)||0)),coins:Math.max(0,Math.floor(Number(server.coins)||0)),totalBet:Math.max(0,Math.floor(Number(server.bet)||0))};
   serverWheelResults.set(k,result);bal=result.coins;ready=true;ui();return result;
  }).catch(error=>{msg('تعذر اعتماد نتيجة العجلة: '+(error.message||'خطأ اتصال'),4000);throw error}).finally(()=>serverWheelRequests.delete(k));
