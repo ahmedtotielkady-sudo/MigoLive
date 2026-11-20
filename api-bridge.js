@@ -470,9 +470,10 @@
     catch (error) { console.warn('Server wallet sync pending:', error.message); }
     finally { walletRefreshBusy = false; }
   }
-  // Fast foreground wallet refresh; server remains the only balance authority.
-  // 500ms keeps the display responsive without trusting game-side coin values.
-  setInterval(refreshWalletSafely, 500);
+  // Socket.IO delivers wallet changes immediately. Keep a slower foreground
+  // reconciliation as a fallback instead of polling twice every second.
+  // This avoids saturating the API and competing with game requests on mobile data.
+  setInterval(refreshWalletSafely, 15000);
   window.addEventListener('focus', refreshWalletSafely);
   document.addEventListener('visibilitychange', refreshWalletSafely);
   window.addEventListener('migo:wallet-updated', refreshWalletSafely);
@@ -662,6 +663,57 @@
     const frames = [$id('gf'), document.querySelector('#migo-game-overlay iframe')].filter(Boolean);
     return frames.find(frame => frame.contentWindow === source) || null;
   }
+  function validateGameServerResult(gameId, action, result) {
+    if (!result || result.gameId !== gameId ||
+        !Number.isSafeInteger(Number(result.coins)) || Number(result.coins) < 0) {
+      throw new Error('رد الخادم غير مكتمل: لم يتم تأكيد رصيد الجولة');
+    }
+    if (action === 'state') return result;
+    if (typeof result.roundId !== 'string' || !result.roundId) {
+      throw new Error('رد الخادم لا يحتوي على رقم الجولة');
+    }
+    if (action === 'start') {
+      if (!Number.isFinite(Number(result.startAt))) throw new Error('بيانات بدء الجولة غير مكتملة');
+      return result;
+    }
+    if (action === 'cancel') {
+      if (!Number.isFinite(Number(result.refunded))) throw new Error('بيانات استرداد الرهان غير مكتملة');
+      return result;
+    }
+    if (action === 'cashout') {
+      if (!Number.isFinite(Number(result.payout))) throw new Error('بيانات سحب الأرباح غير مكتملة');
+      return result;
+    }
+    if (!Number.isFinite(Number(result.payout)) || !result.outcome || typeof result.outcome !== 'object') {
+      throw new Error('نتيجة اللعبة أو قيمة الربح غير مكتملة من الخادم');
+    }
+    const o = result.outcome;
+    if (gameId === 'slot-777' &&
+        (!Array.isArray(o.grid) || o.grid.length !== 5 || o.grid.some(col => !Array.isArray(col) || col.length !== 3))) {
+      throw new Error('شبكة نتيجة سلوت 777 غير مكتملة');
+    }
+    if (gameId === 'ocean-storm' &&
+        (!Array.isArray(result.grid) || result.grid.length !== 6 || result.grid.some(col => !Array.isArray(col) || col.length !== 5))) {
+      throw new Error('شبكة نتيجة عاصفة المحيط غير مكتملة');
+    }
+    if (gameId === 'wheel-animals' &&
+        (!Number.isInteger(Number(o.index)) || Number(o.index) < 0 || Number(o.index) > 7 ||
+         typeof o.animal !== 'string' || !o.animal)) {
+      throw new Error('الحيوان الفائز غير محدد بشكل صحيح من الخادم');
+    }
+    if (gameId === 'fruit-luck' && !['m', '77', 'o'].includes(o.result)) {
+      throw new Error('رمز نتيجة الفواكه غير صحيح');
+    }
+    if (gameId === 'big-warrior' && !['lion', 'tiger', 'draw'].includes(o.winner)) {
+      throw new Error('الفائز في المحارب الكبير غير محدد من الخادم');
+    }
+    if (gameId === 'cleopatra-gold' &&
+        (!Array.isArray(o.grid) || o.grid.length !== 5 || o.grid.some(col => !Array.isArray(col) || col.length !== 4))) {
+      throw new Error('شبكة نتيجة ذهب كليوباترا غير مكتملة');
+    }
+    return result;
+  }
+
   window.addEventListener('message', async event => {
     const request = event.data;
     if (!request || request.t !== 'migo:game:request' || !gameFrameFor(event.source)) return;
@@ -680,7 +732,7 @@
         body: JSON.stringify(request.payload && typeof request.payload === 'object' ? request.payload : {})
       };
       if (request.action !== 'state') options.headers = { 'Idempotency-Key': requestId };
-      const result = await api(endpoint, options);
+      const result = validateGameServerResult(String(request.gameId), String(request.action), await api(endpoint, options));
       if (result && Number.isFinite(Number(result.coins))) {
         const coins = applyServerWalletCoins(result.coins);
         window.dispatchEvent(new CustomEvent('migo:wallet-updated', {
