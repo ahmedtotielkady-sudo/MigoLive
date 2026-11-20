@@ -726,13 +726,13 @@
   (function installOwnerLiveSync(){
     if(window.__migoLiveSyncInstalled)return;window.__migoLiveSyncInstalled=true;
     const script=document.createElement('script');
-    script.src=API.replace(/\\/api$/,'')+'/socket.io/socket.io.js';script.async=true;
+    script.src=API.replace(/\/api$/,'')+'/socket.io/socket.io.js';script.async=true;
     script.onload=()=>{
       if(typeof window.io!=='function')return;
       let socket=null;
       const connectNow=()=>{
         if(socket||!token())return;
-        socket=window.io(API.replace(/\\/api$/,''),{transports:['websocket','polling'],auth:{token:token()},reconnection:true,reconnectionDelay:1000,reconnectionDelayMax:10000,timeout:15000});
+        socket=window.io(API.replace(/\/api$/,''),{transports:['websocket','polling'],auth:{token:token()},reconnection:true,reconnectionDelay:1000,reconnectionDelayMax:10000,timeout:15000});
         window.migoLiveSocket=socket;
         const resync=()=>{if(typeof refreshWalletSafely==='function')refreshWalletSafely();window.dispatchEvent(new Event('migo:live-sync'));};
         socket.on('connect',resync);
