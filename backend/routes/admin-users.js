@@ -1,0 +1,187 @@
+const express = require("express");
+const User = require("../models/User");
+const requireAuth = require("../middleware/requireAuth");
+
+const router = express.Router();
+router.use(requireAuth);
+
+// Member administration is restricted to the verified primary owner role.
+// Never trust a role value supplied by the browser or JWT alone.
+router.use(async (req, res, next) => {
+  try {
+    const actor = await User.findById(req.auth.sub).select("role status").lean();
+    if (!actor || actor.status !== "active" || actor.role !== "owner") {
+      return res.status(403).json({ ok: false, message: "ليس لديك صلاحية إدارة الأعضاء" });
+    }
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+});
+
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function memberView(user) {
+  return {
+    uid: user.uid,
+    username: user.username,
+    displayName: user.displayName,
+    avatar: user.avatar || "",
+    role: user.role,
+    status: user.status,
+    coins: Number(user.coins) || 0,
+    createdAt: user.createdAt || null,
+    lastLoginAt: user.lastLoginAt || null
+  };
+}
+
+// GET /api/admin/users?q=&status=all|active|banned&page=1&limit=30
+router.get("/", async (req, res, next) => {
+  try {
+    const page = Math.max(1, Math.min(100000, Number.parseInt(req.query.page, 10) || 1));
+    const limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 30));
+    const status = ["active", "banned"].includes(String(req.query.status || ""))
+      ? String(req.query.status) : "";
+    const q = String(req.query.q || "").trim().slice(0, 80);
+    const filter = {};
+    if (status) filter.status = status;
+    if (q) {
+      const numericUid = /^\d{1,10}$/.test(q) ? Number(q) : null;
+      const regex = new RegExp(escapeRegex(q), "i");
+      filter.$or = [
+        { username: regex },
+        { displayName: regex },
+        ...(numericUid !== null ? [{ uid: numericUid }] : [])
+      ];
+    }
+    const [total, users] = await Promise.all([
+      User.countDocuments(filter),
+      User.find(filter)
+        .select("uid username displayName avatar role status coins createdAt lastLoginAt")
+        .sort({ createdAt: -1, _id: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean()
+    ]);
+    return res.json({
+      ok: true,
+      users: users.map(memberView),
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit)
+    });
+  } catch (error) { return next(error); }
+});
+
+// POST /api/admin/users/:uid/ban
+router.post("/:uid/ban", async (req, res, next) => {
+  try {
+    const uid = Number(req.params.uid);
+    if (!Number.isSafeInteger(uid) || uid < 1) {
+      return res.status(400).json({ ok: false, message: "رقم العضو غير صحيح" });
+    }
+    const target = await User.findOne({ uid });
+    if (!target) return res.status(404).json({ ok: false, message: "العضو غير موجود" });
+    if (target.role === "owner") {
+      return res.status(403).json({ ok: false, message: "لا يمكن حظر مالك التطبيق" });
+    }
+    const reason = String(req.body && req.body.reason || "").trim().slice(0, 240);
+    target.status = "banned";
+    target.activeSessionId = null;
+    target.activeSessionExpiresAt = null;
+    await target.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      const room = "user:" + String(target._id);
+      io.to(room).emit("auth:revoked", { message: "تم إيقاف هذا الحساب" });
+      io.in(room).disconnectSockets(true);
+    }
+    return res.json({ ok: true, user: memberView(target), reason });
+  } catch (error) { return next(error); }
+});
+
+// POST /api/admin/users/:uid/unban
+router.post("/:uid/unban", async (req, res, next) => {
+  try {
+    const uid = Number(req.params.uid);
+    if (!Number.isSafeInteger(uid) || uid < 1) {
+      return res.status(400).json({ ok: false, message: "رقم العضو غير صحيح" });
+    }
+    const target = await User.findOne({ uid });
+    if (!target) return res.status(404).json({ ok: false, message: "العضو غير موجود" });
+    target.status = "active";
+    // A previously banned user must sign in again; never restore an old session.
+    target.activeSessionId = null;
+    target.activeSessionExpiresAt = null;
+    await target.save();
+    return res.json({ ok: true, user: memberView(target) });
+  } catch (error) { return next(error); }
+});
+
+// PATCH /api/admin/users/:uid — owner can correct a display name or change user/admin role.
+router.patch("/:uid", async (req, res, next) => {
+  try {
+    const uid = Number(req.params.uid);
+    if (!Number.isSafeInteger(uid) || uid < 1) {
+      return res.status(400).json({ ok: false, message: "رقم العضو غير صحيح" });
+    }
+    const target = await User.findOne({ uid });
+    if (!target) return res.status(404).json({ ok: false, message: "العضو غير موجود" });
+    if (target.role === "owner") {
+      return res.status(403).json({ ok: false, message: "لا يمكن تعديل صلاحيات مالك التطبيق" });
+    }
+
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "displayName")) {
+      const displayName = String(req.body.displayName || "").normalize("NFKC").trim();
+      if (displayName.length < 2 || displayName.length > 40) {
+        return res.status(400).json({ ok: false, message: "اسم العرض يجب أن يكون من حرفين إلى 40 حرفاً" });
+      }
+      updates.displayName = displayName;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "role")) {
+      const role = String(req.body.role || "");
+      if (!["user", "admin"].includes(role)) {
+        return res.status(400).json({ ok: false, message: "الصلاحية المطلوبة غير مسموحة" });
+      }
+      updates.role = role;
+    }
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ ok: false, message: "لا توجد تغييرات صالحة" });
+    }
+    Object.assign(target, updates);
+    await target.save();
+    return res.json({ ok: true, user: memberView(target) });
+  } catch (error) { return next(error); }
+});
+
+// POST /api/admin/users/:uid/logout — revoke the current device session immediately.
+router.post("/:uid/logout", async (req, res, next) => {
+  try {
+    const uid = Number(req.params.uid);
+    if (!Number.isSafeInteger(uid) || uid < 1) {
+      return res.status(400).json({ ok: false, message: "رقم العضو غير صحيح" });
+    }
+    const target = await User.findOne({ uid });
+    if (!target) return res.status(404).json({ ok: false, message: "العضو غير موجود" });
+    if (target.role === "owner") {
+      return res.status(403).json({ ok: false, message: "لا يمكن إنهاء جلسة مالك التطبيق" });
+    }
+    target.activeSessionId = null;
+    target.activeSessionExpiresAt = null;
+    await target.save();
+    const io = req.app.get("io");
+    if (io) {
+      const room = "user:" + String(target._id);
+      io.to(room).emit("auth:session-replaced", { message: "تم إنهاء جلسة الحساب بواسطة الإدارة" });
+      io.in(room).disconnectSockets(true);
+    }
+    return res.json({ ok: true, user: memberView(target) });
+  } catch (error) { return next(error); }
+});
+
+module.exports = router;
