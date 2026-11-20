@@ -398,7 +398,7 @@
         const usernameLength = [...raw].length;
         if (usernameLength < 3) return message('اسم المستخدم يجب أن يكون 3 أحرف على الأقل');
         if (usernameLength > 24) return message('اسم المستخدم يجب ألا يزيد عن 24 حرفاً');
-        if (!/^[\\p{L}\\p{N}_.-]+$/u.test(raw)) {
+        if (!/^[\p{L}\p{N}_.-]+$/u.test(raw)) {
           return message('اسم المستخدم يقبل الحروف والأرقام والشرطة والشرطة السفلية والنقطة فقط، دون مسافات');
         }
         if (!phone && !email) return message('أدخل رقم الهاتف أو البريد الإلكتروني');
