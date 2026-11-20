@@ -119,7 +119,7 @@ async function go(){
  if(!walletReady){askWallet();charge(false);return}
  if(bet.st=='queued'||(bet.st=='live'&&state=='wait')){
   try{const r=await migoGameCall('rocket-crash','cancel',{roundId:serverRoundId});bal=Math.max(0,Math.floor(Number(r.coins)||0));serverRoundId='';bet={amt:0,st:'none',win:0};save();ui()}
-  catch(e){charge(false);$('#np').textContent=e.message||'تعذر إلغاء الرهان من الخادم'}
+  catch(e){charge(false);$('#np').textContent=e.message||'تعذر إلغاء الرهان'}
   return;
  }
  if(bet.st=='none'){
@@ -130,7 +130,7 @@ async function go(){
    serverRoundId=r.roundId;bal=Math.max(0,Math.floor(Number(r.coins)||0));
    bet={amt:a,st:'live',win:0};state='wait';t0=performance.now()+Math.max(0,Number(r.startAt)-Date.now());lastServerState=0;mult=1;
    beep(520,.08,'triangle');ui();
-  }catch(e){charge(true);$('#np').textContent=e.message||'تعذر بدء الرهان من الخادم'}
+  }catch(e){charge(true);$('#np').textContent=e.message||'تعذر بدء الجولة'}
   finally{$('#go').disabled=false}
  }
 }
@@ -202,7 +202,7 @@ function ov(){
  const m=$('#mult'),s=$('#sub');$('#stage').className='stage'+(state=='crash'?' crashed':'');let sub='';
  if(state=='wait'){m.className='w';m.textContent='الإقلاع بعد '+Math.max(0,(t0-performance.now())/1000).toFixed(1);sub=bet.st=='live'?'رهانك جاهز: '+fmt(bet.amt):'ضع رهانك قبل الإقلاع'}
  else{m.className='';m.textContent=(state=='crash'?cp:mult).toFixed(2)+'×';
-  if(state=='crash')sub=res;else if(crashPending)sub='وصل الصاروخ إلى 22× — جارٍ تأكيد الانفجار من الخادم';else if(bet.st=='live')sub='الربح الحالي '+fmt(bet.amt*mult);
+  if(state=='crash')sub=res;else if(crashPending)sub='وصل الصاروخ إلى 22× — الصاروخ على وشك الانفجار';else if(bet.st=='live')sub='الربح الحالي '+fmt(bet.amt*mult);
   else if(bet.st=='cashed')sub=`✓ سحبت ×${cashAt.toFixed(2)} · فوز ${fmt(bet.win)}`;else if(bet.st=='queued')sub='رهانك للجولة القادمة'}
  s.textContent=sub;s.style.color=sub.startsWith('✓')||sub.includes('ربحت')?'#7dffaf':sub.includes('خسرت')?'#ff8aa0':'#f1ecff';
 }
