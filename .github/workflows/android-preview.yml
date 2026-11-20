@@ -6,6 +6,10 @@ on:
       - main
       - android-preview
       - feature/agency-owner-approval
+      - feature/permanent-dark-server-wallet
+      - fix/registration-username-min-3-max-24
+      - feature/global-phone-registration-ui-2026-11-20
+      - feature/signup-dark-wallet-integration-2026-11-20
   workflow_dispatch:
 
 permissions:
@@ -130,14 +134,19 @@ jobs:
           jsfixes = [
               ('var winner=r<0.4?"lion":(r<0.8?"tiger":"draw");', 'var opposite=pick==="lion"?"tiger":"lion";var winner;if(pick==="draw"){winner=r<0.45?"lion":(r<0.9?"tiger":"draw")}else{winner=r<0.3?pick:(r<0.9?opposite:"draw")}'),
               ('function bet(){return Math.min(STEPS[stepIdx],coins)}', 'function bet(){return STEPS[stepIdx]}'),
-              ('$("go").disabled=busy||!pick||coins<=0;', '$("go").disabled=busy||!pick||coins<bet();'),
+              ('$("go").disabled=busy||!pick||coins<=0||!walletReady;', '$("go").disabled=busy||!pick||coins<bet()||!walletReady;'),
               ('$("plus").disabled=busy||stepIdx>=STEPS.length-1||STEPS[stepIdx+1]>coins;', '$("plus").disabled=busy||stepIdx>=STEPS.length-1;'),
               ('$("plus").onclick=function(){if(stepIdx<STEPS.length-1&&STEPS[stepIdx+1]<=coins){stepIdx++;render()}};', '$("plus").onclick=function(){if(!busy&&stepIdx<STEPS.length-1){stepIdx++;render()}};'),
               ('if(!pick||busy||coins<=0)return;', 'if(!pick||busy||coins<bet())return;')
           ]
-          for old, new in jsfixes:
+          server_controlled = ('migoGameCall("big-warrior","fight"' in html or "migoGameCall('big-warrior','fight'" in html)
+          for index, (old, new) in enumerate(jsfixes):
               count = html.count(old)
               if count != 1:
+                  # The server-authoritative rewrite already removed the local
+                  # random winner calculation; do not reapply the legacy RNG patch.
+                  if server_controlled and index == 0 and count == 0:
+                      continue
                   raise SystemExit(f'Expected exactly one occurrence for warrior behavior patch, got {count}: {old}')
               html = html.replace(old, new, 1)
           p.write_text(html, encoding='utf-8')
@@ -195,6 +204,30 @@ jobs:
           mkdir -p www/assets
           cp assets/migo-purple-background.svg www/assets/migo-purple-background.svg
           python3 scripts/apply-purple-background.py
+
+      - name: Enforce server-authoritative game wallet messaging
+        run: |
+          python3 scripts/apply-server-authoritative-games.py
+          python3 - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.active=False; self.parts=[]; self.current=[]
+              def handle_starttag(self,tag,attrs):
+                  if tag.lower()=='script': self.active='src' not in dict(attrs); self.current=[]
+              def handle_data(self,data):
+                  if self.active:self.current.append(data)
+              def handle_endtag(self,tag):
+                  if tag.lower()=='script' and self.active:self.parts.append(''.join(self.current));self.active=False
+          files=['www/index.html','www/slot-777.html','www/slot-ocean-storm.html','www/wheel-animals.html','www/games/fruit-luck.html','www/games/cleopatra-gold.html','www/games/big-warrior.html','www/games/rocket-crash.html']
+          for file in files:
+              parser=Scripts();parser.feed(Path(file).read_text(encoding='utf-8'))
+              for i,source in enumerate(parser.parts):
+                  if source.strip():
+                      Path(f'/tmp/server-wallet-{Path(file).stem}-{i}.js').write_text(source,encoding='utf-8')
+          PY
+          for file in /tmp/server-wallet-*.js; do node --check "$file"; done
 
       - name: Install Capacitor
         run: npm install @capacitor/core@^8 @capacitor/cli@^8 @capacitor/android@^8 @capacitor/app@^8

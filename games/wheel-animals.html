@@ -35,6 +35,10 @@ button.b.go{flex:2;background:linear-gradient(#ffd35a,#e08a00);color:#4a1200;box
 button:disabled{opacity:.5}
 .hs{flex:none;display:flex;gap:6px;background:#0005;border:2px solid #ffd35a88;border-radius:14px;padding:4px 6px;direction:ltr}
 .hs i{flex:none;width:30px;aspect-ratio:1;border-radius:50%;background-color:#0004;background-repeat:no-repeat;background-size:625% 625%}
+
+/* Fast Android/WebView touch response: no delayed double-tap handling. */
+button,[role="button"],.chip,.hit,.box{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+button:active,[role="button"]:active,.chip:active,.hit:active,.box:active{filter:brightness(1.18);}
 </style><style>#uav,.top .av{display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;color:#fff;overflow:hidden}#uav{position:absolute;left:10px;top:calc(env(safe-area-inset-top,0px) + 10px);width:44px;height:44px;border-radius:50%;border:2px solid #ffd35a;background:radial-gradient(#5a2a7a,#2a0a40);z-index:5}</style><script>(function(){var avatar='';function valid(v){return typeof v==='string'&&(/^(data:image\/(png|jpeg|jpg|webp|gif);base64,|https?:\/\/)/i).test(v)}function apply(){var a=document.querySelector('.top .av');if(!a)return;if(valid(avatar)){a.style.backgroundImage='url("'+avatar.replace(/["\\)]/g,'')+'")';a.style.backgroundSize='cover';a.style.backgroundPosition='center';a.style.display='flex';a.setAttribute('aria-label','صورة المستخدم');a.textContent=''}else{a.style.backgroundImage='none';a.style.display='none';a.removeAttribute('aria-label');a.textContent=''}}addEventListener('message',function(e){var d=e.data;if(d&&d.t==='me'){avatar=valid(d.avatar)?d.avatar:'';apply()}});addEventListener('DOMContentLoaded',apply)})();</script></head><body>
 <div class="top"><div class="av"></div><div class="pill"><span class="cn"></span><b id="bal">0</b></div><b id="tot" style="display:none">0</b></div>
 <div class="stage" id="st"><div class="needle" id="nd"><i></i></div><div class="ov" id="ov"></div><div class="cd" id="cd">25</div></div>
@@ -55,28 +59,61 @@ const hits=A.map((a,i)=>{const h=document.createElement('button');h.className='h
 const b=document.createElement('div');b.className='bet';b.style.left=a[3]+'%';b.style.top=(a[4]-8.5)+'%';st.appendChild(b);return [h,b]});
 [500,1000,10000,100000].forEach(v=>{const c=document.createElement('button');c.className='chip'+(v==500?' on':'');c.innerHTML='<u></u><s>'+v+'</s>';c.onclick=()=>{chip=v;document.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');tick(600)};document.getElementById('chips').appendChild(c)});
 const total=()=>bets.reduce((a,b)=>a+b,0);
-function ui(){document.getElementById('bal').textContent=F(bal);document.getElementById('tot').textContent=F(total());hits.forEach(([h,b],i)=>{b.style.display=bets[i]?'block':'none';b.textContent=F(bets[i])});try{if(ready)parent.postMessage({t:'set',v:bal},'*')}catch(e){}}
+function ui(){document.getElementById('bal').textContent=F(Math.max(0,bal-total()));document.getElementById('tot').textContent=F(total());hits.forEach(([h,b],i)=>{b.style.display=bets[i]?'block':'none';b.textContent=F(bets[i])})}
 function snd(f,d,t='sine',g=.15){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),k=ac.createGain();o.type=t;o.frequency.value=f;k.gain.value=g;k.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(k);k.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
 function tick(f){snd(f,.08)}
 function msg(t,ms=2500){ov.textContent=t;ov.classList.add('s');clearTimeout(msg.t);msg.t=setTimeout(()=>ov.classList.remove('s'),ms)}
-function add(i){if(busy)return;hits.forEach(([h])=>h.classList.remove('win'));if(chip>bal){msg('الرصيد لا يكفي');return}bal-=chip;bets[i]+=chip;betRound=Math.floor(Date.now()/CYC);saveP();snd(900,.1,'triangle');ui()}
+function add(i){if(busy||!ready)return;hits.forEach(([h])=>h.classList.remove('win'));if(chip>bal-total()){msg('الرصيد لا يكفي');return}bets[i]+=chip;betRound=Math.floor(Date.now()/CYC);saveP();snd(900,.1,'triangle');ui()}
 
 let H=[];
 function renderH(){const hs=document.getElementById('hs'),bg=BG;hs.innerHTML='';for(let k=0;k<8;k++){const e=document.createElement('i'),a=A[H[k]];if(a){e.style.backgroundImage=bg;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%'}hs.appendChild(e)}}
 const GAP=[22,65,108.7,155.5,205,251.7,294.5,337.7];
-function showWin(i,p){let w=document.getElementById('wv');if(!w){w=document.createElement('div');w.id='wv';w.className='wv';w.innerHTML='<i id="wi"></i><b id="wn"></b><span id="wa"></span>';document.body.appendChild(w)}const a=A[i],e=document.getElementById('wi');e.style.backgroundImage=BG;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%';document.getElementById('wn').textContent=a[0]+' ×'+a[2];document.getElementById('wa').textContent=p>0?'ربحت '+F(p):(p<0?'آخر نتيجة':'حظ أوفر');e.style.animation='none';void e.offsetWidth;e.style.animation='';w.classList.add('s');clearTimeout(showWin.t);showWin.t=setTimeout(()=>w.classList.remove('s'),3000)}
+function showWin(i,p){let w=document.getElementById('wv');if(!w){w=document.createElement('div');w.id='wv';w.className='wv';w.innerHTML='<i id="wi"></i><b id="wn"></b><span id="wa"></span>';document.body.appendChild(w)}const a=A[i],e=document.getElementById('wi');e.style.backgroundImage=BG;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%';document.getElementById('wn').textContent='الفائز: '+a[0]+' ×'+a[2];document.getElementById('wa').textContent=p>0?'ربحت '+F(p):(p<0?'آخر نتيجة':'حظ أوفر');e.style.animation='none';void e.offsetWidth;e.style.animation='';w.classList.add('s');clearTimeout(showWin.t);showWin.t=setTimeout(()=>w.classList.remove('s'),3000)}
 const CYC=34000,BET=25000,SEND=30200;
 function rng(n){let a=(n*2654435761)>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function resultOf(n){const r=rng(n);const w=A.map(a=>1/a[2]),s=w.reduce((a,b)=>a+b);let x=r()*s,k=0;for(;k<7;k++){x-=w[k];if(x<=0)break}return{i:k,tg:A[k][1]+(r()*16-8)}}
 let betRound=-1,doneN=-1,spunN=-1,rn=-1,siv;
-function saveP(){try{localStorage.setItem('wheelP',JSON.stringify({n:betRound,b:bets}))}catch(e){}}
-try{const q=JSON.parse(localStorage.getItem('wheelP')||'null');if(q&&q.b&&q.b.length==8){bets=q.b;betRound=q.n}}catch(e){}
+function saveP(){}
+try{localStorage.removeItem('wheelP')}catch(e){}
 function setH(fin){const L=[];for(let k=fin;k>fin-40&&L.length<8;k--){const r=resultOf(k);if(r.i>=0)L.push(r.i)}H=L;renderH()}
 function startTicks(){clearInterval(siv);let last=-1;siv=setInterval(()=>{const m=new DOMMatrix(getComputedStyle(nd).transform),a=(Math.atan2(m.b,m.a)*180/Math.PI+360)%360,k=Math.floor(a/22.5);if(k!==last){last=k;snd(500+Math.random()*80,.05,'square',.06)}},30);setTimeout(()=>clearInterval(siv),5200)}
-function applyRound(k,live){
- const r=resultOf(k),had=k===betRound&&total()>0;let p=0;
- if(had&&r.i>=0)p=bets[r.i]*A[r.i][2];
- if(had){bal+=p;bets=A.map(()=>0);betRound=-1;saveP();ui()}
+const serverWheelResults=new Map(),serverWheelRequests=new Map();
+function resolveAnimalIndex(outcome){
+ const raw=outcome&&(outcome.animal??outcome.name??outcome.symbol??outcome.label);
+ if(raw!=null){
+  const value=String(raw).trim().toLowerCase();
+  const aliases={'نمر':'نمر','tiger':'نمر','أسد':'أسد','اسد':'أسد','lion':'أسد','فهد':'فهد','cheetah':'فهد','ذئب':'ذئب','ذيب':'ذئب','wolf':'ذئب','جمل':'جمل','camel':'جمل','حصان':'حصان','horse':'حصان','ماعز':'ماعز','goat':'ماعز','بقرة':'بقرة','cow':'بقرة'};
+  const name=aliases[value]||value;
+  const found=A.findIndex(a=>a[0]===name);
+  if(found>=0)return found;
+ }
+ const index=Number(outcome&&outcome.index);
+ if(Number.isInteger(index)&&index>=0&&index<A.length)return index;
+ throw new Error('اسم الحيوان الفائز غير معروف');
+}
+function wheelTarget(index){return A[index][1]+(Math.random()*16-8)}
+function requestWheelResult(k){
+ if(serverWheelResults.has(k))return Promise.resolve(serverWheelResults.get(k));
+ if(serverWheelRequests.has(k))return serverWheelRequests.get(k);
+ if(k!==betRound||total()<=0)return Promise.resolve(null);
+ const placed=bets.slice();
+ const task=migoGameCall('wheel-animals','spin',{bets:placed}).then(server=>{
+  const outcome=server&&server.outcome||{};
+  const index=resolveAnimalIndex(outcome);
+  const result={i:index,tg:wheelTarget(index),payout:Math.max(0,Math.floor(Number(server.payout)||0)),coins:Math.max(0,Math.floor(Number(server.coins)||0)),totalBet:Math.max(0,Math.floor(Number(server.bet)||0))};
+  serverWheelResults.set(k,result);bal=result.coins;ready=true;ui();return result;
+ }).catch(error=>{msg('تعذر اعتماد نتيجة العجلة: '+(error.message||'خطأ اتصال'),4000);throw error}).finally(()=>serverWheelRequests.delete(k));
+ serverWheelRequests.set(k,task);return task;
+}
+function beginWheelSpin(k,result){
+ const d=((result.tg-cur)%360+360)%360;cur+=1800+d;nd.style.transition='';nd.style.transform='rotate('+cur+'deg)';startTicks();spunN=k;
+}
+function applyRound(k,live,serverResult){
+ const had=k===betRound&&total()>0;
+ const r=had?serverResult:resultOf(k);
+ if(had&&!serverResult)return{had,p:0,pending:true};
+ const p=had?(serverResult.payout||0):0;
+ if(had){bal=serverResult.coins;bets=A.map(()=>0);betRound=-1;saveP();serverWheelResults.delete(k);ui()}
  if(live){
   if(r.i<0){msg('وقف بين الحيوانات — جولة بدون فائز',3500)}
   else{hits[r.i][0].classList.add('win');showWin(r.i,p);
@@ -89,13 +126,22 @@ function tick(){
  const now=Date.now(),n=Math.floor(now/CYC),t=now%CYC,fin=t>=SEND?n:n-1,c=document.getElementById('cd');
  if(n!==rn){rn=n;hits.forEach(([h])=>h.classList.remove('win'))}
  busy=t>=BET;
- if(t>=BET&&spunN<n){spunN=n;const r=resultOf(n),d=((r.tg-cur)%360+360)%360;
-  if(t<BET+600){cur+=1800+d;nd.style.transform='rotate('+cur+'deg)';startTicks()}
-  else{nd.style.transition='none';cur+=d;nd.style.transform='rotate('+cur+'deg)';void nd.offsetWidth;nd.style.transition=''}}
- if(doneN<fin){const live=fin===n&&t-SEND<1500;let away=0,any=false;
-  for(let k=doneN+1;k<=fin;k++){const o=applyRound(k,live&&k===fin);if(o.had){any=true;away+=o.p}}
-  doneN=fin;setH(fin);
-  if(!live&&any)msg(away?'أثناء غيابك ربحت '+F(away):'أثناء غيابك: جولات بدون ربح',4000)}
+ if(t>=BET&&spunN<n){
+  if(n===betRound&&total()>0){
+   requestWheelResult(n).then(result=>{if(result&&spunN<n)beginWheelSpin(n,result)}).catch(()=>{});
+  }else{beginWheelSpin(n,resultOf(n))}
+ }
+ if(doneN<fin){
+  const live=fin===n&&t-SEND<1500;let away=0,any=false,blocked=false;
+  for(let k=doneN+1;k<=fin;k++){
+   const had=k===betRound&&total()>0,serverResult=had?serverWheelResults.get(k):null;
+   if(had&&!serverResult){blocked=true;requestWheelResult(k).then(result=>{if(result&&spunN<k)beginWheelSpin(k,result)}).catch(()=>{});break}
+   const o=applyRound(k,live&&k===fin,serverResult);
+   if(o.pending){blocked=true;break}
+   if(o.had){any=true;away+=o.p}
+  }
+  if(!blocked){doneN=fin;setH(fin);if(!live&&any)msg(away?'أثناء غيابك ربحت '+F(away):'أثناء غيابك: جولات بدون ربح',4000)}
+ }
  if(t<BET){const s=Math.ceil((BET-t)/1000);if(c.textContent!=s){c.textContent=s;c.classList.remove('sp');if(s<=5)snd(800,.1,'square',.08)}}
  else{c.textContent='🎯';c.classList.add('sp')}
 }
@@ -103,5 +149,6 @@ function tick(){
  doneN=(betRound>=0&&total()>0)?Math.min(betRound-1,fin):fin;
  spunN=n-1;cur=resultOf(n-1).tg;nd.style.transition='none';nd.style.transform='rotate('+cur+'deg)';void nd.offsetWidth;nd.style.transition='';
  setH(fin);ui();tick();setInterval(tick,200)})();
-addEventListener('message',e=>{const d=e.data;if(d&&d.t==='bal'){bal=d.v;ready=true;ui()}});try{parent.postMessage({t:'get'},'*')}catch(e){}
-</script></body></html>
+addEventListener('message',e=>{const d=e.data;if(d&&d.t==='bal'&&Number.isFinite(Number(d.v))){bal=Math.max(0,Math.floor(Number(d.v)));ready=true;ui()}});try{parent.postMessage({t:'get'},'*')}catch(e){}
+</script>
+<script id="migo-server-game-rpc">(()=>{let n=0;const pending=new Map(),retryKeys=new Map();function key(){const a=new Uint8Array(18);crypto.getRandomValues(a);return 'g'+Array.from(a,x=>x.toString(16).padStart(2,'0')).join('')+(++n)}window.migoGameCall=(gameId,action,payload)=>new Promise((resolve,reject)=>{const sig=gameId+':'+action+':'+JSON.stringify(payload||{}),requestId=retryKeys.get(sig)||key(),timer=setTimeout(()=>{pending.delete(requestId);reject(new Error('انتهت مهلة اتصال اللعبة بالخادم'))},20000);retryKeys.set(sig,requestId);pending.set(requestId,{resolve,reject,timer,sig});parent.postMessage({t:'migo:game:request',gameId,action,payload,requestId},'*')});addEventListener('message',e=>{const d=e.data;if(!d||d.t!=='migo:game:response')return;const p=pending.get(d.requestId);if(!p)return;clearTimeout(p.timer);pending.delete(d.requestId);if(d.ok){retryKeys.delete(p.sig);p.resolve(d.result)}else p.reject(new Error(d.message||'تعذر تنفيذ الجولة'))})})();</script></body></html>

@@ -12,7 +12,19 @@
   async function api(path, options = {}) {
     const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
     if (token()) headers.Authorization = 'Bearer ' + token();
-    const response = await fetch(API + path, Object.assign({}, options, { headers }));
+    let response;
+    const method = String(options.method || 'GET').toUpperCase();
+    const requestOptions = Object.assign({}, options, { headers });
+    // Wallet polling must bypass browser/WebView ETag caching: a 304 has no JSON
+    // body and the API wrapper correctly treats it as a failed API response.
+    if (method === 'GET') requestOptions.cache = 'no-store';
+    try {
+      response = await fetch(API + path, requestOptions);
+      markNetworkOnline();
+    } catch (error) {
+      markNetworkOffline();
+      throw error;
+    }
     let data = {};
     try { data = await response.json(); } catch (_) {}
     if (!response.ok || data.ok === false) throw new Error(data.message || ('HTTP ' + response.status));
@@ -71,6 +83,54 @@
 
   const message = (text) => { const el = $id('aerr'); if (el) el.textContent = text; else if (typeof toast === 'function') toast(text); };
 
+  // Graceful offline gate: wait 7 seconds before blocking the app, then resume automatically.
+  let offlineTimer = null;
+  let offlineOverlay = null;
+  function showOfflineGate() {
+    if (offlineOverlay || !document.body) return;
+    offlineOverlay = document.createElement('div');
+    offlineOverlay.id = 'migo-offline-gate';
+    offlineOverlay.setAttribute('role', 'alert');
+    offlineOverlay.setAttribute('aria-live', 'assertive');
+    offlineOverlay.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:rgba(8,5,20,.97);color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,sans-serif;text-align:center';
+    const card = document.createElement('div');
+    card.style.cssText = 'width:100%;max-width:380px;background:#1a1035;border:1px solid #7542bb;border-radius:20px;padding:28px 22px;box-shadow:0 12px 50px #0009';
+    const title = document.createElement('h2');
+    title.textContent = '📡 الإنترنت لا يعمل';
+    title.style.cssText = 'font-size:23px;margin:0 0 12px;color:#ffc24a';
+    const note = document.createElement('p');
+    note.textContent = 'تأكد من اتصالك بالإنترنت. سيعود التطبيق للعمل تلقائياً بمجرد رجوع الاتصال.';
+    note.style.cssText = 'line-height:1.9;margin:0;color:#eee';
+    card.append(title, note);
+    offlineOverlay.append(card);
+    document.body.append(offlineOverlay);
+    document.body.style.overflow = 'hidden';
+  }
+  function clearOfflineGate() {
+    if (offlineTimer) clearTimeout(offlineTimer);
+    offlineTimer = null;
+    if (offlineOverlay) offlineOverlay.remove();
+    offlineOverlay = null;
+    if (!document.getElementById('migo-mandatory-update')) document.body.style.overflow = '';
+  }
+  function markNetworkOffline() {
+    if (offlineTimer || offlineOverlay) return;
+    offlineTimer = setTimeout(() => {
+      offlineTimer = null;
+      showOfflineGate();
+    }, 7000);
+  }
+  function markNetworkOnline() {
+    clearOfflineGate();
+  }
+  window.addEventListener('offline', markNetworkOffline);
+  window.addEventListener('online', () => {
+    markNetworkOnline();
+    if (typeof refreshWalletSafely === 'function') refreshWalletSafely();
+  });
+  if (navigator.onLine === false) markNetworkOffline();
+
+
   // Bind the existing owner Coins form to the server-authoritative wallet.
   // No new controls are added; only the existing username/amount/Execute form is handled.
   const ownerAdjustmentRetries = new WeakMap();
@@ -80,7 +140,10 @@
       let current = node.parentElement;
       for (let depth = 0; depth < 5 && current; depth++, current = current.parentElement) {
         const fields = Array.from(current.querySelectorAll('input'));
-        if (fields.some(x => /اسم المستخدم/.test(x.placeholder || '')) &&
+        // Accept both the original placeholder and the normalized ID placeholder.
+        // The first server-backed adjustment changes the placeholder, so matching
+        // only "اسم المستخدم" made later clicks fall through to the local handler.
+        if (fields.some(x => /اسم المستخدم|رقم ID المستخدم|رقم المعرف/i.test(x.placeholder || '')) &&
             fields.some(x => /العدد/.test(x.placeholder || ''))) { root = current; break; }
       }
     }
@@ -131,6 +194,16 @@
         })
       });
       ownerAdjustmentRetries.delete(form.root);
+      // Keep the owner's local user list in step with the committed server balance.
+      // The API remains authoritative; this only refreshes the presentation cache.
+      if (data && Number.isSafeInteger(Number(data.uid)) && Number.isFinite(Number(data.coins))) {
+        const targetKey = Object.keys(DB.users || {}).find(key =>
+          Number(DB.users[key] && DB.users[key].uid) === Number(data.uid));
+        if (targetKey) {
+          DB.users[targetKey].coins = Number(data.coins);
+          save();
+        }
+      }
       if (typeof toast === 'function') {
         toast((amount < 0 ? 'تم الخصم بنجاح' : 'تم الشحن بنجاح') +
           ' · الرصيد الحالي: ' + Number(data.coins).toLocaleString('ar-EG') + ' عملة');
@@ -147,6 +220,57 @@
     }
     return true;
   }
+  // Approve receipt-backed package top-ups on the server, not only in localStorage.
+  // The top-up request itself is local in this build; approval is the point where
+  // the canonical server wallet must be credited.
+  async function approveTopupOnServer(button) {
+    const index = Number(button && button.getAttribute('data-tok'));
+    const topup = Number.isInteger(index) && index >= 0 ? DB.topups[index] : null;
+    const user = topup && DB.users[topup.user];
+    const targetUid = Number(user && user.uid);
+    const amount = Number(topup && topup.amount);
+    if (!topup || topup.status !== 'pending' || !user ||
+        !Number.isSafeInteger(targetUid) || targetUid < 100000 ||
+        !Number.isSafeInteger(amount) || amount < 1) {
+      if (typeof toast === 'function') toast('طلب الشحن غير صالح أو تمت معالجته');
+      return;
+    }
+    if (button) button.disabled = true;
+    try {
+      const stableId = String(topup.id || '');
+      if (!/^\d{10,20}$/.test(stableId)) throw new Error('رقم طلب الشحن غير صالح');
+      const data = await api('/wallet/admin/adjust', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': 'topup-approval-' + stableId },
+        body: JSON.stringify({
+          targetUid,
+          amount,
+          description: 'اعتماد طلب شحن بإيصال' + (topup.pack ? ' · باقة ' + Number(topup.pack.coins || amount) : '')
+        })
+      });
+      // Only mark the receipt approved after the server confirms its atomic ledger write.
+      topup.status = 'ok';
+      user.coins = Number(data.coins);
+      if (typeof addCharge === 'function') addCharge(topup.user, amount);
+      if (typeof notifyUserResult === 'function') {
+        notifyUserResult(topup.user, 'تم تنفيذ شحن ' + amount.toLocaleString('ar-EG') +
+          ' عملة بنجاح. رصيدك الآن ' + Number(data.coins).toLocaleString('ar-EG') + ' عملة');
+      }
+      if (typeof logIt === 'function') logIt('مالك', 'شحن ' + amount + ' عملة لـ ' + (user.name || targetUid) + ' (إيصال)');
+      save();
+      if (typeof toast === 'function') toast('تم الشحن وحفظ الرصيد على الخادم');
+      if (typeof render === 'function') render();
+      window.dispatchEvent(new Event('migo:wallet-updated'));
+    } catch (error) {
+      if (typeof toast === 'function') {
+        toast('لم يتم تأكيد الشحن على الخادم: ' + (error.message || 'خطأ غير معروف') +
+          ' · الطلب لم يُعتمد محلياً، ويمكن إعادة المحاولة بأمان');
+      }
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
   document.addEventListener('submit', async event => {
     const form = findCoinsAdjustmentForm(event.target);
     if (!form) return;
@@ -157,7 +281,14 @@
   document.addEventListener('click', async event => {
     const button = event.target && event.target.closest &&
       event.target.closest('button,input[type="submit"]');
-    if (!button || !/تنفيذ/.test(button.textContent || button.value || '')) return;
+    if (!button) return;
+    if (button.hasAttribute('data-tok')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      await approveTopupOnServer(button);
+      return;
+    }
+    if (!/تنفيذ/.test(button.textContent || button.value || '')) return;
     const form = findCoinsAdjustmentForm(button);
     if (!form) return;
     event.preventDefault();
@@ -170,21 +301,109 @@
     const old = DB.users[key] || {};
     DB.users[key] = Object.assign(old, {
       name: user.displayName || user.username || ('عضو ' + user.uid),
-      username: user.username, phone: user.phone || '', uid: user.uid,
+      username: user.username, phone: user.phone || '', email: user.email || '', uid: user.uid,
       coins: Number(user.coins) || 0, role: user.role || 'user',
       avatar: user.avatar || '', pass: password ? await hash(password) : (old.pass || ''),
       serverId: user.id, serverBacked: true, banned: false
     });
     return key;
   };
+  // Add a country-aware registration contact form without replacing the existing auth screen.
+  function installInternationalContactFields() {
+    const phoneInput = $id('reg-phone');
+    if (!phoneInput || $id('reg-country')) return;
+    const countryWrap = document.createElement('div');
+    countryWrap.id = 'reg-phone-country-wrap';
+    countryWrap.style.cssText = 'display:flex;gap:8px;align-items:center;margin:8px 0;width:100%';
+    const countrySelect = document.createElement('select');
+    countrySelect.id = 'reg-country';
+    countrySelect.className = 'in';
+    countrySelect.setAttribute('aria-label', 'دولة رقم الهاتف');
+    countrySelect.style.cssText = 'flex:1;min-width:0;margin:0;direction:rtl';
+    countrySelect.innerHTML = '<option value="EG">🇪🇬 مصر (+20)</option>';
+    countryWrap.append(countrySelect);
+    phoneInput.insertAdjacentElement('beforebegin', countryWrap);
+
+    const emailInput = document.createElement('input');
+    emailInput.id = 'reg-email';
+    emailInput.type = 'email';
+    emailInput.className = 'in hide';
+    emailInput.autocomplete = 'email';
+    emailInput.inputMode = 'email';
+    emailInput.placeholder = 'البريد الإلكتروني (بديل رقم الهاتف)';
+    emailInput.setAttribute('aria-label', 'البريد الإلكتروني');
+    emailInput.style.cssText = 'width:100%;box-sizing:border-box';
+    phoneInput.insertAdjacentElement('afterend', emailInput);
+
+    let allCountries = [{ country: 'EG', callingCode: '+20', name: 'مصر' }];
+    const flagFor = code => String(code || '').toUpperCase().replace(/[A-Z]/g, c => String.fromCodePoint(127397 + c.charCodeAt(0)));
+    const renderCountries = () => {
+      const previous = countrySelect.value || 'EG';
+      const list = allCountries;
+      countrySelect.innerHTML = '';
+      list.forEach(c => {
+        const option = document.createElement('option');
+        option.value = c.country;
+        option.textContent = flagFor(c.country) + ' ' + c.name + ' (' + c.callingCode + ')';
+        countrySelect.append(option);
+      });
+      if (list.some(c => c.country === previous)) countrySelect.value = previous;
+      else if (list.some(c => c.country === 'EG')) countrySelect.value = 'EG';
+      else if (list.length) countrySelect.value = list[0].country;
+    };
+    api('/auth/phone-countries').then(data => {
+      if (Array.isArray(data.countries) && data.countries.length) {
+        allCountries = data.countries;
+        renderCountries();
+      }
+    }).catch(error => console.warn('Country list unavailable:', error.message));
+
+    const syncVisibility = () => {
+      const registering = !!(typeof reg !== 'undefined' && reg);
+      countryWrap.classList.toggle('hide', !registering);
+      emailInput.classList.toggle('hide', !registering);
+    };
+    const switchButton = $id('bsw');
+    if (switchButton && !switchButton.dataset.migoContactWrapped) {
+      const prior = switchButton.onclick;
+      switchButton.onclick = function () {
+        if (typeof prior === 'function') prior.apply(this, arguments);
+        syncVisibility();
+      };
+      switchButton.dataset.migoContactWrapped = '1';
+    }
+    syncVisibility();
+  }
+  installInternationalContactFields();
   const originalLogin = $id('bin') && $id('bin').onclick;
   if ($id('bin') && typeof originalLogin === 'function') {
     $id('bin').onclick = async () => {
-      const raw = ($id('u')?.value || '').trim();
-      const phone = ($id('reg-phone')?.value || '').trim();
+      const rawInput = ($id('u')?.value || '');
+      const raw = rawInput.normalize('NFKC').trim();
+      const phoneCountry = $id('reg-country')?.value || 'EG';
+      let phone = ($id('reg-phone')?.value || '').trim()
+        .replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+        .replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+        .replace(/[\s\u00a0\u200e\u200f\u202a-\u202e()-]/g,'');
+      if (phoneCountry === 'EG') {
+        if(/^01[0-9]{9}$/.test(phone)) phone='+20'+phone.slice(1);
+        else if(/^00201[0-9]{9}$/.test(phone)) phone='+20'+phone.slice(4);
+        else if(/^201[0-9]{9}$/.test(phone)) phone='+'+phone;
+      }
+      const email = ($id('reg-email')?.value || '').trim().toLowerCase();
       const password = $id('p')?.value || '';
       const registering = !!(typeof reg !== 'undefined' && reg);
-      if (!raw || !password) return message('أدخل بيانات الحساب');
+      if (!raw || !password) return message('أدخل اسم المستخدم وكلمة المرور');
+      if (registering) {
+        const usernameLength = [...raw].length;
+        if (usernameLength < 3) return message('اسم المستخدم يجب أن يكون 3 أحرف على الأقل');
+        if (usernameLength > 24) return message('اسم المستخدم يجب ألا يزيد عن 24 حرفاً');
+        if (!/^[\p{L}\p{N}_.-]+$/u.test(raw)) {
+          return message('اسم المستخدم يقبل الحروف والأرقام والشرطة والشرطة السفلية والنقطة فقط، دون مسافات');
+        }
+        if (!phone && !email) return message('أدخل رقم الهاتف أو البريد الإلكتروني');
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return message('البريد الإلكتروني غير صحيح');
+      }
       if (password.length < (registering ? 8 : 1)) return message(registering ? 'كلمة المرور يجب ألا تقل عن 8 أحرف' : 'أدخل كلمة المرور');
       const button = $id('bin');
       if (button) button.disabled = true;
@@ -192,7 +411,7 @@
         let data;
         if (registering) {
           data = await api('/auth/register', { method: 'POST', body: JSON.stringify({
-            username: raw, displayName: raw, phone, password
+            username: raw, displayName: raw, phone, phoneCountry, email, password
           }) });
         } else {
           data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ identifier: raw, password }) });
@@ -214,17 +433,86 @@
     };
   }
 
+  function applyServerWalletCoins(value) {
+    const coins = Math.max(0, Math.floor(Number(value) || 0));
+    if (typeof me !== 'undefined' && me && DB.users[me]) {
+      DB.users[me].coins = coins;
+      save();
+    }
+    const top = $id('mycoins');
+    if (top) top.textContent = coins.toLocaleString('en-US');
+    document.querySelectorAll('[data-server-wallet-balance]').forEach(node => {
+      node.textContent = coins.toLocaleString('en-US');
+    });
+    // Push the canonical server balance to every active game immediately.
+    const gameFrames = [$id('gf'), ...document.querySelectorAll('#migo-game-overlay iframe')].filter(Boolean);
+    gameFrames.forEach(frame => {
+      try { frame.contentWindow.postMessage({ t: 'bal', v: coins }, '*'); } catch (_) {}
+    });
+    return coins;
+  }
+
   async function refreshWallet() {
     if (!token() || typeof me === 'undefined' || !me || !DB.users[me]) return;
     const data = await api('/wallet');
-    DB.users[me].coins = Number(data.coins) || 0;
-    save();
-    const top = $id('mycoins');
-    if (top) top.textContent = DB.users[me].coins;
-    const walletBalance = document.querySelector('#main [data-server-wallet-balance]');
-    if (walletBalance) walletBalance.textContent = DB.users[me].coins;
+    applyServerWalletCoins(data.coins);
     return data;
   }
+
+  // The server is authoritative for incoming transfers and owner/agency credits.
+  // Refresh while the app is foregrounded so a recipient sees newly received coins
+  // without signing out or reopening the wallet. Pause polling while a game is open.
+  let walletRefreshBusy = false;
+  async function refreshWalletSafely() {
+    if (walletRefreshBusy || document.visibilityState === 'hidden') return;
+    walletRefreshBusy = true;
+    try { await refreshWallet(); }
+    catch (error) { console.warn('Server wallet sync pending:', error.message); }
+    finally { walletRefreshBusy = false; }
+  }
+  // Socket.IO delivers wallet changes immediately. Keep a slower foreground
+  // reconciliation as a fallback instead of polling twice every second.
+  // This avoids saturating the API and competing with game requests on mobile data.
+  setInterval(refreshWalletSafely, 15000);
+  window.addEventListener('focus', refreshWalletSafely);
+  document.addEventListener('visibilitychange', refreshWalletSafely);
+  window.addEventListener('migo:wallet-updated', refreshWalletSafely);
+
+  // Secure game-to-server bridge: the game iframe requests a server-settled
+  // round; it never supplies a resulting balance or payout.
+  function gameRequestKey(prefix) {
+    if (!window.crypto || !window.crypto.getRandomValues) throw new Error('تعذر تأمين الجولة');
+    const bytes = new Uint8Array(20);
+    window.crypto.getRandomValues(bytes);
+    return prefix + '-' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  }
+  window.addEventListener('message', async event => {
+    const request = event.data;
+    if (!gameFrameFor(event.source) || !request ||
+        request.t !== 'migo:game:slot-777:spin') return;
+    const reply = (payload) => {
+      try { event.source.postMessage(Object.assign({
+        t: 'migo:game:slot-777:result', requestId: request.requestId
+      }, payload), event.origin || '*'); } catch (_) {}
+    };
+    const bet = Number(request.bet);
+    if (typeof request.requestId !== 'string' || !/^[A-Za-z0-9_-]{16,80}$/.test(request.requestId) ||
+        !Number.isSafeInteger(bet) || bet <= 0) {
+      reply({ ok: false, message: 'بيانات الرهان غير صحيحة' });
+      return;
+    }
+    try {
+      const result = await api('/games/slot-777/spin', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': request.requestId },
+        body: JSON.stringify({ bet })
+      });
+      reply({ ok: true, result });
+      refreshWalletSafely();
+    } catch (error) {
+      reply({ ok: false, message: error.message || 'تعذر تنفيذ الجولة على الخادم' });
+    }
+  });
 
   // Keep the balance display synchronized with the server whenever the wallet opens.
   if (typeof rWallet === 'function') {
@@ -356,4 +644,216 @@
       if (typeof forceOut === 'function') forceOut('انتهت جلسة الدخول؛ سجّل الدخول مرة أخرى');
     });
   }
+
+  // Server-authoritative settlement bridge for every game iframe.
+  // Iframes submit bets/choices only; balances and payouts are never client supplied.
+  const GAME_ACTIONS = {
+    'slot-777:spin': '/games/slot-777/spin',
+    'ocean-storm:spin': '/games/ocean-storm/spin',
+    'wheel-animals:spin': '/games/wheel-animals/spin',
+    'fruit-luck:spin': '/games/fruit-luck/spin',
+    'big-warrior:fight': '/games/big-warrior/fight',
+    'cleopatra-gold:spin': '/games/cleopatra-gold/spin',
+    'rocket-crash:start': '/games/rocket-crash/start',
+    'rocket-crash:state': '/games/rocket-crash/state',
+    'rocket-crash:cashout': '/games/rocket-crash/cashout',
+    'rocket-crash:cancel': '/games/rocket-crash/cancel'
+  };
+  function gameFrameFor(source) {
+    const frames = [$id('gf'), document.querySelector('#migo-game-overlay iframe')].filter(Boolean);
+    return frames.find(frame => frame.contentWindow === source) || null;
+  }
+  function validateGameServerResult(gameId, action, result) {
+    if (!result || result.gameId !== gameId ||
+        !Number.isSafeInteger(Number(result.coins)) || Number(result.coins) < 0) {
+      throw new Error('رد الخادم غير مكتمل: لم يتم تأكيد رصيد الجولة');
+    }
+    if (action === 'state') return result;
+    if (typeof result.roundId !== 'string' || !result.roundId) {
+      throw new Error('رد الخادم لا يحتوي على رقم الجولة');
+    }
+    if (action === 'start') {
+      if (!Number.isFinite(Number(result.startAt))) throw new Error('بيانات بدء الجولة غير مكتملة');
+      return result;
+    }
+    if (action === 'cancel') {
+      if (!Number.isFinite(Number(result.refunded))) throw new Error('بيانات استرداد الرهان غير مكتملة');
+      return result;
+    }
+    if (action === 'cashout') {
+      if (!Number.isFinite(Number(result.payout))) throw new Error('بيانات سحب الأرباح غير مكتملة');
+      return result;
+    }
+    if (!Number.isFinite(Number(result.payout)) || !result.outcome || typeof result.outcome !== 'object') {
+      throw new Error('نتيجة اللعبة أو قيمة الربح غير مكتملة من الخادم');
+    }
+    const o = result.outcome;
+    if (gameId === 'slot-777' &&
+        (!Array.isArray(o.grid) || o.grid.length !== 5 || o.grid.some(col => !Array.isArray(col) || col.length !== 3))) {
+      throw new Error('شبكة نتيجة سلوت 777 غير مكتملة');
+    }
+    if (gameId === 'ocean-storm' &&
+        (!Array.isArray(result.grid) || result.grid.length !== 6 || result.grid.some(col => !Array.isArray(col) || col.length !== 5))) {
+      throw new Error('شبكة نتيجة عاصفة المحيط غير مكتملة');
+    }
+    if (gameId === 'wheel-animals' &&
+        (!Number.isInteger(Number(o.index)) || Number(o.index) < 0 || Number(o.index) > 7 ||
+         typeof o.animal !== 'string' || !o.animal)) {
+      throw new Error('الحيوان الفائز غير محدد بشكل صحيح من الخادم');
+    }
+    if (gameId === 'fruit-luck' && !['m', '77', 'o'].includes(o.result)) {
+      throw new Error('رمز نتيجة الفواكه غير صحيح');
+    }
+    if (gameId === 'big-warrior' && !['lion', 'tiger', 'draw'].includes(o.winner)) {
+      throw new Error('الفائز في المحارب الكبير غير محدد من الخادم');
+    }
+    if (gameId === 'cleopatra-gold' &&
+        (!Array.isArray(o.grid) || o.grid.length !== 5 || o.grid.some(col => !Array.isArray(col) || col.length !== 4))) {
+      throw new Error('شبكة نتيجة ذهب كليوباترا غير مكتملة');
+    }
+    return result;
+  }
+
+  window.addEventListener('message', async event => {
+    const request = event.data;
+    if (!request || request.t !== 'migo:game:request' || !gameFrameFor(event.source)) return;
+    const endpoint = GAME_ACTIONS[String(request.gameId || '') + ':' + String(request.action || '')];
+    const requestId = String(request.requestId || '');
+    const reply = payload => {
+      try { event.source.postMessage(Object.assign({ t: 'migo:game:response', requestId }, payload), event.origin || '*'); } catch (_) {}
+    };
+    if (!endpoint || !/^[A-Za-z0-9_-]{16,80}$/.test(requestId)) {
+      reply({ ok: false, message: 'طلب اللعبة غير صالح' });
+      return;
+    }
+    try {
+      const options = {
+        method: 'POST',
+        body: JSON.stringify(request.payload && typeof request.payload === 'object' ? request.payload : {})
+      };
+      if (request.action !== 'state') options.headers = { 'Idempotency-Key': requestId };
+      const result = validateGameServerResult(String(request.gameId), String(request.action), await api(endpoint, options));
+      if (result && Number.isFinite(Number(result.coins))) {
+        const coins = applyServerWalletCoins(result.coins);
+        window.dispatchEvent(new CustomEvent('migo:wallet-updated', {
+          detail: { coins, source: 'server-game' }
+        }));
+      }
+      reply({ ok: true, result });
+      if (result && Number.isFinite(Number(result.coins))) refreshWalletSafely();
+    } catch (error) {
+      if (request.gameId === 'wheel-animals' && Number.isSafeInteger(Number(error && error.coins))) { const coins = applyServerWalletCoins(Number(error.coins)); window.dispatchEvent(new CustomEvent('migo:wallet-updated', { detail: { coins, source: 'server-game-rejected' } })); reply({ ok: false, message: error.message || 'تعذر تنفيذ الجولة', coins }); } else reply({ ok: false, message: error && error.message ? error.message : 'تعذر تنفيذ الجولة على الخادم' });
+    }
+  });
+
+
+  function openMemberManagement() {
+    if (document.getElementById('migo-member-admin')) return;
+    const root=document.createElement('section'); root.id='migo-member-admin'; root.dir='rtl';
+    root.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#100827;color:#fff;overflow:auto;padding:18px 14px 36px;font-family:system-ui,sans-serif';
+    root.innerHTML='<style>#migo-member-admin *{box-sizing:border-box}#migo-member-admin .h{display:flex;justify-content:space-between;align-items:center;margin:5px 0 18px}#migo-member-admin .t{font-size:22px;font-weight:900;color:#f4d48b}#migo-member-admin button,#migo-member-admin input,#migo-member-admin select{border:1px solid #6940a6;background:#28134b;color:#fff;border-radius:11px;padding:11px;font-weight:700}#migo-member-admin input{width:100%;background:#1c1038;margin-bottom:9px}#migo-member-admin .filters{display:grid;grid-template-columns:1fr 120px;gap:8px}#migo-member-admin .card{background:linear-gradient(135deg,#241044,#180b32);border:1px solid #55328a;border-radius:16px;padding:13px;margin:10px 0}#migo-member-admin .meta{font-size:12px;color:#c7b5e9;line-height:1.8}#migo-member-admin .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}#migo-member-admin .bad{background:#5b1736}#migo-member-admin .good{background:#174b3d}#migo-member-admin .stats{color:#d8c8f5;font-size:13px;margin:8px 0}</style><header class="h"><b class="t">إدارة الأعضاء</b><button id="ma-close">إغلاق ✕</button></header><div class="filters"><input id="ma-q" placeholder="ابحث بالاسم أو رقم ID"><select id="ma-status"><option value="">كل الأعضاء</option><option value="active">النشطون</option><option value="banned">المحظورون</option></select></div><div class="stats" id="ma-stats">جارٍ التحميل…</div><div id="ma-list"></div><button id="ma-more" style="width:100%;display:none">عرض المزيد</button>';
+    document.body.append(root);
+    const list=root.querySelector('#ma-list'),stats=root.querySelector('#ma-stats'),more=root.querySelector('#ma-more');
+    let page=1,total=0,busy=false,q='';
+    const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const fmt=n=>Number(n||0).toLocaleString('ar-EG');
+    async function load(reset){if(busy)return;busy=true;more.disabled=true;if(reset){page=1;list.innerHTML='';stats.textContent='جارٍ تحميل الأعضاء…'}
+      try{const p=new URLSearchParams({page:String(page),limit:'30',q,status:root.querySelector('#ma-status').value});const d=await api('/admin/users?'+p);
+        total=Number(d.total||0);(d.users||[]).forEach(u=>{const c=document.createElement('article');c.className='card';c.innerHTML='<b>'+esc(u.displayName)+'</b><div class="meta">ID: '+esc(u.uid)+' · @'+esc(u.username)+'<br>الرصيد: '+fmt(u.coins)+' عملة · '+(u.status==='banned'?'محظور':'نشط')+' · '+(u.role==='admin'?'مشرف':'عضو')+'</div>';
+          if(u.role!=='owner'){const a=document.createElement('div');a.className='actions';const add=(label,fn,cl='')=>{const b=document.createElement('button');b.textContent=label;if(cl)b.classList.add(cl);b.onclick=fn;a.append(b)};
+            add('تعديل الاسم',async()=>{const v=prompt('اسم العرض الجديد:',u.displayName||'');if(v===null)return;try{await api('/admin/users/'+u.uid,{method:'PATCH',body:JSON.stringify({displayName:v})});load(true)}catch(e){alert(e.message)}});
+            add(u.role==='admin'?'إلغاء المشرف':'جعله مشرفاً',async()=>{if(!confirm('تأكيد تغيير صلاحية العضو؟'))return;try{await api('/admin/users/'+u.uid,{method:'PATCH',body:JSON.stringify({role:u.role==='admin'?'user':'admin'})});load(true)}catch(e){alert(e.message)}});
+            add('تسجيل خروج',async()=>{if(!confirm('إنهاء جلسة العضو على جميع الأجهزة؟'))return;try{await api('/admin/users/'+u.uid+'/logout',{method:'POST',body:'{}'});alert('تم إنهاء الجلسة')}catch(e){alert(e.message)}});
+            add(u.status==='banned'?'فك الحظر':'حظر العضو',async()=>{if(!confirm('تأكيد '+(u.status==='banned'?'فك حظر':'حظر')+' العضو؟'))return;try{await api('/admin/users/'+u.uid+'/'+(u.status==='banned'?'unban':'ban'),{method:'POST',body:'{}'});load(true)}catch(e){alert(e.message)}},u.status==='banned'?'good':'bad');c.append(a)}
+          list.append(c)});
+        stats.textContent='إجمالي الأعضاء: '+fmt(total)+' · المعروض: '+fmt(list.children.length);more.style.display=list.children.length<total?'block':'none';page++;
+      }catch(e){stats.textContent=e.message||'تعذر تحميل الأعضاء';if(!list.children.length)list.textContent='تأكد من تسجيل الدخول بحساب المالك ونشر تحديث إدارة الأعضاء.';more.style.display='none'}finally{busy=false;more.disabled=false}}
+    root.querySelector('#ma-close').onclick=()=>root.remove();more.onclick=()=>load(false);root.querySelector('#ma-status').onchange=()=>load(true);
+    let timer;root.querySelector('#ma-q').oninput=e=>{clearTimeout(timer);timer=setTimeout(()=>{q=e.target.value.trim();load(true)},300)};load(true);
+  }
+  document.addEventListener('click',event=>{if(event.target.closest('#migo-member-admin'))return;let n=event.target;for(let i=0;n&&i<7;i++,n=n.parentElement){const t=String(n.innerText||n.textContent||'').replace(/[›❯>]/g,'').trim();if(t==='الأعضاء'||(t.startsWith('الأعضاء')&&t.length<45)){event.preventDefault();event.stopImmediatePropagation();openMemberManagement();return}}},true);
+
+
+  // Shared owner settings: persisted centrally and pushed to every connected app.
+  let sharedPublicSettings = {};
+  let sharedSettingsRevision = 0;
+  function applySharedSettings(payload, source) {
+    if (!payload || !payload.settings || typeof payload.settings !== 'object') return;
+    sharedPublicSettings = payload.settings;
+    sharedSettingsRevision = Number(payload.revision || sharedSettingsRevision || 0);
+    try {
+      localStorage.setItem('migo_public_settings_v1', JSON.stringify({
+        settings: sharedPublicSettings, revision: sharedSettingsRevision,
+        updatedAt: payload.updatedAt || null
+      }));
+    } catch (_) {}
+    window.dispatchEvent(new CustomEvent('migo:settings-updated', {
+      detail: { settings: sharedPublicSettings, revision: sharedSettingsRevision,
+        updatedAt: payload.updatedAt || null, source: source || 'server' }
+    }));
+  }
+  async function refreshSharedSettings() {
+    try {
+      const payload = await api('/app-settings/public');
+      applySharedSettings(payload, 'server');
+      return sharedPublicSettings;
+    } catch (error) {
+      // Keep the last server-confirmed cache visible during temporary outages.
+      try {
+        const cached = JSON.parse(localStorage.getItem('migo_public_settings_v1') || '{}');
+        if (cached.settings && typeof cached.settings === 'object') {
+          sharedPublicSettings = cached.settings;
+          sharedSettingsRevision = Number(cached.revision || 0);
+        }
+      } catch (_) {}
+      throw error;
+    }
+  }
+  window.MigoSettings = Object.freeze({
+    get: () => sharedPublicSettings,
+    refresh: refreshSharedSettings,
+    update: async patch => {
+      if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('بيانات الإعدادات غير صالحة');
+      const payload = await api('/app-settings/owner', {
+        method: 'PUT', body: JSON.stringify({ settings: patch })
+      });
+      applySharedSettings(payload, 'owner-save');
+      return payload;
+    }
+  });
+
+  // Authenticated live updates from the API. Reconnects re-read canonical data.
+  (function installOwnerLiveSync(){
+    if(window.__migoLiveSyncInstalled)return;window.__migoLiveSyncInstalled=true;
+    const script=document.createElement('script');
+    script.src=API.replace(/\/api$/,'')+'/socket.io/socket.io.js';script.async=true;
+    script.onload=()=>{
+      if(typeof window.io!=='function')return;
+      let socket=null;
+      const connectNow=()=>{
+        if(socket||!token())return;
+        socket=window.io(API.replace(/\/api$/,''),{transports:['websocket','polling'],auth:{token:token()},reconnection:true,reconnectionDelay:1000,reconnectionDelayMax:10000,timeout:15000});
+        window.migoLiveSocket=socket;
+        const resync=()=>{if(typeof refreshWalletSafely==='function')refreshWalletSafely();refreshSharedSettings().catch(()=>{});window.dispatchEvent(new Event('migo:live-sync'));};
+        socket.on('connect',resync);
+        socket.on('wallet:updated',payload=>{
+          if(payload&&Number.isFinite(Number(payload.coins))){
+            try{const uid=Number(payload.uid),key=Object.keys(DB.users||{}).find(k=>Number(DB.users[k]&&DB.users[k].uid)===uid);if(key){DB.users[key].coins=Number(payload.coins);if(typeof save==='function')save();}}catch(_){}
+            if(typeof refreshWalletSafely==='function')refreshWalletSafely();
+            window.dispatchEvent(new CustomEvent('migo:wallet-updated',{detail:payload}));
+          }
+        });
+        socket.on('owner:settings-updated',payload=>applySharedSettings(payload,'realtime'));
+        socket.on('owner:announcement',payload=>{const msg=String(payload&&payload.message||'').trim();if(msg&&typeof toast==='function')toast(msg);window.dispatchEvent(new CustomEvent('migo:announcement',{detail:payload||{}}));});
+        socket.on('owner:policy-updated',payload=>{window.dispatchEvent(new CustomEvent('migo:policy-updated',{detail:payload||{}}));if(payload&&payload.kind==='app-update'&&typeof checkMandatoryUpdate==='function')checkMandatoryUpdate();if(payload&&payload.kind==='game-control')window.dispatchEvent(new Event('migo:games-updated'));});
+        socket.on('owner:member-updated',payload=>window.dispatchEvent(new CustomEvent('migo:member-updated',{detail:payload||{}})));
+        socket.on('auth:revoked',payload=>{alert(String(payload&&payload.message||'تم إيقاف هذا الحساب'));if(typeof logout==='function')logout();});
+        socket.on('auth:session-replaced',payload=>{alert(String(payload&&payload.message||'تم إنهاء جلسة الحساب'));if(typeof logout==='function')logout();});
+      };
+      connectNow();
+      const waitForLogin=setInterval(()=>{if(!socket)connectNow();else clearInterval(waitForLogin);},1000);
+    };
+    script.onerror=()=>{window.__migoLiveSyncInstalled=false;};document.head.append(script);
+  })();
+
 })();

@@ -207,21 +207,30 @@ async function freeSpins(n){
   await banner("إجمالي الربح",fmt(sum),2800);
   fm=0;setFm();$("last").textContent=fmt(sum);say("انتهت اللفات المجانية — ربحت "+fmt(sum));
 }
+function applyServerGrid(grid){
+  if(!Array.isArray(grid))return;
+  for(var c=0;c<COLS;c++)for(var r=0;r<ROWS;r++){
+    var cell=grid[c]&&grid[c][r],d=g[c]&&g[c][r];if(!cell||!d)continue;
+    d.t=cell.type==="symbol"?"s":cell.type==="scatter"?"sc":"orb";
+    d.v=cell.type==="symbol"?Number(cell.symbol):Number(cell.value);
+    var h=d.t==="s"?(ICON[d.v]||""):d.t==="sc"?'<div class="sc"></div>':'<div class="orb">'+d.v+'x</div>';
+    d.el.querySelector(".sy").innerHTML=h;
+  }
+}
 async function press(buy){
   if(busy)return;busy=true;lock(true);
-  var c=buy?bet()*100:cost();
-  if(bal<c){say("الرصيد لا يكفي");busy=false;lock(false);auto=false;sync();if(bal<10)offerReset();return}
-  bal-=c;upd();$("last").textContent="0";say("حظًا موفقًا!");
+  var selectedBet=bet();$("last").textContent="0";say("جارٍ اعتماد الجولة على الخادم...");
   try{
-    if(buy){await fillAll();var rb=await tumbleRound();await payout(Math.min(rb.mult?rb.total*rb.mult:rb.total,cap()))}
-    else{
-      await fillAll();
-      var r=await tumbleRound(),w=r.mult?r.total*r.mult:r.total;w=Math.min(w,cap());
-      if(r.mult&&r.total>0)say("المضاعف الكلي ×"+r.mult);
-      await payout(w);
-      if(scCount()>=4)await freeSpins(15);
-    }
-  }catch(e){console.error(e)}
+    var server=await migoGameCall("ocean-storm","spin",{bet:selectedBet,ante:!!ante,buyFeature:!!buy});
+    await fillAll();
+    applyServerGrid(server.grid);
+    bal=Math.max(0,Math.floor(Number(server.coins)||0));upd();
+    var win=Math.max(0,Math.floor(Number(server.payout)||0));
+    if(server.outcome&&server.outcome.orbMultiplier)say("المضاعف الكلي ×"+server.outcome.orbMultiplier);
+    if(win>0){addWin(win);$("last").textContent=fmt(win);showWin(fmt(win));beep(880,.3,"square",.05);beep(1180,.4,"triangle",.05);say("فزت بـ "+fmt(win));await sleep(1000);hideWin()}
+    var freeCount=Number(server.outcome&&server.outcome.freeSpinsAwarded)||0;
+    if(freeCount>0)await banner("🌩️ لفات مجانية!",freeCount+" لفة تم احتسابها على الخادم");
+  }catch(e){say(e&&e.message?e.message:"تعذر تنفيذ الجولة على الخادم");console.error(e)}
   busy=false;lock(false);
   if(bal<BETS[0]){offerReset();return}
   if(auto)setTimeout(function(){press()},400);
@@ -244,5 +253,7 @@ var free=Math.max(0,ab.bottom-pb-last),top0=bb.top-ab.top,want=innerHeight/2-(ab
 b.style.marginTop=Math.max(0,Math.min(want,free))+'px'}
 function q(){cancelAnimationFrame(raf);raf=requestAnimationFrame(c)}
 addEventListener('resize',q);addEventListener('load',q);document.addEventListener('DOMContentLoaded',q);
-try{new ResizeObserver(q).observe(b)}catch(e){}q()})();</script></body>
+try{new ResizeObserver(q).observe(b)}catch(e){}q()})();</script>
+<script id="migo-server-game-rpc">(()=>{let n=0;const pending=new Map(),retryKeys=new Map();function key(){const a=new Uint8Array(18);crypto.getRandomValues(a);return 'g'+Array.from(a,x=>x.toString(16).padStart(2,'0')).join('')+(++n)}window.migoGameCall=(gameId,action,payload)=>new Promise((resolve,reject)=>{const sig=gameId+':'+action+':'+JSON.stringify(payload||{}),requestId=retryKeys.get(sig)||key(),timer=setTimeout(()=>{pending.delete(requestId);reject(new Error('انتهت مهلة اتصال اللعبة بالخادم'))},20000);retryKeys.set(sig,requestId);pending.set(requestId,{resolve,reject,timer,sig});parent.postMessage({t:'migo:game:request',gameId,action,payload,requestId},'*')});addEventListener('message',e=>{const d=e.data;if(!d||d.t!=='migo:game:response')return;const p=pending.get(d.requestId);if(!p)return;clearTimeout(p.timer);pending.delete(d.requestId);if(d.ok){retryKeys.delete(p.sig);p.resolve(d.result)}else p.reject(new Error(d.message||'تعذر تنفيذ الجولة'))})})();</script>
+</body>
 </html>
