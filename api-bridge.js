@@ -742,7 +742,7 @@
       reply({ ok: true, result });
       if (result && Number.isFinite(Number(result.coins))) refreshWalletSafely();
     } catch (error) {
-      reply({ ok: false, message: error && error.message ? error.message : 'تعذر تنفيذ الجولة على الخادم' });
+      if (request.gameId === 'wheel-animals' && Number.isSafeInteger(Number(error && error.coins))) { const coins = applyServerWalletCoins(Number(error.coins)); window.dispatchEvent(new CustomEvent('migo:wallet-updated', { detail: { coins, source: 'server-game-rejected' } })); reply({ ok: false, message: error.message || 'تعذر تنفيذ الجولة', coins }); } else reply({ ok: false, message: error && error.message ? error.message : 'تعذر تنفيذ الجولة على الخادم' });
     }
   });
 
