@@ -65,7 +65,7 @@ let H=[];
 function renderH(){const hs=document.getElementById('hs'),bg=BG;hs.innerHTML='';for(let k=0;k<8;k++){const e=document.createElement('i'),a=A[H[k]];if(a){e.style.backgroundImage=bg;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%'}hs.appendChild(e)}}
 const GAP=[22,65,108.7,155.5,205,251.7,294.5,337.7];
 let settlingRounds=false;
-function showWin(i,p){let w=document.getElementById('wv');if(!w){w=document.createElement('div');w.id='wv';w.className='wv';w.innerHTML='<i id="wi"></i><b id="wn"></b><span id="wa"></span>';document.body.appendChild(w)}const a=A[i],e=document.getElementById('wi');e.style.backgroundImage=BG;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%';document.getElementById('wn').textContent=a[0]+' ×'+a[2];document.getElementById('wa').textContent=p>0?'ربحت '+F(p):(p<0?'آخر نتيجة':'حظ أوفر');e.style.animation='none';void e.offsetWidth;e.style.animation='';w.classList.add('s');clearTimeout(showWin.t);showWin.t=setTimeout(()=>w.classList.remove('s'),3000)}
+function showWin(i,p){let w=document.getElementById('wv');if(!w){w=document.createElement('div');w.id='wv';w.className='wv';w.innerHTML='<i id="wi"></i><b id="wn"></b><span id="wa"></span>';document.body.appendChild(w)}const a=A[i],e=document.getElementById('wi');e.style.backgroundImage=BG;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%';document.getElementById('wn').textContent='الفائز: '+a[0]+' ×'+a[2];document.getElementById('wa').textContent=p>0?'ربحت '+F(p):(p<0?'آخر نتيجة':'حظ أوفر');e.style.animation='none';void e.offsetWidth;e.style.animation='';w.classList.add('s');clearTimeout(showWin.t);showWin.t=setTimeout(()=>w.classList.remove('s'),3000)}
 const CYC=34000,BET=25000,SEND=30200;
 function rng(n){let a=(n*2654435761)>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function resultOf(n){const r=rng(n);const w=A.map(a=>1/a[2]),s=w.reduce((a,b)=>a+b);let x=r()*s,k=0;for(;k<7;k++){x-=w[k];if(x<=0)break}return{i:k,tg:A[k][1]+(r()*16-8)}}
@@ -78,7 +78,10 @@ async function applyRound(k,live){
  let r=resultOf(k),had=k===betRound&&total()>0,p=0;
  if(had){
   const server=await migoGameCall('wheel-animals','spin',{bets:bets.slice()});
-  const index=Number(server.outcome.index);
+  const rawAnimal=server.outcome.animal??server.outcome.name??server.outcome.symbol??server.outcome.label;
+  const aliases={'نمر':'نمر','tiger':'نمر','أسد':'أسد','اسد':'أسد','lion':'أسد','فهد':'فهد','cheetah':'فهد','ذئب':'ذئب','wolf':'ذئب','جمل':'جمل','camel':'جمل','حصان':'حصان','horse':'حصان','ماعز':'ماعز','goat':'ماعز','بقرة':'بقرة','cow':'بقرة'};
+  const named=rawAnimal==null?-1:A.findIndex(a=>a[0]===(aliases[String(rawAnimal).trim().toLowerCase()]||String(rawAnimal).trim()));
+  const index=named>=0?named:Number(server.outcome.index);
   r={i:Number.isInteger(index)?index:-1,tg:r.tg};
   p=Math.max(0,Number(server.payout)||0);
   bal=Math.max(0,Math.floor(Number(server.coins)||0));
