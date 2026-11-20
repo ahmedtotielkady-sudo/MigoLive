@@ -106,8 +106,7 @@ const RK=new Image();RK.src='data:image/webp;base64,UklGRkJOAABXRUJQVlA4WAoAAAAQ
 const cv=$('#cv'),cx=cv.getContext('2d');let W=0,H=0,stars=[];
 function size(){const r=cv.getBoundingClientRect(),d=devicePixelRatio||1;W=r.width;H=r.height;cv.width=W*d;cv.height=H*d;cx.setTransform(d,0,0,d,0,0);initWorld()}
 addEventListener('resize',size);
-function genCP(){const u=Math.random();return Math.min(22,Math.max(1,Math.floor(96/(1-u))/100))}
-function startWait(){crashPending=false;state='wait';t0=performance.now()+5000;cp=genCP();pts=[];mult=1;if(bet.st=='queued')bet.st='live';else if(bet.st=='cashed'||bet.st=='lost')bet={amt:0,st:'none',win:0};res='';ui()}
+function startWait(){crashPending=false;state='wait';t0=performance.now()+5000;cp=1;pts=[];mult=1;if(bet.st=='queued')bet.st='live';else if(bet.st=='cashed'||bet.st=='lost')bet={amt:0,st:'none',win:0};res='';ui()}
 function startFly(){state='fly';t0=performance.now();pts=[[0,1]];beep(110,1.3,'sawtooth',.05,520);ui()}
 function crash(){crashPending=false;state='crash';crashT=performance.now();mult=cp;hist.unshift(cp);hist=hist.slice(0,10);beep(170,.55,'sawtooth',.12,40);
  if(bet.st=='live'){res=`💥 انفجر · خسرت ${fmt(bet.amt)}`;bet={amt:0,st:'none',win:0};serverRoundId=''}
@@ -220,7 +219,7 @@ function tick(){
  const n=performance.now();
  if(state=='wait'){if(n>=t0)startFly()}
  else if(state=='fly'){
-  const t=(n-t0)/1000;const local=Math.min(22,Math.exp(.13*Math.max(0,t)));mult=local;if(local>=22&&!crashPending){crashPending=true;$('#cash').disabled=true;}if(!serverStateBusy&&n-lastServerState>250){lastServerState=n;pollRocketState()}
+  const t=(n-t0)/1000;const local=Math.min(22,Math.exp(.13*Math.max(0,t)));mult=local;if(local>=22&&!crashPending){crashPending=true;$('#cash').disabled=true;lastServerState=0;pollRocketState();}if(!serverStateBusy&&n-lastServerState>250){lastServerState=n;pollRocketState()}
   pts.push([t,mult]);const sm=$('#cash small');if(sm&&bet.st=='live')sm.textContent=fmt(bet.amt*mult)+' 🪙';
  }
  ov();draw();requestAnimationFrame(tick);
