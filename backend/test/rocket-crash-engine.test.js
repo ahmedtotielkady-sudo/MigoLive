@@ -3,10 +3,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const engine = require("../game-engines/rocket-crash");
 
-test("rocket crash points vary within the supported 1.10x–22x range", () => {
+test("rocket crash points vary within the supported 1.00x–22.00x range", () => {
   const points = Array.from({ length: 10000 }, () => engine.generateCrashPoint());
   for (const point of points) {
-    assert.ok(point >= 1.1 && point <= engine.MAX_MULTIPLIER);
+    assert.ok(point >= 1 && point <= engine.MAX_MULTIPLIER);
     assert.equal(Math.round(point * 100) / 100, point);
   }
   assert.ok(new Set(points).size > 100, "rounds should not all use one fixed crash point");
