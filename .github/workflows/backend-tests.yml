@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/global-phone-registration-2026-11-20
+      - hotfix/game-control-api-production-2026-11-19
   pull_request:
     paths:
       - "backend/**"
