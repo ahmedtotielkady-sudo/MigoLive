@@ -97,6 +97,7 @@ router.post("/:uid/ban", async (req, res, next) => {
     const io = req.app.get("io");
     if (io) {
       const room = "user:" + String(target._id);
+      io.emit("owner:member-updated", { uid: target.uid, action: "banned", status: "banned" });
       io.to(room).emit("auth:revoked", { message: "تم إيقاف هذا الحساب" });
       io.in(room).disconnectSockets(true);
     }
@@ -118,6 +119,8 @@ router.post("/:uid/unban", async (req, res, next) => {
     target.activeSessionId = null;
     target.activeSessionExpiresAt = null;
     await target.save();
+    const io = req.app.get("io");
+    if (io) io.emit("owner:member-updated", { uid: target.uid, action: "unbanned", status: "active" });
     return res.json({ ok: true, user: memberView(target) });
   } catch (error) { return next(error); }
 });
@@ -155,6 +158,8 @@ router.patch("/:uid", async (req, res, next) => {
     }
     Object.assign(target, updates);
     await target.save();
+    const io = req.app.get("io");
+    if (io) io.to("user:" + String(target._id)).emit("owner:member-updated", { uid: target.uid, action: "profile-updated", user: memberView(target) });
     return res.json({ ok: true, user: memberView(target) });
   } catch (error) { return next(error); }
 });
@@ -177,6 +182,7 @@ router.post("/:uid/logout", async (req, res, next) => {
     const io = req.app.get("io");
     if (io) {
       const room = "user:" + String(target._id);
+      io.emit("owner:member-updated", { uid: target.uid, action: "logout" });
       io.to(room).emit("auth:session-replaced", { message: "تم إنهاء جلسة الحساب بواسطة الإدارة" });
       io.in(room).disconnectSockets(true);
     }
