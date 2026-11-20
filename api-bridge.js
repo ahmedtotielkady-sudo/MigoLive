@@ -378,7 +378,8 @@
   const originalLogin = $id('bin') && $id('bin').onclick;
   if ($id('bin') && typeof originalLogin === 'function') {
     $id('bin').onclick = async () => {
-      const raw = ($id('u')?.value || '').trim();
+      const rawInput = ($id('u')?.value || '');
+      const raw = rawInput.normalize('NFKC').trim();
       const phoneCountry = $id('reg-country')?.value || 'EG';
       let phone = ($id('reg-phone')?.value || '').trim()
         .replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d))
@@ -397,6 +398,9 @@
         const usernameLength = [...raw].length;
         if (usernameLength < 3) return message('اسم المستخدم يجب أن يكون 3 أحرف على الأقل');
         if (usernameLength > 24) return message('اسم المستخدم يجب ألا يزيد عن 24 حرفاً');
+        if (!/^[\\p{L}\\p{N}_.-]+$/u.test(raw)) {
+          return message('اسم المستخدم يقبل الحروف والأرقام والشرطة والشرطة السفلية والنقطة فقط، دون مسافات');
+        }
         if (!phone && !email) return message('أدخل رقم الهاتف أو البريد الإلكتروني');
         if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return message('البريد الإلكتروني غير صحيح');
       }
