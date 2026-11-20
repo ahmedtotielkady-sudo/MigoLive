@@ -867,6 +867,14 @@
       .migo-royal-nav-icon svg{width:100%;height:100%;overflow:visible}
       .migo-royal-nav-item{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:1px!important}
       .migo-royal-nav-item .migo-royal-nav-icon{pointer-events:none}
+      /* Remove the old unread-count bubble from the messages tab only. */
+      .migo-royal-nav-item[data-migo-nav-key="messages"] .badge,
+      .migo-royal-nav-item[data-migo-nav-key="messages"] .unread-badge,
+      .migo-royal-nav-item[data-migo-nav-key="messages"] .notification-badge,
+      .migo-royal-nav-item[data-migo-nav-key="messages"] .nav-badge,
+      .migo-royal-nav-item[data-migo-nav-key="messages"] [data-badge],
+      .migo-royal-nav-item[data-migo-nav-key="messages"] .count,
+      .migo-royal-nav-item[data-migo-nav-key="messages"] .message-count{display:none!important;visibility:hidden!important;}
       .migo-royal-nav-item{color:#f7dcff!important;text-shadow:0 1px 3px #260044}
       .migo-royal-nav-item.active,.migo-royal-nav-item[aria-current="page"]{background:linear-gradient(145deg,rgba(116,0,190,.42),rgba(36,0,75,.8))!important;box-shadow:inset 0 0 15px rgba(255,64,255,.25),0 0 12px rgba(185,42,255,.28)!important;border-radius:14px}
       .migo-royal-icon svg .gold{stroke:url(#migoGold);fill:url(#migoGoldFill)}
@@ -905,7 +913,7 @@
           return item.labels.some(label=>txt===label||txt.includes(label))&&rect.width>24&&rect.height>24&&rect.bottom>innerHeight*.72;
         }).sort((a,b)=>a.getBoundingClientRect().height-b.getBoundingClientRect().height);
         const el=candidates[0];if(!el)continue;
-        el.dataset.migoRoyalNav='1';el.classList.add('migo-royal-nav-item');
+        el.dataset.migoRoyalNav='1';el.dataset.migoNavKey=item.key;el.classList.add('migo-royal-nav-item');
         const label=item.labels.find(x=>String(el.innerText||el.textContent||'').includes(x))||item.labels[0];
         const span=document.createElement('span');span.className='migo-royal-nav-icon';span.innerHTML=icon(item.key,46);
         // Keep existing navigation handlers and label; replace only decorative emoji/icon.
@@ -917,7 +925,7 @@
     function installCommonIcons(){
       const selectors='button,.shortcut,.quick-action,.service-item,[role="button"]';
       document.querySelectorAll(selectors).forEach(el=>{
-        if(el.dataset.migoRoyalCommon)return;
+        if(el.dataset.migoRoyalCommon||el.classList.contains('migo-royal-nav-item'))return;
         const txt=String(el.innerText||el.textContent||'').trim();
         if(!txt||txt.length>65)return;
         const map=[['المحفظة','wallet'],['الأمان','crown'],['الدعوات','gift'],['الأصدقاء','profile'],['لوحة المالك','crown'],['الإعدادات','settings'],['الرسائل','messages'],['الألعاب','games'],['الغرف','rooms']];
