@@ -69,7 +69,10 @@ router.put("/:gameId", ownerOnly, async (req, res, next) => {
       { new: true, upsert: true, setDefaultsOnInsert: true }
     ).lean();
     const value = policy.games instanceof Map ? policy.games.get(game.id) : policy.games[game.id];
-    return res.json({ ok: true, game: { ...game, enabled: !(value && value.enabled === false) } });
+    const updatedGame = { ...game, enabled: !(value && value.enabled === false) };
+    const io = req.app.get("io");
+    if (io) io.emit("owner:policy-updated", { kind: "game-control", game: updatedGame });
+    return res.json({ ok: true, game: updatedGame });
   } catch (error) { return next(error); }
 });
 

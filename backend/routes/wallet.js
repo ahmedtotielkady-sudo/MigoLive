@@ -324,6 +324,11 @@ router.post("/admin/adjust", async (req, res) => {
       }], { session });
       result = { username: updated.username, uid: updated.uid, coins: updated.coins, transactionId: String(tx._id), repeated: false };
     });
+    const io = req.app.get("io");
+    if (io && result && Number.isSafeInteger(Number(result.uid))) {
+      const target = await User.findOne({ uid: Number(result.uid) }).select("_id").lean();
+      if (target) io.to("user:" + String(target._id)).emit("wallet:updated", { uid: Number(result.uid), coins: Number(result.coins) });
+    }
     return res.json({ ok: true, ...result });
   } catch (error) {
     if (error && error.code === 11000) {
