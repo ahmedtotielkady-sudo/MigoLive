@@ -54,6 +54,8 @@ router.put("/policy", requireAuth, ownerOnly, async (req, res, next) => {
       { $set: { enabled, latestVersion, minimumVersion, downloadUrl, message: message.slice(0, 500), updatedAt: new Date(), updatedBy: req.auth.sub } },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     ).lean();
+    const io = req.app.get("io");
+    if (io) io.emit("owner:policy-updated", { kind: "app-update", policy: clean(policy) });
     return res.json({ ok: true, policy: clean(policy) });
   } catch (error) { return next(error); }
 });
