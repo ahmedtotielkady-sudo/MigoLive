@@ -15,6 +15,15 @@ const TOKEN_TTL = "7d";
 // Signup bonus is granted only while creating a brand-new account.
 // Login intentionally never changes the persisted User.coins value.
 const INITIAL_SIGNUP_COINS = 100;
+
+// Normalize usernames consistently before validation, duplicate checks and storage.
+function normalizeUsername(value) {
+  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase("en-US");
+}
+function validUsername(value) {
+  const length = [...value].length;
+  return length >= 3 && length <= 24 && /^[\p{L}\p{N}_.-]+$/u.test(value);
+}
 function normalizePhone(value, country) {
   let input = String(value || "")
     .replace(/[٠-٩]/g, digit => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
@@ -68,14 +77,14 @@ function issueToken(user, sessionId) {
 router.post("/register", async (req, res, next) => {
   let dbSession;
   try {
-    const username = String(req.body.username || "").trim();
-    const displayName = String(req.body.displayName || username).trim().slice(0, 40);
+    const username = normalizeUsername(req.body.username);
+    const displayName = String(req.body.displayName || req.body.username || username).normalize("NFKC").trim().slice(0, 40);
     const phone = normalizePhone(req.body.phone, req.body.phoneCountry);
     const email = String(req.body.email || "").trim().toLowerCase();
     const password = String(req.body.password || "");
 
-    if (!/^[\p{L}\p{N}_.-]{3,24}$/u.test(username)) {
-      return res.status(400).json({ ok: false, message: "اسم المستخدم يجب أن يكون من 3 إلى 24 حرفًا أو رقمًا" });
+    if (!validUsername(username)) {
+      return res.status(400).json({ ok: false, message: "اسم المستخدم: 3 إلى 24 حرفًا أو رقمًا، ويسمح بالشرطة والشرطة السفلية والنقطة دون مسافات" });
     }
     if (password.length < 8 || password.length > 72) {
       return res.status(400).json({ ok: false, message: "كلمة المرور يجب ألا تقل عن 8 أحرف" });
@@ -91,12 +100,16 @@ router.post("/register", async (req, res, next) => {
       return res.status(400).json({ ok: false, message: "أدخل رقم الهاتف أو البريد الإلكتروني" });
     }
 
-    const normalized = username.toLowerCase();
-    const duplicate = await User.findOne({
-      $or: [{ username: normalized }, ...(phone ? [{ phone }] : []), ...(email ? [{ email }] : [])]
-    }).lean();
-    if (duplicate) {
-      return res.status(409).json({ ok: false, message: "اسم المستخدم أو رقم الهاتف مستخدم بالفعل" });
+    const normalized = username;
+    const duplicateUsername = await User.findOne({ username: normalized }).select("_id").lean();
+    if (duplicateUsername) {
+      return res.status(409).json({ ok: false, code: "USERNAME_TAKEN", message: "اسم المستخدم مستخدم بالفعل، اختر اسمًا آخر" });
+    }
+    const duplicateContact = await User.findOne({
+      $or: [...(phone ? [{ phone }] : []), ...(email ? [{ email }] : [])]
+    }).select("_id").lean();
+    if (duplicateContact) {
+      return res.status(409).json({ ok: false, code: "CONTACT_TAKEN", message: "رقم الهاتف أو البريد الإلكتروني مستخدم بالفعل" });
     }
 
     // Hash before opening the transaction so CPU work does not hold MongoDB locks.
@@ -141,7 +154,13 @@ router.post("/register", async (req, res, next) => {
     return res.status(201).json({ ok: true, token, user: publicUser(createdUser) });
   } catch (error) {
     if (error && error.code === 11000) {
-      return res.status(409).json({ ok: false, message: "اسم المستخدم أو رقم الهاتف مستخدم بالفعل" });
+      const duplicateField = Object.keys(error.keyPattern || {})[0] || "";
+      const usernameTaken = duplicateField === "username";
+      return res.status(409).json({
+        ok: false,
+        code: usernameTaken ? "USERNAME_TAKEN" : "CONTACT_TAKEN",
+        message: usernameTaken ? "اسم المستخدم مستخدم بالفعل، اختر اسمًا آخر" : "رقم الهاتف أو البريد الإلكتروني مستخدم بالفعل"
+      });
     }
     return next(error);
   } finally {
