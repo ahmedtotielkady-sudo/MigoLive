@@ -27,7 +27,16 @@
     }
     let data = {};
     try { data = await response.json(); } catch (_) {}
-    if (!response.ok || data.ok === false) throw new Error(data.message || ('HTTP ' + response.status));
+    if (!response.ok || data.ok === false) {
+      const error = new Error(data.message || ('HTTP ' + response.status));
+      // Preserve authoritative server balance on rejected game bets so the iframe
+      // can reconcile immediately instead of keeping a stale local wallet value.
+      if (Number.isSafeInteger(Number(data.coins)) && Number(data.coins) >= 0) {
+        error.coins = Number(data.coins);
+      }
+      error.status = response.status;
+      throw error;
+    }
     return data;
   }
 
