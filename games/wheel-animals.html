@@ -75,9 +75,10 @@ function resultOf(n){const r=rng(n);const w=A.map(a=>1/a[2]),s=w.reduce((a,b)=>a
 let betRound=-1,doneN=-1,spunN=-1,rn=-1,siv;
 function saveP(){}
 try{localStorage.removeItem('wheelP')}catch(e){}
-function setH(fin){const L=[];for(let k=fin;k>fin-40&&L.length<8;k--){const r=resultOf(k);if(r.i>=0)L.push(r.i)}H=L;renderH()}
+const settledWheelHistory=new Map();
+function setH(fin){const L=[];for(let k=fin;k>fin-40&&L.length<8;k--){const i=settledWheelHistory.has(k)?settledWheelHistory.get(k):resultOf(k).i;if(i>=0)L.push(i)}H=L;renderH()}
 function startTicks(){clearInterval(siv);let last=-1;siv=setInterval(()=>{const m=new DOMMatrix(getComputedStyle(nd).transform),a=(Math.atan2(m.b,m.a)*180/Math.PI+360)%360,k=Math.floor(a/22.5);if(k!==last){last=k;snd(500+Math.random()*80,.05,'square',.06)}},30);setTimeout(()=>clearInterval(siv),5200)}
-const serverWheelResults=new Map(),serverWheelRequests=new Map();
+const serverWheelResults=new Map(),serverWheelRequests=new Map(),serverWheelFailures=new Map();
 function resolveAnimalIndex(outcome){
  // The server's numeric index is the canonical identity shared with the
  // payout engine. Never let a stale/mismatched display name select another
@@ -98,14 +99,16 @@ function wheelTarget(index){return A[index][1]+(Math.random()*16-8)}
 function requestWheelResult(k){
  if(serverWheelResults.has(k))return Promise.resolve(serverWheelResults.get(k));
  if(serverWheelRequests.has(k))return serverWheelRequests.get(k);
+ const failure=serverWheelFailures.get(k);
+ if(failure&&Date.now()<failure.retryAt)return Promise.resolve(null);
  if(k!==betRound||total()<=0)return Promise.resolve(null);
  const placed=bets.slice();
  const task=migoGameCall('wheel-animals','spin',{bets:placed}).then(server=>{
   const outcome=server&&server.outcome||{};
   const index=resolveAnimalIndex(outcome);
   const result={i:index,tg:wheelTarget(index),payout:Math.max(0,Math.floor(Number(server.payout)||0)),coins:Math.max(0,Math.floor(Number(server.coins)||0)),totalBet:Math.max(0,Math.floor(Number(server.bet)||0))};
-  serverWheelResults.set(k,result);bal=result.coins;ready=true;ui();return result;
- }).catch(error=>{msg('تعذر اعتماد نتيجة العجلة: '+(error.message||'خطأ اتصال'),4000);throw error}).finally(()=>serverWheelRequests.delete(k));
+  serverWheelResults.set(k,result);serverWheelFailures.delete(k);bal=result.coins;ready=true;ui();return result;
+ }).catch(error=>{const previous=serverWheelFailures.get(k),attempts=(previous?previous.attempts:0)+1,delay=Math.min(15000,1000*Math.pow(2,Math.min(attempts-1,4)));serverWheelFailures.set(k,{attempts,retryAt:Date.now()+delay});if(!previous||Date.now()>=previous.retryAt)msg('تعذر الاتصال لإتمام الجولة؛ سنعيد المحاولة تلقائياً',3500);throw error}).finally(()=>serverWheelRequests.delete(k));
  serverWheelRequests.set(k,task);return task;
 }
 function beginWheelSpin(k,result){
@@ -116,7 +119,7 @@ function applyRound(k,live,serverResult){
  const r=had?serverResult:resultOf(k);
  if(had&&!serverResult)return{had,p:0,pending:true};
  const p=had?(serverResult.payout||0):0;
- if(had){bal=serverResult.coins;bets=A.map(()=>0);betRound=-1;saveP();serverWheelResults.delete(k);ui()}
+ if(had){settledWheelHistory.set(k,r.i);while(settledWheelHistory.size>80)settledWheelHistory.delete(settledWheelHistory.keys().next().value);bal=serverResult.coins;bets=A.map(()=>0);betRound=-1;saveP();serverWheelResults.delete(k);serverWheelFailures.delete(k);ui()}
  if(live){
   if(r.i<0){msg('وقف بين الحيوانات — جولة بدون فائز',3500)}
   else{hits[r.i][0].classList.add('win');showWin(r.i,p);
