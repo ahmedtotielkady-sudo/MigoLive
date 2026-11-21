@@ -470,10 +470,10 @@
     catch (error) { console.warn('Server wallet sync pending:', error.message); }
     finally { walletRefreshBusy = false; }
   }
-  // Socket.IO delivers wallet changes immediately. Keep a slower foreground
-  // reconciliation as a fallback instead of polling twice every second.
-  // This avoids saturating the API and competing with game requests on mobile data.
-  setInterval(refreshWalletSafely, 15000);
+  // Socket.IO pushes wallet changes immediately; reconcile with the server
+  // every second while the app is visible to recover missed events safely.
+  // The busy guard prevents overlapping requests on slow connections.
+  setInterval(refreshWalletSafely, 1000);
   window.addEventListener('focus', refreshWalletSafely);
   document.addEventListener('visibilitychange', refreshWalletSafely);
   window.addEventListener('migo:wallet-updated', refreshWalletSafely);
