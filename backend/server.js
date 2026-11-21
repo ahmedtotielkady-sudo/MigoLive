@@ -55,7 +55,9 @@ app.use("/api/games", (req, res, next) => {
   res.json = (body) => {
     const coins = body && Number(body.coins);
     const userId = req.auth && req.auth.sub;
-    if (Number.isSafeInteger(coins) && coins >= 0 && userId) {
+    // Rocket state polling returns a balance for display but does not change it.
+    // Avoid broadcasting wallet events for every state poll; emit after settled actions.
+    if (Number.isSafeInteger(coins) && coins >= 0 && userId && !req.path.endsWith("/state")) {
       const io = req.app.get("io");
       if (io) io.to("user:" + String(userId)).emit("wallet:updated", { coins });
     }
