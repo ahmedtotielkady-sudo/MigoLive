@@ -302,7 +302,7 @@ jobs:
           if re.search(r'versionName\s+"[^"]+"', s):
               s = re.sub(r'versionName\s+"[^"]+"', 'versionName "1.0.0"', s, count=1)
           p.write_text(s)
-          print(f'Android versionCode={code}, versionName=1.0.{code}')
+          print(f'Android versionCode={code}, versionName=1.0.0 (first release)')
           PY
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
