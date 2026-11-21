@@ -63,7 +63,7 @@ function ui(){document.getElementById('bal').textContent=F(Math.max(0,bal-total(
 function snd(f,d,t='sine',g=.15){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),k=ac.createGain();o.type=t;o.frequency.value=f;k.gain.value=g;k.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(k);k.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
 function tick(f){snd(f,.08)}
 function msg(t,ms=2500){ov.textContent=t;ov.classList.add('s');clearTimeout(msg.t);msg.t=setTimeout(()=>ov.classList.remove('s'),ms)}
-function add(i){if(busy||!ready)return;hits.forEach(([h])=>h.classList.remove('win'));if(chip>bal-total()){msg('الرصيد لا يكفي');return}bets[i]+=chip;betRound=Math.floor(Date.now()/CYC);saveP();snd(900,.1,'triangle');ui()}
+function add(i){if(busy||!ready)return;hits.forEach(([h])=>h.classList.remove('win'));const currentTotal=total();if(currentTotal+chip>bal){msg('الرصيد لا يكفي');return}if(currentTotal+chip>5000000){msg('الحد الأقصى لإجمالي الرهان 5,000,000 عملة');return}bets[i]+=chip;betRound=Math.floor(Date.now()/CYC);saveP();snd(900,.1,'triangle');ui()}
 
 let H=[];
 function renderH(){const hs=document.getElementById('hs'),bg=BG;hs.innerHTML='';for(let k=0;k<8;k++){const e=document.createElement('i'),a=A[H[k]];if(a){e.style.backgroundImage=bg;e.style.backgroundPosition=((6.25*a[3]-50)/5.25)+'% '+((6.25*a[4]-50)/5.25)+'%'}hs.appendChild(e)}}
