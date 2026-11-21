@@ -79,6 +79,11 @@ function setH(fin){const L=[];for(let k=fin;k>fin-40&&L.length<8;k--){const r=re
 function startTicks(){clearInterval(siv);let last=-1;siv=setInterval(()=>{const m=new DOMMatrix(getComputedStyle(nd).transform),a=(Math.atan2(m.b,m.a)*180/Math.PI+360)%360,k=Math.floor(a/22.5);if(k!==last){last=k;snd(500+Math.random()*80,.05,'square',.06)}},30);setTimeout(()=>clearInterval(siv),5200)}
 const serverWheelResults=new Map(),serverWheelRequests=new Map();
 function resolveAnimalIndex(outcome){
+ // The server's numeric index is the canonical identity shared with the
+ // payout engine. Never let a stale/mismatched display name select another
+ // animal image when the authoritative index is present.
+ const index=Number(outcome&&outcome.index);
+ if(Number.isInteger(index)&&index>=0&&index<A.length)return index;
  const raw=outcome&&(outcome.animal??outcome.name??outcome.symbol??outcome.label);
  if(raw!=null){
   const value=String(raw).trim().toLowerCase();
@@ -87,9 +92,7 @@ function resolveAnimalIndex(outcome){
   const found=A.findIndex(a=>a[0]===name);
   if(found>=0)return found;
  }
- const index=Number(outcome&&outcome.index);
- if(Number.isInteger(index)&&index>=0&&index<A.length)return index;
- throw new Error('اسم الحيوان الفائز غير معروف');
+ throw new Error('هوية الحيوان الفائز غير معروفة من الخادم');
 }
 function wheelTarget(index){return A[index][1]+(Math.random()*16-8)}
 function requestWheelResult(k){
