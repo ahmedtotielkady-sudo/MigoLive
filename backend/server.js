@@ -4,6 +4,8 @@ const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
+const requireAuth = require("./middleware/requireAuth");
+const requireGameEnabled = require("./middleware/requireGameEnabled");
 const http = require("http");
 const { attachRealtime } = require("./realtime");
 
@@ -37,6 +39,32 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/gifts", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/gifts"));
 
 app.use("/api/wallet", require("./routes/wallet"));
+app.use("/api/app-update", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/app-update"));
+app.use("/api/app-settings", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/app-settings"));
+
+// Owner-managed game policy is persisted in MongoDB. All game API requests pass
+// through the policy gate before reaching individual game routers.
+app.use("/api/game-control", rateLimit({ windowMs: 60_000, limit: 40, standardHeaders: true, legacyHeaders: false }), require("./routes/game-control"));
+app.use("/api/games", requireAuth, requireGameEnabled);
+
+// Push the committed server wallet balance to every active session as soon as
+// a game endpoint settles a round. This covers all games, including games
+// mounted by separate routers, without trusting client-supplied balances.
+app.use("/api/games", (req, res, next) => {
+  const sendJson = res.json.bind(res);
+  res.json = (body) => {
+    const coins = body && Number(body.coins);
+    const userId = req.auth && req.auth.sub;
+    // Rocket state polling returns a balance for display but does not change it.
+    // Avoid broadcasting wallet events for every state poll; emit after settled actions.
+    if (Number.isSafeInteger(coins) && coins >= 0 && userId && !req.path.endsWith("/state")) {
+      const io = req.app.get("io");
+      if (io) io.to("user:" + String(userId)).emit("wallet:updated", { coins });
+    }
+    return sendJson(body);
+  };
+  next();
+});
 
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/games"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ocean-storm"));
@@ -48,6 +76,8 @@ app.use("/api/rooms/livekit", rateLimit({ windowMs: 60_000, limit: 20, standardH
 
 app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/rooms"));
 app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/room-details"));
+
+app.use("/api/admin/users", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/admin-users"));
 
 app.use("/api/users", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), require("./routes/users"));
 

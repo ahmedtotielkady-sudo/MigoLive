@@ -92,7 +92,8 @@ router.post("/slot-777/spin", async (req, res) => {
     return res.json({ ok: true, gameId: "slot-777", ...result });
   } catch (error) {
     return res.status(error.status || 500).json({
-      ok: false, message: error.status ? error.message : "تعذر تنفيذ الجولة"
+      ok: false, message: error.status ? error.message : "تعذر تنفيذ الجولة",
+      ...(Number.isSafeInteger(error.currentCoins) ? { coins: error.currentCoins } : {})
     });
   } finally {
     await session.endSession();
@@ -132,7 +133,7 @@ router.post("/wheel-animals/spin", async (req, res) => {
       const user = await User.findOne({ _id: req.auth.sub, status: "active" })
         .session(session).select("coins");
       if (!user) throw Object.assign(new Error("الحساب غير موجود أو غير نشط"), { status: 404 });
-      if (user.coins < game.totalBet) throw Object.assign(new Error("رصيدك غير كافٍ"), { status: 409 });
+      if (user.coins < game.totalBet) throw Object.assign(new Error("رصيدك غير كافٍ"), { status: 409, currentCoins: user.coins });
 
       user.coins -= game.totalBet;
       await WalletTransaction.create([{
@@ -162,7 +163,8 @@ router.post("/wheel-animals/spin", async (req, res) => {
     return res.json({ ok: true, gameId: "wheel-animals", ...result });
   } catch (error) {
     return res.status(error.status || 500).json({
-      ok: false, message: error.status ? error.message : "تعذر تنفيذ الجولة"
+      ok: false, message: error.status ? error.message : "تعذر تنفيذ الجولة",
+      ...(Number.isSafeInteger(error.currentCoins) ? { coins: error.currentCoins } : {})
     });
   } finally { await session.endSession(); }
 });

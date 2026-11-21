@@ -7,6 +7,7 @@ const Counter = require("../models/Counter");
 const requireAuth = require("../middleware/requireAuth");
 const rateLimit = require("express-rate-limit");
 const crypto = require("crypto");
+const { getCountries, getCountryCallingCode, parsePhoneNumberFromString } = require("libphonenumber-js/max");
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const router = express.Router();
@@ -15,6 +16,41 @@ const TOKEN_TTL = "7d";
 // Login intentionally never changes the persisted User.coins value.
 const INITIAL_SIGNUP_COINS = 100;
 
+// Normalize usernames consistently before validation, duplicate checks and storage.
+function normalizeUsername(value) {
+  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase("en-US");
+}
+function validUsername(value) {
+  const length = [...value].length;
+  return length >= 3 && length <= 24 && /^[\p{L}\p{N}_.-]+$/u.test(value);
+}
+function normalizePhone(value, country) {
+  let input = String(value || "")
+    .replace(/[٠-٩]/g, digit => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, digit => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/[\s\u00a0\u200e\u200f\u202a-\u202e()-]/g, "");
+  if (!input) return "";
+  if (input.startsWith("00")) input = "+" + input.slice(2);
+  try {
+    const parsed = input.startsWith("+")
+      ? parsePhoneNumberFromString(input)
+      : parsePhoneNumberFromString(input, String(country || "EG").toUpperCase());
+    return parsed && parsed.isValid() ? parsed.number : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+router.get("/phone-countries", (_req, res) => {
+  const names = new Intl.DisplayNames(["ar"], { type: "region" });
+  const countries = getCountries().map(country => ({
+    country,
+    callingCode: "+" + getCountryCallingCode(country),
+    name: names.of(country) || country
+  })).sort((a, b) => a.name.localeCompare(b.name, "ar"));
+  return res.json({ ok: true, countries });
+});
+
 function publicUser(user) {
   return {
     id: String(user._id),
@@ -22,6 +58,7 @@ function publicUser(user) {
     username: user.username,
     displayName: user.displayName,
     phone: user.phone || "",
+    email: user.email || "",
     coins: user.coins,
     role: user.role,
     avatar: user.avatar || "",
@@ -40,27 +77,39 @@ function issueToken(user, sessionId) {
 router.post("/register", async (req, res, next) => {
   let dbSession;
   try {
-    const username = String(req.body.username || "").trim();
-    const displayName = String(req.body.displayName || username).trim().slice(0, 40);
-    const phone = String(req.body.phone || "").replace(/[\\s()-]/g, "");
+    const username = normalizeUsername(req.body.username);
+    const displayName = String(req.body.displayName || req.body.username || username).normalize("NFKC").trim().slice(0, 40);
+    const phone = normalizePhone(req.body.phone, req.body.phoneCountry);
+    const email = String(req.body.email || "").trim().toLowerCase();
     const password = String(req.body.password || "");
 
-    if (!/^[\\p{L}\\p{N}_.-]{3,24}$/u.test(username)) {
-      return res.status(400).json({ ok: false, message: "اسم المستخدم يجب أن يكون من 3 إلى 24 حرفًا أو رقمًا" });
+    if (!validUsername(username)) {
+      return res.status(400).json({ ok: false, message: "اسم المستخدم: 3 إلى 24 حرفًا أو رقمًا، ويسمح بالشرطة والشرطة السفلية والنقطة دون مسافات" });
     }
     if (password.length < 8 || password.length > 72) {
       return res.status(400).json({ ok: false, message: "كلمة المرور يجب ألا تقل عن 8 أحرف" });
     }
-    if (phone && !/^\\+?[0-9]{7,15}$/.test(phone)) {
+    if (phone === null) {
       return res.status(400).json({ ok: false, message: "رقم الهاتف غير صحيح" });
     }
 
-    const normalized = username.toLowerCase();
-    const duplicate = await User.findOne({
-      $or: [{ username: normalized }, ...(phone ? [{ phone }] : [])]
-    }).lean();
-    if (duplicate) {
-      return res.status(409).json({ ok: false, message: "اسم المستخدم أو رقم الهاتف مستخدم بالفعل" });
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ ok: false, message: "البريد الإلكتروني غير صحيح" });
+    }
+    if (!phone && !email) {
+      return res.status(400).json({ ok: false, message: "أدخل رقم الهاتف أو البريد الإلكتروني" });
+    }
+
+    const normalized = username;
+    const duplicateUsername = await User.findOne({ username: normalized }).select("_id").lean();
+    if (duplicateUsername) {
+      return res.status(409).json({ ok: false, code: "USERNAME_TAKEN", message: "اسم المستخدم مستخدم بالفعل، اختر اسمًا آخر" });
+    }
+    const duplicateContact = await User.findOne({
+      $or: [...(phone ? [{ phone }] : []), ...(email ? [{ email }] : [])]
+    }).select("_id").lean();
+    if (duplicateContact) {
+      return res.status(409).json({ ok: false, code: "CONTACT_TAKEN", message: "رقم الهاتف أو البريد الإلكتروني مستخدم بالفعل" });
     }
 
     // Hash before opening the transaction so CPU work does not hold MongoDB locks.
@@ -87,6 +136,7 @@ router.post("/register", async (req, res, next) => {
         username: normalized,
         displayName,
         phone: phone || undefined,
+        email: email || undefined,
         passwordHash,
         coins: INITIAL_SIGNUP_COINS,
         role: "user"
@@ -104,7 +154,13 @@ router.post("/register", async (req, res, next) => {
     return res.status(201).json({ ok: true, token, user: publicUser(createdUser) });
   } catch (error) {
     if (error && error.code === 11000) {
-      return res.status(409).json({ ok: false, message: "اسم المستخدم أو رقم الهاتف مستخدم بالفعل" });
+      const duplicateField = Object.keys(error.keyPattern || {})[0] || "";
+      const usernameTaken = duplicateField === "username";
+      return res.status(409).json({
+        ok: false,
+        code: usernameTaken ? "USERNAME_TAKEN" : "CONTACT_TAKEN",
+        message: usernameTaken ? "اسم المستخدم مستخدم بالفعل، اختر اسمًا آخر" : "رقم الهاتف أو البريد الإلكتروني مستخدم بالفعل"
+      });
     }
     return next(error);
   } finally {
@@ -118,13 +174,15 @@ router.post("/login", async (req, res, next) => {
     if (!identifier || !password) {
       return res.status(400).json({ ok: false, message: "أدخل رقم ID أو الهاتف وكلمة المرور" });
     }
-    const normalizedPhone = identifier.replace(/[\s()-]/g, "");
+    const normalizedPhone = normalizePhone(identifier, req.body.phoneCountry) || identifier.replace(/[\s()-]/g, "");
+    const normalizedEmail = identifier.includes("@") ? identifier.toLowerCase() : "";
     const byUid = /^\d{5,10}$/.test(identifier) ? Number(identifier) : -1;
     const user = await User.findOne({
       $or: [
         ...(byUid > 0 ? [{ uid: byUid }] : []),
         { username: identifier.toLowerCase() },
-        { phone: normalizedPhone }
+        { phone: normalizedPhone },
+        ...(normalizedEmail ? [{ email: normalizedEmail }] : [])
       ]
     }).select("+passwordHash");
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {

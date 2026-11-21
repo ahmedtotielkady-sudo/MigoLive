@@ -7,6 +7,7 @@ on:
       - android-preview
       - feature/agency-owner-approval
       - feature/mongodb-primary-integration
+      - build/rocket-crash-combined-release-2026-11-20
   workflow_dispatch:
 
 permissions:
