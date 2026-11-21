@@ -47,6 +47,23 @@ app.use("/api/app-settings", rateLimit({ windowMs: 60_000, limit: 60, standardHe
 app.use("/api/game-control", rateLimit({ windowMs: 60_000, limit: 40, standardHeaders: true, legacyHeaders: false }), require("./routes/game-control"));
 app.use("/api/games", requireAuth, requireGameEnabled);
 
+// Push the committed server wallet balance to every active session as soon as
+// a game endpoint settles a round. This covers all games, including games
+// mounted by separate routers, without trusting client-supplied balances.
+app.use("/api/games", (req, res, next) => {
+  const sendJson = res.json.bind(res);
+  res.json = (body) => {
+    const coins = body && Number(body.coins);
+    const userId = req.auth && req.auth.sub;
+    if (Number.isSafeInteger(coins) && coins >= 0 && userId) {
+      const io = req.app.get("io");
+      if (io) io.to("user:" + String(userId)).emit("wallet:updated", { coins });
+    }
+    return sendJson(body);
+  };
+  next();
+});
+
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/games"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ocean-storm"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/cleopatra-gold"));
