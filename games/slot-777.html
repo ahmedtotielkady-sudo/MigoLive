@@ -175,32 +175,9 @@ function countUp(to){
   (function f(t){const p=Math.min(1,(t-t0)/d);$('win').textContent=fmt(to*p);if(p<1)requestAnimationFrame(f)})(t0);
 }
 
-let pendingSpinId=null;
 function requestServerSpin(bet){
-  if(!pendingSpinId){
-    if(!window.crypto||!window.crypto.getRandomValues) return Promise.reject(new Error('تعذر تأمين الجولة'));
-    const bytes=new Uint8Array(20);window.crypto.getRandomValues(bytes);
-    pendingSpinId='slot777_'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
-  }
-  const requestId=pendingSpinId;
-  return new Promise((resolve,reject)=>{
-    const onMessage=e=>{
-      const d=e.data||{};
-      if(d.t!=='migo:game:slot-777:result'||d.requestId!==requestId)return;
-      removeEventListener('message',onMessage);
-      clearTimeout(timer);
-      pendingSpinId=null;
-      if(d.ok&&d.result)resolve(d.result);
-      else reject(new Error(d.message||'تعذر تنفيذ الجولة'));
-    };
-    const timer=setTimeout(()=>{
-      removeEventListener('message',onMessage);
-      reject(new Error('لم يصل رد الخادم. اضغط دوران مرة أخرى لإعادة التحقق من نفس الجولة دون تكرار الخصم.'));
-    },25000);
-    addEventListener('message',onMessage);
-    try{parent.postMessage({t:'migo:game:slot-777:spin',requestId,bet},'*')}
-    catch(error){clearTimeout(timer);removeEventListener('message',onMessage);reject(error)}
-  });
+  if(typeof window.migoGameCall!=='function') return Promise.reject(new Error('اتصال المحفظة غير جاهز'));
+  return window.migoGameCall('slot-777','spin',{bet});
 }
 
 async function spin(){
