@@ -175,32 +175,9 @@ function countUp(to){
   (function f(t){const p=Math.min(1,(t-t0)/d);$('win').textContent=fmt(to*p);if(p<1)requestAnimationFrame(f)})(t0);
 }
 
-let pendingSpinId=null;
-function requestServerSpin(bet){
-  if(!pendingSpinId){
-    if(!window.crypto||!window.crypto.getRandomValues) return Promise.reject(new Error('تعذر تأمين الجولة'));
-    const bytes=new Uint8Array(20);window.crypto.getRandomValues(bytes);
-    pendingSpinId='slot777_'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
-  }
-  const requestId=pendingSpinId;
-  return new Promise((resolve,reject)=>{
-    const onMessage=e=>{
-      const d=e.data||{};
-      if(d.t!=='migo:game:slot-777:result'||d.requestId!==requestId)return;
-      removeEventListener('message',onMessage);
-      clearTimeout(timer);
-      pendingSpinId=null;
-      if(d.ok&&d.result)resolve(d.result);
-      else reject(new Error(d.message||'تعذر تنفيذ الجولة'));
-    };
-    const timer=setTimeout(()=>{
-      removeEventListener('message',onMessage);
-      reject(new Error('لم يصل رد الخادم. اضغط دوران مرة أخرى لإعادة التحقق من نفس الجولة دون تكرار الخصم.'));
-    },25000);
-    addEventListener('message',onMessage);
-    try{parent.postMessage({t:'migo:game:slot-777:spin',requestId,bet},'*')}
-    catch(error){clearTimeout(timer);removeEventListener('message',onMessage);reject(error)}
-  });
+async function requestServerSpin(bet){
+  if(typeof window.migoGameCall!=='function') throw new Error('تعذر الاتصال الآمن بالخادم');
+  return window.migoGameCall('slot-777','spin',{bet});
 }
 
 async function spin(){
@@ -263,6 +240,8 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){auto=0;upd
 // initial board
 const init=makeGrid();init.forEach((c,i)=>c.forEach((s,r)=>setCell(cells[i][r],s)));
 upd();updAuto();
+
+<script id="migo-server-game-rpc">(()=>{let n=0;const pending=new Map(),retryKeys=new Map();function key(){const a=new Uint8Array(18);crypto.getRandomValues(a);return 'g'+Array.from(a,x=>x.toString(16).padStart(2,'0')).join('')+(++n)}window.migoGameCall=(gameId,action,payload)=>new Promise((resolve,reject)=>{const sig=gameId+':'+action+':'+JSON.stringify(payload||{}),requestId=retryKeys.get(sig)||key(),timer=setTimeout(()=>{pending.delete(requestId);reject(new Error('انتهت مهلة اتصال اللعبة بالخادم'))},20000);retryKeys.set(sig,requestId);pending.set(requestId,{resolve,reject,timer,sig});parent.postMessage({t:'migo:game:request',gameId,action,payload,requestId},'*')});addEventListener('message',e=>{const d=e.data;if(!d||d.t!=='migo:game:response')return;const p=pending.get(d.requestId);if(!p)return;clearTimeout(p.timer);pending.delete(d.requestId);if(d.ok){retryKeys.delete(p.sig);p.resolve(d.result)}else p.reject(new Error(d.message||'تعذر تنفيذ الجولة'))})})();</script>
 </script>
 </body>
 </html>
