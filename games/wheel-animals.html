@@ -138,7 +138,7 @@ function tick(){
   }else{beginWheelSpin(n,resultOf(n))}
  }
  if(doneN<fin){
-  const live=fin===n&&t-SEND<1500;let away=0,any=false,blocked=false;
+  const live=fin===n&&t>=SEND;let away=0,any=false,blocked=false;
   for(let k=doneN+1;k<=fin;k++){
    const had=k===betRound&&total()>0,serverResult=had?serverWheelResults.get(k):null;
    if(had&&!serverResult){blocked=true;requestWheelResult(k).then(result=>{if(result&&spunN<k)beginWheelSpin(k,result)}).catch(()=>{});break}
