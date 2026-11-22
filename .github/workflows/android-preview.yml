@@ -100,7 +100,8 @@ jobs:
           print(f'Extracted {len(scripts)} inline JavaScript block(s)')
           PY
           for file in /tmp/migolive-inline-*.js; do node --check "$file"; done
-          cp slot-777.html slot-ocean-storm.html wheel-animals.html www/
+          cp slot-777.html slot-ocean-storm.html www/
+          cp games/wheel-animals.html www/wheel-animals.html
           mkdir -p www/games
           if [ -d games ]; then cp -R games/. www/games/; fi
           test -s www/games/cleopatra-gold.html
