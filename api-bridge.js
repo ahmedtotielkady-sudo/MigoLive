@@ -6,11 +6,34 @@
   'use strict';
   const API = 'https://migolive-api-production.up.railway.app/api';
   const TOKEN_KEY = 'migolive_api_token_v1';
+  const DEVICE_KEY = 'migolive_device_id_v1';
+  let deviceInfoPromise = null;
+  async function deviceHeaders() {
+    if (!deviceInfoPromise) deviceInfoPromise = (async () => {
+      let id = ''; let info = {};
+      try {
+        const nativeDevice = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Device;
+        if (nativeDevice && typeof nativeDevice.getId === 'function') { const result = await nativeDevice.getId(); id = String(result && result.identifier || ''); }
+        if (nativeDevice && typeof nativeDevice.getInfo === 'function') info = await nativeDevice.getInfo() || {};
+      } catch (_) {}
+      try {
+        if (!id) id = localStorage.getItem(DEVICE_KEY) || '';
+        if (!id) { const bytes = new Uint8Array(24); if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(bytes); else for (let i=0;i<bytes.length;i++) bytes[i]=Math.floor(Math.random()*256); id = Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join(''); }
+        localStorage.setItem(DEVICE_KEY,id);
+      } catch (_) {}
+      const ua = navigator.userAgent || '';
+      const match = ua.match(/;\s*([^;)]+)\s+Build\//i);
+      let appVersion = String(info.appVersion || '');
+      try { if (!appVersion && typeof installedAppVersion === 'function') appVersion = await installedAppVersion(); } catch (_) {}
+      return { 'X-Migo-Device-ID': id, 'X-Migo-Device-Platform': String(info.platform || (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || 'web').slice(0,32), 'X-Migo-Device-Model': String(info.model || (match && match[1]) || 'غير معروف').slice(0,120), 'X-Migo-Device-Manufacturer': String(info.manufacturer || '').slice(0,80), 'X-Migo-OS-Version': String(info.osVersion || '').slice(0,40), 'X-Migo-App-Version': String(appVersion || '1.0.1').slice(0,32) };
+    })();
+    return deviceInfoPromise;
+  }
   const $id = (id) => document.getElementById(id);
   const token = () => { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (_) { return ''; } };
   const saveToken = (v) => { try { if (v) localStorage.setItem(TOKEN_KEY, v); else localStorage.removeItem(TOKEN_KEY); } catch (_) {} };
   async function api(path, options = {}) {
-    const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, await deviceHeaders(), options.headers || {});
     if (token()) headers.Authorization = 'Bearer ' + token();
     let response;
     const method = String(options.method || 'GET').toUpperCase();
@@ -39,6 +62,8 @@
     }
     return data;
   }
+  window.migoApi = api;
+  window.migoDeviceHeaders = deviceHeaders;
 
   // Server-controlled mandatory update gate. APK installation still requires Android confirmation.
   const MIGO_APP_VERSION = '1.0.1';
@@ -78,13 +103,13 @@
   let installedVersionPromise=null;
   async function checkMandatoryUpdate(){
     try{
-      const response=await fetch(API+'/app-update/status',{cache:'no-store'});
-      if(!response.ok)return;
-      const data=await response.json(),policy=data.policy||{};
-      if(!policy.enabled)return;
       if(!installedVersionPromise)installedVersionPromise=installedAppVersion();
       const installed=await installedVersionPromise;
-      if(compareVersions(installed,policy.minimumVersion)<0)showMandatoryUpdate(policy);
+      const response=await fetch(API+'/app-update/status?version='+encodeURIComponent(installed),{cache:'no-store'});
+      if(!response.ok)return;
+      const data=await response.json(),policy=data.policy||{};
+      const individuallyBlocked=Array.isArray(policy.blockedVersions)&&policy.blockedVersions.includes(installed);
+      if(individuallyBlocked||(policy.enabled&&compareVersions(installed,policy.minimumVersion)<0))showMandatoryUpdate(policy);
     }catch(_){}
   }
   checkMandatoryUpdate();

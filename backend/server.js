@@ -76,6 +76,7 @@ app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: 
 app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/room-details"));
 
 app.use("/api/admin/users", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/admin-users"));
+app.use("/api/admin/devices", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/admin-devices"));
 
 app.use("/api/users", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), require("./routes/users"));
 
