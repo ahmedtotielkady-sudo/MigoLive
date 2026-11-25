@@ -8,6 +8,8 @@ on:
   pull_request:
     paths:
       - "backend/**"
+      - "index.html"
+      - "api-bridge.js"
       - ".github/workflows/backend-tests.yml"
 
 permissions:
