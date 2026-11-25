@@ -42,3 +42,24 @@ test("owner can observe and block individual app versions", () => {
   assert.match(html, /إدارة الإصدارات/);
   assert.match(html, /الأجهزة والحظر/);
 });
+
+
+test("owner device inventory is paginated instead of capped at the first 200 records", () => {
+  const route = read("routes/admin-devices.js");
+  const html = fs.readFileSync(path.join(__dirname, "..", "..", "index.html"), "utf8");
+  assert.match(route, /countDocuments\(filter\)/);
+  assert.match(route, /skip\(\(page - 1\) \* limit\)/);
+  assert.match(route, /pages: Math\.ceil\(total \/ limit\)/);
+  assert.match(html, /status=all&page=1&limit=500/);
+  assert.match(html, /for\(let page=2;page<=pages;page\+\+\)/);
+});
+
+test("owner version inventory merges app-update sightings with versions stored on devices", () => {
+  const route = read("routes/app-update.js");
+  const html = fs.readFileSync(path.join(__dirname, "..", "..", "index.html"), "utf8");
+  assert.match(route, /Device\.aggregate/);
+  assert.match(route, /deviceCount/);
+  assert.match(route, /router\.get\("\/versions", requireAuth, ownerOnly/);
+  assert.match(html, /migoApi\('\/app-update\/versions'\)/);
+  assert.match(html, /الأجهزة:/);
+});
