@@ -53,7 +53,11 @@ test("Ocean Storm keeps the same cascade wire format at the maximum tumble depth
     assert.equal(step.grid.length, 6);
     assert.ok(step.grid.every(column => column.length === 5));
     assert.ok(step.removed.length > 0);
-    assert.ok(step.removed.every(position => /^\\d+:\\d+$/.test(position)));
+    assert.ok(step.removed.every(position => {
+      const [column, row] = position.split(":").map(Number);
+      return Number.isInteger(column) && column >= 0 && column < 6 &&
+        Number.isInteger(row) && row >= 0 && row < 5;
+    }));
   }
   assert.ok(Number.isSafeInteger(result.payout));
   assert.ok(result.payout >= 0);
