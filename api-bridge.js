@@ -23,7 +23,9 @@
       } catch (_) {}
       const ua = navigator.userAgent || '';
       const match = ua.match(/;\s*([^;)]+)\s+Build\//i);
-      return { 'X-Migo-Device-ID': id, 'X-Migo-Device-Platform': String(info.platform || (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || 'web').slice(0,32), 'X-Migo-Device-Model': String(info.model || (match && match[1]) || 'غير معروف').slice(0,120), 'X-Migo-Device-Manufacturer': String(info.manufacturer || '').slice(0,80), 'X-Migo-OS-Version': String(info.osVersion || '').slice(0,40), 'X-Migo-App-Version': String(info.appVersion || '1.0.1').slice(0,32) };
+      let appVersion = String(info.appVersion || '');
+      try { if (!appVersion && typeof installedAppVersion === 'function') appVersion = await installedAppVersion(); } catch (_) {}
+      return { 'X-Migo-Device-ID': id, 'X-Migo-Device-Platform': String(info.platform || (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || 'web').slice(0,32), 'X-Migo-Device-Model': String(info.model || (match && match[1]) || 'غير معروف').slice(0,120), 'X-Migo-Device-Manufacturer': String(info.manufacturer || '').slice(0,80), 'X-Migo-OS-Version': String(info.osVersion || '').slice(0,40), 'X-Migo-App-Version': String(appVersion || '1.0.1').slice(0,32) };
     })();
     return deviceInfoPromise;
   }
