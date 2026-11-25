@@ -1520,7 +1520,7 @@ async function appUpdateOwnerBind(m){
  if(!U()||U().role!=='owner'){toast('هذا التحكم للمالك فقط');return}
  const $au=id=>m.querySelector('#'+id),button=$au('au-save'),error=$au('au-error'),state=$au('au-state');
  try{
-  const data=await fetch('https://migolive-api-production.up.railway.app/api/app-update/status').then(r=>r.json());
+  const data=await window.migoApi('/app-update/status');
   const p=data.policy||{};
   $au('au-enabled').checked=!!p.enabled;
   $au('au-latest').value=p.latestVersion||'1.0.1';
@@ -1533,8 +1533,7 @@ async function appUpdateOwnerBind(m){
   if(!U()||U().role!=='owner')return toast('هذا التحكم للمالك فقط');
   button.disabled=true;error.textContent='';
   try{
-   const response=await fetch('https://migolive-api-production.up.railway.app/api/app-update/policy',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.getItem('migolive_api_token_v1')||'')},body:JSON.stringify({enabled:$au('au-enabled').checked,latestVersion:$au('au-latest').value.trim(),minimumVersion:$au('au-min').value.trim(),downloadUrl:$au('au-url').value.trim(),message:$au('au-msg').value.trim()})});
-   const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.message||'تعذر حفظ الإعدادات');
+   const result=await window.migoApi('/app-update/policy',{method:'PUT',body:JSON.stringify({enabled:$au('au-enabled').checked,latestVersion:$au('au-latest').value.trim(),minimumVersion:$au('au-min').value.trim(),downloadUrl:$au('au-url').value.trim(),message:$au('au-msg').value.trim()})});
    state.textContent=result.policy.enabled?'التحديث الإجباري مفعّل · الحد الأدنى '+result.policy.minimumVersion:'التحديث الإجباري متوقف حالياً';
    toast('تم حفظ إعدادات التحديث على الخادم');
   }catch(e){error.textContent=e.message||'حدث خطأ أثناء الحفظ';}
