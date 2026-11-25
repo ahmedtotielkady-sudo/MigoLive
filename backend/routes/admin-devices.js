@@ -35,7 +35,7 @@ router.get("/", async (req, res, next) => {
     if (q) {
       const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
       filter.$or = [{ model: re }, { manufacturer: re }, { platform: re }, { appVersion: re }];
-      if (/^\\d{5,10}$/.test(q)) filter.$or.push({ lastUid: Number(q) });
+      if (/^\d{5,10}$/.test(q)) filter.$or.push({ lastUid: Number(q) });
     }
     const devices = await Device.find(filter).sort({ lastSeenAt: -1 }).limit(200).lean();
     return res.json({ ok: true, devices: devices.map(view) });
