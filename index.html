@@ -1553,15 +1553,15 @@ async function ownerVersionsBind(m){
  if(!U()||U().role!=='owner')return toast('هذا التحكم للمالك فقط');
  const state=m.querySelector('#ov-state'),list=m.querySelector('#ov-list'),saveBtn=m.querySelector('#ov-save'),error=m.querySelector('#ov-error');
  try{
-  const data=await window.migoApi('/app-update/status'),p=data.policy||{},blocked=new Set(p.blockedVersions||[]),observed=Array.isArray(p.versions)?p.versions:[];
+  const data=await window.migoApi('/app-update/versions'),p=data.policy||{},blocked=new Set(p.blockedVersions||[]),observed=Array.isArray(data.versions)?data.versions:(Array.isArray(p.versions)?p.versions:[]);
   const byVersion=new Map(observed.map(v=>[v.version,v]));
-  for(const version of blocked)if(!byVersion.has(version))byVersion.set(version,{version,seenCount:0,lastSeenAt:null});
+  for(const version of blocked)if(!byVersion.has(version))byVersion.set(version,{version,seenCount:0,deviceCount:0,lastSeenAt:null});
   const versions=Array.from(byVersion.values()).sort((a,b)=>String(b.version).localeCompare(String(a.version),undefined,{numeric:true}));
-  m.querySelector('#ov-total').textContent=observed.length;
+  m.querySelector('#ov-total').textContent=versions.length;
   m.querySelector('#ov-blocked').textContent=blocked.size;
-  m.querySelector('#ov-latest').textContent=observed.slice().sort((a,b)=>String(b.version).localeCompare(String(a.version),undefined,{numeric:true}))[0]?.version||'—';
-  state.textContent=versions.length?'تم تحميل سجل الإصدارات بنجاح':'لا توجد إصدارات مرصودة بعد؛ ستظهر النسخة بعد اتصالها بالخادم.';
-  list.innerHTML=versions.map(v=>`<label class="owner-version-row"><span class="owner-version-main"><b class="owner-version-number" dir="ltr">${esc(v.version)}</b><small class="owner-version-meta">${v.seenCount?('عدد مرات الاتصال: '+fmt(v.seenCount)):'إصدار محظور يدويًا وغير مرصود'} · آخر ظهور: ${v.lastSeenAt?new Date(v.lastSeenAt).toLocaleString('ar-EG'):'—'}</small></span><span class="owner-version-toggle"><input type="checkbox" data-block-version="${esc(v.version)}" ${blocked.has(v.version)?'checked':''}><b>حظر</b></span></label>`).join('')||'<div class="owner-empty-state"><span>📦</span><b>لا توجد إصدارات مسجلة</b><p>سيظهر الإصدار تلقائيًا عندما يتصل التطبيق بالخادم.</p></div>';
+  m.querySelector('#ov-latest').textContent=versions[0]?.version||'—';
+  state.textContent=versions.length?'تم تجميع الإصدارات من سجل الأجهزة وسجل الاتصالات':'لا توجد إصدارات محفوظة على الخادم حتى الآن.';
+  list.innerHTML=versions.map(v=>`<label class="owner-version-row"><span class="owner-version-main"><b class="owner-version-number" dir="ltr">${esc(v.version)}</b><small class="owner-version-meta">الأجهزة: ${fmt(v.deviceCount||0)} · مرات الاتصال: ${fmt(v.seenCount||0)} · آخر ظهور: ${v.lastSeenAt?new Date(v.lastSeenAt).toLocaleString('ar-EG'):'—'}</small></span><span class="owner-version-toggle"><input type="checkbox" data-block-version="${esc(v.version)}" ${blocked.has(v.version)?'checked':''}><b>حظر</b></span></label>`).join('')||'<div class="owner-empty-state"><span>📦</span><b>لا توجد إصدارات مسجلة</b><p>ستظهر الإصدارات المحفوظة في سجلات الأجهزة تلقائيًا.</p></div>';
  }catch(e){state.classList.add('is-error');state.textContent='تعذر تحميل الإصدارات: '+(e.message||'خطأ اتصال');}
  m.querySelector('#ov-add').onclick=()=>{
   const field=m.querySelector('#ov-manual'),version=field.value.trim();
@@ -1600,8 +1600,8 @@ async function ownerDevicesBind(m){
  const renderList=()=>{
   const term=q.value.trim().toLowerCase();
   const filtered=allDevices.filter(d=>{
-   const text=[d.manufacturer,d.model,d.platform,d.osVersion,d.appVersion,d.uid].join(' ').toLowerCase();
-   return (!term||text.includes(term))&&(status.value==='all'||(status.value==='blocked'?d.blocked:!d.blocked));
+   const value=[d.manufacturer,d.model,d.platform,d.osVersion,d.appVersion,d.uid].join(' ').toLowerCase();
+   return (!term||value.includes(term))&&(status.value==='all'||(status.value==='blocked'?d.blocked:!d.blocked));
   });
   list.innerHTML=filtered.map(d=>{
    const blocked=!!d.blocked,platform=String(d.platform||'').toLowerCase(),symbol=platform.includes('android')?'🤖':platform.includes('ios')?'🍎':'🌐';
@@ -1612,20 +1612,24 @@ async function ownerDevicesBind(m){
   }).join('')||'<div class="owner-empty-state"><span>📱</span><b>لا توجد أجهزة مطابقة</b><p>جرّب تغيير كلمات البحث أو فلتر الحالة.</p></div>';
  };
  const load=async()=>{
-  state.classList.remove('is-error');state.textContent='جارٍ تحميل الأجهزة…';list.innerHTML='';
+  state.classList.remove('is-error');state.textContent='جارٍ تحميل جميع الأجهزة…';list.innerHTML='';
   try{
-   const data=await window.migoApi('/admin/devices?status=all');
-   allDevices=data.devices||[];
+   const first=await window.migoApi('/admin/devices?status=all&page=1&limit=500');
+   const pages=Math.max(1,Number(first.pages)||1);
+   allDevices=Array.isArray(first.devices)?first.devices.slice():[];
+   for(let page=2;page<=pages;page++){
+    const data=await window.migoApi('/admin/devices?status=all&page='+page+'&limit=500');
+    if(Array.isArray(data.devices))allDevices.push(...data.devices);
+   }
    const blocked=allDevices.filter(d=>d.blocked).length;
-   m.querySelector('#od-total').textContent=allDevices.length;
-   m.querySelector('#od-active').textContent=allDevices.length-blocked;
+   m.querySelector('#od-total').textContent=Number(first.total??allDevices.length);
+   m.querySelector('#od-active').textContent=Math.max(0,allDevices.length-blocked);
    m.querySelector('#od-blocked').textContent=blocked;
-   state.textContent='تم تحميل سجل الأجهزة · '+allDevices.length+' جهاز';
+   state.textContent='تم تحميل جميع الأجهزة · '+allDevices.length+' من '+Number(first.total??allDevices.length)+' جهاز';
    renderList();
-  }catch(e){state.classList.add('is-error');state.textContent='تعذر تحميل الأجهزة: '+(e.message||'خطأ اتصال');}
+  }catch(e){state.classList.add('is-error');state.textContent='تعذر تحميل سجل الأجهزة كاملًا: '+(e.message||'خطأ اتصال');}
  };
- m.querySelector('#od-refresh').onclick=load;status.onchange=renderList;
- q.oninput=renderList;
+ m.querySelector('#od-refresh').onclick=load;status.onchange=renderList;q.oninput=renderList;
  list.onclick=async e=>{
   const btn=e.target.closest('[data-device-action]');if(!btn)return;
   if(!U()||U().role!=='owner')return toast('الحظر للمالك فقط');
@@ -1633,7 +1637,7 @@ async function ownerDevicesBind(m){
   if(action==='block'&&!confirm('تأكيد حظر هذا الهاتف؟ سيتم رفض تسجيل الدخول منه حتى لو استخدم حسابًا آخر.'))return;
   btn.disabled=true;
   try{
-   await window.migoApi('/admin/devices/'+encodeURIComponent(id)+'/'+action,{method:'POST',body:JSON.stringify({reason:action==='block'?'حظر نهائي من لوحة المالك':''})});
+   await window.migoApi('/admin/devices/'+encodeURIComponent(id)+'/'+action,{method:'POST',body:JSON.stringify({reason:action==='block'?'حظر من لوحة المالك':''})});
    toast(action==='block'?'تم حظر الجهاز':'تم رفع حظر الجهاز');await load();
   }catch(err){toast(err.message||'تعذر تنفيذ العملية');btn.disabled=false;}
  };

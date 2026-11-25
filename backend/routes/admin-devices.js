@@ -29,6 +29,8 @@ router.get("/", async (req, res, next) => {
   try {
     const status = String(req.query.status || "all");
     const q = String(req.query.q || "").trim().slice(0, 80);
+    const page = Math.max(1, Math.min(1000000, Number.parseInt(req.query.page, 10) || 1));
+    const limit = Math.max(1, Math.min(500, Number.parseInt(req.query.limit, 10) || 100));
     const filter = {};
     if (status === "blocked") filter.blocked = true;
     if (status === "active") filter.blocked = false;
@@ -37,8 +39,15 @@ router.get("/", async (req, res, next) => {
       filter.$or = [{ model: re }, { manufacturer: re }, { platform: re }, { appVersion: re }];
       if (/^\d{5,10}$/.test(q)) filter.$or.push({ lastUid: Number(q) });
     }
-    const devices = await Device.find(filter).sort({ lastSeenAt: -1 }).limit(200).lean();
-    return res.json({ ok: true, devices: devices.map(view) });
+    const [total, blockedTotal, devices] = await Promise.all([
+      Device.countDocuments(filter),
+      Device.countDocuments({ blocked: true }),
+      Device.find(filter).sort({ lastSeenAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean()
+    ]);
+    return res.json({
+      ok: true, devices: devices.map(view), total, page, limit,
+      pages: Math.ceil(total / limit), blockedTotal
+    });
   } catch (error) { return next(error); }
 });
 router.post("/:id/block", async (req, res, next) => {

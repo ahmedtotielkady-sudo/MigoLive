@@ -2,6 +2,7 @@
 const express = require("express");
 const User = require("../models/User");
 const AppUpdatePolicy = require("../models/AppUpdatePolicy");
+const Device = require("../models/Device");
 const requireAuth = require("../middleware/requireAuth");
 
 const router = express.Router();
@@ -72,6 +73,48 @@ router.put("/policy", requireAuth, ownerOnly, async (req, res, next) => {
   } catch (error) { return next(error); }
 });
 
+
+
+// Owner inventory: merge version sightings with app versions recorded on every device.
+router.get("/versions", requireAuth, ownerOnly, async (req, res, next) => {
+  try {
+    const [policy, deviceVersions] = await Promise.all([
+      AppUpdatePolicy.findById("global").lean(),
+      Device.aggregate([
+        { $match: { appVersion: { $type: "string", $ne: "" } } },
+        { $group: {
+          _id: "$appVersion",
+          deviceCount: { $sum: 1 },
+          firstSeenAt: { $min: "$firstSeenAt" },
+          lastSeenAt: { $max: "$lastSeenAt" }
+        } }
+      ])
+    ]);
+    const versions = new Map();
+    for (const item of (policy && Array.isArray(policy.versions) ? policy.versions : [])) {
+      if (!item || !item.version) continue;
+      versions.set(item.version, {
+        version: item.version, firstSeenAt: item.firstSeenAt || null,
+        lastSeenAt: item.lastSeenAt || null, seenCount: Number(item.seenCount || 0),
+        deviceCount: 0
+      });
+    }
+    for (const item of deviceVersions) {
+      const version = String(item._id || "").trim();
+      if (!version) continue;
+      const prior = versions.get(version) || { version, firstSeenAt: null, lastSeenAt: null, seenCount: 0, deviceCount: 0 };
+      prior.deviceCount = Number(item.deviceCount || 0);
+      if (!prior.firstSeenAt || (item.firstSeenAt && new Date(item.firstSeenAt) < new Date(prior.firstSeenAt))) prior.firstSeenAt = item.firstSeenAt;
+      if (!prior.lastSeenAt || (item.lastSeenAt && new Date(item.lastSeenAt) > new Date(prior.lastSeenAt))) prior.lastSeenAt = item.lastSeenAt;
+      versions.set(version, prior);
+    }
+    const cleaned = clean(policy || {});
+    return res.json({
+      ok: true, policy: cleaned,
+      versions: Array.from(versions.values()).sort((a, b) => String(b.version).localeCompare(String(a.version), undefined, { numeric: true }))
+    });
+  } catch (error) { return next(error); }
+});
 
 router.put("/versions", requireAuth, ownerOnly, async (req, res, next) => {
   try {
