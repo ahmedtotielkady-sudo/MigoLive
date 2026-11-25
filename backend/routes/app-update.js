@@ -80,6 +80,7 @@ router.put("/versions", requireAuth, ownerOnly, async (req, res, next) => {
     if (!Array.isArray(input) || input.length > 100) return res.status(400).json({ ok: false, message: "قائمة الإصدارات غير صحيحة" });
     const blockedVersions = [...new Set(input.map(v => String(v || "").trim()))];
     if (blockedVersions.some(v => !versionPattern.test(v))) return res.status(400).json({ ok: false, message: "يوجد رقم إصدار غير صحيح" });
+    if (blockedVersions.length && !/^https:\\/\\//i.test(String((await AppUpdatePolicy.findById("global").select("downloadUrl").lean()) || {}).downloadUrl || "")) return res.status(400).json({ ok: false, message: "أضف رابط تنزيل آمن HTTPS من قسم تحديث التطبيق قبل حظر الإصدارات" });
     const policy = await AppUpdatePolicy.findOneAndUpdate(
       { _id: "global" },
       { $set: { blockedVersions, updatedAt: new Date(), updatedBy: req.auth.sub } },
