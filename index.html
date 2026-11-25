@@ -1565,7 +1565,7 @@ async function ownerVersionsBind(m){
  }catch(e){state.classList.add('is-error');state.textContent='تعذر تحميل الإصدارات: '+(e.message||'خطأ اتصال');}
  m.querySelector('#ov-add').onclick=()=>{
   const field=m.querySelector('#ov-manual'),version=field.value.trim();
-  if(!/^\\d{1,4}\\.\\d{1,4}\\.\\d{1,4}(?:[-+][A-Za-z0-9.-]{1,20})?$/.test(version)){toast('اكتب رقم إصدار صحيحًا مثل 1.2.3');return;}
+  if(!/^\d{1,4}\.\d{1,4}\.\d{1,4}(?:[-+][A-Za-z0-9.-]{1,20})?$/.test(version)){toast('اكتب رقم إصدار صحيحًا مثل 1.2.3');return;}
   if(list.querySelector('[data-block-version="'+version+'"]')){toast('هذا الإصدار موجود بالفعل');return;}
   const row=document.createElement('label');row.className='owner-version-row';
   row.innerHTML='<span class="owner-version-main"><b class="owner-version-number" dir="ltr">'+esc(version)+'</b><small class="owner-version-meta">إصدار أُضيف يدويًا · لم يتم رصده تلقائيًا</small></span><span class="owner-version-toggle"><input type="checkbox" data-block-version="'+esc(version)+'" checked><b>حظر</b></span>';
