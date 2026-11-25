@@ -846,20 +846,20 @@
         'button, label, h2, h3, h4, p, span, div'
       )).filter(element => {
         if (!isVisible(element) || element.children.length > 4) return false;
-        const text = (element.textContent || '').replace(/\\s+/g, ' ').trim();
-        return text.length < 100 && /(?:نسخ\\s*(?:الرقم|رقم)|إرسال\\s*(?:مستند|إيصال)|إرفاق\\s*(?:مستند|إيصال)|رفع\\s*(?:مستند|إيصال)|إثبات\\s*(?:التحويل|الدفع))/i.test(text);
+        const text = (element.textContent || '').replace(/\s+/g, ' ').trim();
+        return text.length < 100 && /(?:نسخ\s*(?:الرقم|رقم)|إرسال\s*(?:مستند|إيصال)|إرفاق\s*(?:مستند|إيصال)|رفع\s*(?:مستند|إيصال)|إثبات\s*(?:التحويل|الدفع))/i.test(text);
       });
       const candidates = [...labels, ...receiptInputs];
       if (!candidates.length) return null;
       // Prefer the payment number/copy control, otherwise the receipt upload.
-      const copy = labels.find(element => /نسخ\\s*(?:الرقم|رقم)/.test(element.textContent || ''));
+      const copy = labels.find(element => /نسخ\s*(?:الرقم|رقم)/.test(element.textContent || ''));
       const target = copy || receiptInputs[0] || labels[0];
       let section = target;
       for (let depth = 0; depth < 4 && section.parentElement; depth++) {
         const parent = section.parentElement;
         const text = (parent.textContent || '').slice(0, 1800);
         if (parent.querySelector('input[type="file"]') &&
-            /(?:نسخ|رقم\\s*الشحن|التحويل|إيصال|مستند)/.test(text)) {
+            /(?:نسخ|رقم\s*الشحن|التحويل|إيصال|مستند)/.test(text)) {
           section = parent;
           break;
         }
