@@ -1424,7 +1424,7 @@ function rOwner(m){
   if(!isStaff(U())){tab='me';return render()}
   if(ot==='appupdate'&&(!U()||U().role!=='owner')){ot='dash';toast('التحكم في تحديث التطبيق متاح للمالك فقط')}
   const users=Object.entries(DB.users),agents=users.filter(([,x])=>x.role==='agent');
-  const tabsO=staffTabs([['dash','📊 الرئيسية'],['tp','طلبات الشحن'],['set','الإعدادات'],['coins','العملات'],['agents','الوكلاء'],['users','الأعضاء'],['hosts','سجل المضيفين'],['alog','سجل الوكلاء'],['ag','وكالات المضيفين'],['ship','وكالات الشحن'],['ledger','دفاتر الحسابات'],['vip','VIP'],['gifts','الهدايا'],['broadcast','رسائل النظام'],['events','الفعاليات'],['staff','الصلاحيات'],['appupdate','📲 تحديث التطبيق'],['countries','طلبات تغيير البلد'],['support','الدعم']].filter(([k])=>k!=='appupdate'||U().role==='owner'))
+  const tabsO=staffTabs([['dash','📊 الرئيسية'],['tp','طلبات الشحن'],['set','الإعدادات'],['coins','العملات'],['agents','الوكلاء'],['users','الأعضاء'],['hosts','سجل المضيفين'],['alog','سجل الوكلاء'],['ag','وكالات المضيفين'],['ship','وكالات الشحن'],['ledger','دفاتر الحسابات'],['vip','VIP'],['gifts','الهدايا'],['broadcast','رسائل النظام'],['events','الفعاليات'],['staff','الصلاحيات'],['appupdate','📲 تحديث التطبيق'],['versions','📦 إدارة الإصدارات'],['devices','📱 الأجهزة والحظر'],['countries','طلبات تغيير البلد'],['support','الدعم']].filter(([k])=>!['appupdate','versions','devices'].includes(k)||U().role==='owner'))
   let body='';
   if(ot==='dash')body=ownerDashboardHTML(tabsO);
   if(ot==='ship')body=shippingOwnerHTML();
@@ -1447,6 +1447,8 @@ function rOwner(m){
   if(ot==='countries')body=(U().role==='owner'?(DB.countryRequests||[]).filter(x=>x.status==='pending').map(x=>{const u=DB.users[x.user];return `<div class="card"><b>${esc(u?u.name:x.user)}</b><div class="mu">ID: ${u?u.uid:'-'} · البلد المطلوب: ${esc(x.country)} · الرسوم: 100,000 عملة</div><div class="row" style="margin-top:8px"><button class="btn g s grow" data-country-ok="${x.id}">موافقة وخصم الرسوم</button><button class="btn r s grow" data-country-no="${x.id}">رفض</button></div></div>`}).join('')||'<p class="mu">لا توجد طلبات تغيير بلد معلقة.</p>':'<p class="mu">طلبات تغيير البلد متاحة للمالك فقط.</p>');
   if(ot==='support')body=supportOwnerHTML();
   if(ot==='appupdate')body=appUpdateOwnerHTML();
+  if(ot==='versions')body=ownerVersionsHTML();
+  if(ot==='devices')body=ownerDevicesHTML();
   if(ot==='hostapps')body=localHostAppsHTML();
   if(ot==='referrals')body=localReferralsHTML();
   if(ot==='vipplans')body=localVipPlansHTML();
@@ -1467,6 +1469,8 @@ function rOwner(m){
   if(ot==='staff')staffOwnerBind(m);
   if(ot==='support')supportOwnerBind(m);
   if(ot==='appupdate')appUpdateOwnerBind(m);
+  if(ot==='versions')ownerVersionsBind(m);
+  if(ot==='devices')ownerDevicesBind(m);
   m.querySelectorAll('[data-country-ok]').forEach(b=>b.onclick=()=>{if(!U()||U().role!=='owner')return toast('الموافقة للمالك فقط');const q=(DB.countryRequests||[]).find(x=>x.id==b.dataset.countryOk&&x.status==='pending'),u=q&&DB.users[q.user];if(!q||!u)return toast('الطلب غير موجود');if((+u.coins||0)<100000)return toast('رصيد المستخدم لم يعد كافياً');u.coins-=100000;u.country=q.country;u.countrySetOnce=true;q.status='approved';q.reviewed=Date.now();q.reviewedBy=me;logIt('المالك',`وافق على تغيير بلد ${u.name} إلى ${q.country} وخصم 100,000 عملة`);notifyUserResult(q.user,`تمت الموافقة على تغيير بلدك إلى ${q.country} وخصم 100,000 عملة`);save();toast('تمت الموافقة وتغيير البلد');render()});
   m.querySelectorAll('[data-country-no]').forEach(b=>b.onclick=()=>{if(!U()||U().role!=='owner')return toast('الرفض للمالك فقط');const q=(DB.countryRequests||[]).find(x=>x.id==b.dataset.countryNo&&x.status==='pending');if(!q)return;q.status='rejected';q.reviewed=Date.now();q.reviewedBy=me;logIt('المالك',`رفض طلب تغيير بلد الحساب ${q.user}`);notifyUserResult(q.user,`تم رفض طلب تغيير البلد إلى ${q.country}`);save();toast('تم رفض الطلب');render()});
   if(ot==='hostapps')localHostAppsBind(m);
@@ -1538,6 +1542,57 @@ async function appUpdateOwnerBind(m){
  };
 }
 
+function ownerVersionsHTML(){
+ return `<div class="card"><b>📦 التحكم في جميع إصدارات ميجو لايف</b><p class="mu">الإصدارات التي سجلت دخولها للتطبيق تظهر هنا تلقائياً. ضع علامة حظر بجانب أي إصدار قديم لمنعه من الدخول وإظهار شاشة التحديث له.</p><div id="ov-state" class="mu">جارٍ تحميل الإصدارات…</div><div id="ov-list"></div><button class="btn g w" id="ov-save">حفظ حظر الإصدارات المحددة</button><div class="err" id="ov-error"></div></div><div class="card"><b>ملاحظة</b><p class="mu">حظر إصدار محدد لا يغيّر ملفات APK المنشورة، لكنه يمنع التطبيق الذي يحمل رقم هذا الإصدار من الاستمرار عند اتصاله بالخادم.</p></div>`;
+}
+async function ownerVersionsBind(m){
+ if(!U()||U().role!=='owner')return toast('هذا التحكم للمالك فقط');
+ const state=m.querySelector('#ov-state'),list=m.querySelector('#ov-list'),saveBtn=m.querySelector('#ov-save'),error=m.querySelector('#ov-error');
+ try{
+  const data=await window.migoApi('/app-update/status'),p=data.policy||{},blocked=new Set(p.blockedVersions||[]),versions=p.versions||[];
+  state.textContent=versions.length?'الإصدارات التي رصدها الخادم: '+versions.length:'لم يسجل الخادم إصدارات بعد. ستظهر النسخة الحالية بعد فتحها بهذا التحديث.';
+  list.innerHTML=versions.slice().sort((a,b)=>String(b.version).localeCompare(String(a.version),undefined,{numeric:true})).map(v=>`<label class="row card" style="justify-content:space-between"><span class="grow"><b dir="ltr">${esc(v.version)}</b><small class="mu" style="display:block">مرات الظهور: ${fmt(v.seenCount||0)} · آخر ظهور: ${v.lastSeenAt?new Date(v.lastSeenAt).toLocaleString('ar-EG'):'-'}</small></span><span><input type="checkbox" data-block-version="${esc(v.version)}" ${blocked.has(v.version)?'checked':''} style="width:22px;height:22px"></span><b class="mu">حظر</b></label>`).join('')||'<p class="mu">لا توجد إصدارات مسجلة حتى الآن.</p>';
+ }catch(e){state.textContent='تعذر تحميل الإصدارات: '+(e.message||'خطأ اتصال');}
+ saveBtn.onclick=async()=>{
+  if(!U()||U().role!=='owner')return toast('هذا التحكم للمالك فقط');
+  saveBtn.disabled=true;error.textContent='';
+  try{
+   const blockedVersions=Array.from(list.querySelectorAll('[data-block-version]:checked')).map(x=>x.dataset.blockVersion);
+   const result=await window.migoApi('/app-update/versions',{method:'PUT',body:JSON.stringify({blockedVersions})});
+   toast('تم حفظ قائمة الإصدارات المحظورة');
+   state.textContent='تم الحفظ · الإصدارات المحظورة: '+(result.policy.blockedVersions||[]).length;
+  }catch(e){error.textContent=e.message||'تعذر حفظ الإصدارات';}
+  finally{saveBtn.disabled=false;}
+ };
+}
+function ownerDevicesHTML(){
+ return `<div class="card"><b>📱 الأجهزة المسجلة والحظر النهائي</b><p class="mu">يعرض نوع الهاتف وطرازه ونظام التشغيل والإصدار الذي يستخدمه. حظر الجهاز يمنع تسجيل الدخول من معرّف هذا الجهاز حتى لو حاول استخدام حساب آخر.</p><div class="row"><input class="in grow" id="od-q" placeholder="بحث بالطراز أو ID العضو أو الإصدار" style="margin:0"><select class="in" id="od-status" style="width:auto;margin:0"><option value="all">كل الأجهزة</option><option value="active">غير محظورة</option><option value="blocked">محظورة</option></select></div><button class="btn o w" id="od-refresh" style="margin-top:10px">تحديث القائمة</button></div><div id="od-state" class="mu">جارٍ تحميل الأجهزة…</div><div id="od-list"></div>`;
+}
+async function ownerDevicesBind(m){
+ if(!U()||U().role!=='owner')return toast('إدارة الأجهزة للمالك فقط');
+ const state=m.querySelector('#od-state'),list=m.querySelector('#od-list'),q=m.querySelector('#od-q'),status=m.querySelector('#od-status');
+ const load=async()=>{
+  state.textContent='جارٍ تحميل الأجهزة…';list.innerHTML='';
+  try{
+   const data=await window.migoApi('/admin/devices?status='+encodeURIComponent(status.value)+'&q='+encodeURIComponent(q.value.trim()));
+   const devices=data.devices||[];state.textContent='عدد الأجهزة: '+devices.length;
+   list.innerHTML=devices.map(d=>`<div class="card"><div class="row"><b class="grow">${esc(d.manufacturer||'')} ${esc(d.model||'جهاز غير معروف')}</b><span class="badge">${d.blocked?'محظور':'نشط'}</span></div><div class="mu">المنصة: ${esc(d.platform||'-')} · النظام: ${esc(d.osVersion||'-')} · إصدار التطبيق: <b dir="ltr">${esc(d.appVersion||'-')}</b></div><div class="mu">آخر حساب: ${d.uid?('ID '+d.uid):'غير معروف'} · آخر ظهور: ${d.lastSeenAt?new Date(d.lastSeenAt).toLocaleString('ar-EG'):'-'}</div>${d.blockReason?'<div class="mu">سبب الحظر: '+esc(d.blockReason)+'</div>':''}<button class="btn ${d.blocked?'o':'r'} s w" data-device-action="${d.blocked?'unblock':'block'}" data-device-id="${d.id}" style="margin-top:10px">${d.blocked?'رفع حظر الجهاز':'حظر هذا الهاتف نهائياً'}</button></div>`).join('')||'<div class="card mu">لا توجد أجهزة مطابقة للبحث.</div>';
+  }catch(e){state.textContent='تعذر تحميل الأجهزة: '+(e.message||'خطأ اتصال');}
+ };
+ m.querySelector('#od-refresh').onclick=load;status.onchange=load;
+ q.onkeydown=e=>{if(e.key==='Enter')load()};
+ list.onclick=async e=>{
+  const btn=e.target.closest('[data-device-action]');if(!btn)return;
+  if(!U()||U().role!=='owner')return toast('الحظر للمالك فقط');
+  const action=btn.dataset.deviceAction,id=btn.dataset.deviceId;
+  if(action==='block'&&!confirm('تأكيد حظر هذا الجهاز من استخدام ميجو لايف؟'))return;
+  btn.disabled=true;
+  try{await window.migoApi('/admin/devices/'+encodeURIComponent(id)+'/'+action,{method:'POST',body:JSON.stringify({reason:action==='block'?'حظر من لوحة المالك':''})});toast(action==='block'?'تم حظر الجهاز':'تم رفع حظر الجهاز');await load();}
+  catch(err){toast(err.message||'تعذر تنفيذ العملية');btn.disabled=false;}
+ };
+ await load();
+}
+
 /* ===== مركز الإدارة الموسع: شحن، رسائل، فعاليات، دفاتر ===== */
 
 function adminLog(type,detail){DB.audit.unshift({t:Date.now(),by:me||'local',type,detail});DB.audit=DB.audit.slice(0,5000);}
@@ -1550,7 +1605,7 @@ function ownerPendingBadge(section){const n=ownerPendingCount(section);return n?
 function ownerTotalBadge(){const n=ownerPendingTotal();return n?'<span class="owner-menu-pending" aria-label="'+n+' إجراء معلق">'+(n>99?'99+':n)+'</span>':''}
 function ownerDashboardHTML(tabsO=[]){
  const us=Object.values(DB.users),pending=ownerPendingCount('tp'),allPending=ownerPendingTotal();
- const icons={tp:'🧾',set:'⚙️',coins:'🪙',agents:'🛡️',users:'👥',hosts:'🎙️',alog:'📋',ag:'🏢',ship:'🏦',ledger:'📒',vip:'💎',gifts:'🎁',broadcast:'📣',events:'🎉',staff:'🔐',appupdate:'📲',countries:'🌍',support:'🆘',hostapps:'🎤',referrals:'🎟️',vipplans:'💠',localsec:'🛡️'};
+ const icons={tp:'🧾',set:'⚙️',coins:'🪙',agents:'🛡️',users:'👥',hosts:'🎙️',alog:'📋',ag:'🏢',ship:'🏦',ledger:'📒',vip:'💎',gifts:'🎁',broadcast:'📣',events:'🎉',staff:'🔐',appupdate:'📲',versions:'📦',devices:'📱',countries:'🌍',support:'🆘',hostapps:'🎤',referrals:'🎟️',vipplans:'💠',localsec:'🛡️'};
  const cards=tabsO.filter(([k])=>k!=='dash').map(([k,label])=>`<button type="button" class="owner-menu-item" data-jump="${k}"><span class="owner-menu-icon">${icons[k]||'📂'}</span><span class="owner-menu-label">${label.replace(/^\S+\s/,'')}</span>${ownerPendingBadge(k)}<span class="owner-menu-arrow">‹</span></button>`).join('');
  return `<section class="owner-summary card"><b>📊 ملخص التطبيق</b><div class="owner-stats">
  <div><span>الحسابات</span><b>${us.length}</b></div><div><span>إجمالي العملات</span><b>${fmt(us.reduce((a,x)=>a+(+x.coins||0),0))}</b></div><div><span>طلبات الشحن المعلقة</span><b>${pending}</b></div><div class="owner-pending-summary"><span>كل الإجراءات المعلقة</span><b>${allPending}</b></div>
