@@ -60,6 +60,8 @@
     }
     return data;
   }
+  window.migoApi = api;
+  window.migoDeviceHeaders = deviceHeaders;
 
   // Server-controlled mandatory update gate. APK installation still requires Android confirmation.
   const MIGO_APP_VERSION = '1.0.1';
@@ -105,7 +107,7 @@
       if(!response.ok)return;
       const data=await response.json(),policy=data.policy||{};
       const individuallyBlocked=Array.isArray(policy.blockedVersions)&&policy.blockedVersions.includes(installed);
-      if(policy.enabled&&(compareVersions(installed,policy.minimumVersion)<0||individuallyBlocked))showMandatoryUpdate(policy);
+      if(individuallyBlocked||(policy.enabled&&compareVersions(installed,policy.minimumVersion)<0))showMandatoryUpdate(policy);
     }catch(_){}
   }
   checkMandatoryUpdate();
