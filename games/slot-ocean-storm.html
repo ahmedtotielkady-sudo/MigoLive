@@ -171,8 +171,9 @@ async function tumbleRound(){
     await sleep(420);
     rem.forEach(function(d){d.el.remove()});
     hideWin();
+    var remSet=new Set(rem);
     for(var c=0;c<COLS;c++){
-      var keep=g[c].filter(function(d){return rem.indexOf(d)<0}),n=ROWS-keep.length,nw=[];
+      var keep=g[c].filter(function(d){return !remSet.has(d)}),n=ROWS-keep.length,nw=[];
       for(var k=0;k<n;k++)nw.push(mk(c,k,-(n-k)*S-S));
       g[c]=nw.concat(keep);
       g[c].forEach(function(d,idx){d.r=idx});
