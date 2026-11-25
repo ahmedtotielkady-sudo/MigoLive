@@ -120,13 +120,31 @@ router.put("/versions", requireAuth, ownerOnly, async (req, res, next) => {
   try {
     const versionPattern = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:[-+][A-Za-z0-9.-]{1,20})?$/;
     const input = req.body && req.body.blockedVersions;
-    if (!Array.isArray(input) || input.length > 100) return res.status(400).json({ ok: false, message: "قائمة الإصدارات غير صحيحة" });
+    const catalogInput = req.body && req.body.versions;
+    if (!Array.isArray(input) || input.length > 100) return res.status(400).json({ ok: false, message: "قائمة الإصدارات المحظورة غير صحيحة" });
+    if (catalogInput !== undefined && (!Array.isArray(catalogInput) || catalogInput.length > 500)) {
+      return res.status(400).json({ ok: false, message: "قائمة سجل الإصدارات غير صحيحة" });
+    }
     const blockedVersions = [...new Set(input.map(v => String(v || "").trim()))];
-    if (blockedVersions.some(v => !versionPattern.test(v))) return res.status(400).json({ ok: false, message: "يوجد رقم إصدار غير صحيح" });
+    const catalogVersions = [...new Set((catalogInput || []).map(v => String(v || "").trim()))];
+    if (blockedVersions.some(v => !versionPattern.test(v)) || catalogVersions.some(v => !versionPattern.test(v))) {
+      return res.status(400).json({ ok: false, message: "يوجد رقم إصدار غير صحيح" });
+    }
     if (blockedVersions.length && !/^https:\/\//i.test(String((await AppUpdatePolicy.findById("global").select("downloadUrl").lean()) || {}).downloadUrl || "")) return res.status(400).json({ ok: false, message: "أضف رابط تنزيل آمن HTTPS من قسم تحديث التطبيق قبل حظر الإصدارات" });
+    const current = await AppUpdatePolicy.findById("global").lean() || {};
+    const versionMap = new Map((Array.isArray(current.versions) ? current.versions : [])
+      .filter(v => v && v.version).map(v => [v.version, v]));
+    for (const version of catalogVersions) {
+      if (!versionMap.has(version)) versionMap.set(version, {
+        version, firstSeenAt: new Date(), lastSeenAt: null, seenCount: 0
+      });
+    }
     const policy = await AppUpdatePolicy.findOneAndUpdate(
       { _id: "global" },
-      { $set: { blockedVersions, updatedAt: new Date(), updatedBy: req.auth.sub } },
+      { $set: {
+        blockedVersions, versions: Array.from(versionMap.values()),
+        updatedAt: new Date(), updatedBy: req.auth.sub
+      } },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     ).lean();
     const io = req.app.get("io");
