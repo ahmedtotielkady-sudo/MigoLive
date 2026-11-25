@@ -1542,12 +1542,12 @@ async function appUpdateOwnerBind(m){
 }
 
 function ownerVersionsHTML(){
- return \`<section class="owner-control-hero"><span class="owner-control-icon">📦</span><div class="owner-control-title"><span class="owner-eyebrow">VERSION MANAGEMENT</span><h4>إدارة إصدارات ميجو لايف</h4><p>راقب الإصدارات التي اتصلت بالخادم، وحدد النسخ التي تريد إيقافها. الحظر يظهر للمستخدم شاشة التحديث عند اتصاله.</p></div></section>
+ return `<section class="owner-control-hero"><span class="owner-control-icon">📦</span><div class="owner-control-title"><span class="owner-eyebrow">VERSION MANAGEMENT</span><h4>إدارة إصدارات ميجو لايف</h4><p>راقب الإصدارات التي اتصلت بالخادم، وحدد النسخ التي تريد إيقافها. الحظر يظهر للمستخدم شاشة التحديث عند اتصاله.</p></div></section>
  <div class="owner-control-stats"><div class="owner-control-stat"><span>إصدارات مرصودة</span><b id="ov-total">—</b></div><div class="owner-control-stat"><span>إصدارات محظورة</span><b id="ov-blocked">—</b></div><div class="owner-control-stat"><span>أحدث إصدار مرصود</span><b id="ov-latest" dir="ltr">—</b></div></div>
  <section class="card owner-control-card"><div class="owner-card-heading"><div><b>قائمة الإصدارات</b><p class="mu">حدد الحظر بجوار كل إصدار ثم احفظ التغييرات</p></div><span class="badge">تحكم المالك</span></div>
  <div id="ov-state" class="owner-inline-state">جارٍ تحميل سجل الإصدارات…</div><div id="ov-list" class="owner-version-list"></div>
  <div class="owner-sticky-action"><p class="mu">لن يُطبق التغيير إلا بعد حفظ القائمة على الخادم.</p><button class="btn g w" id="ov-save">حفظ إعدادات حظر الإصدارات</button><div class="err" id="ov-error" role="alert"></div></div></section>
- <div class="owner-info-note"><b>معلومة مهمة</b><p>الإصدارات تظهر في السجل بعد أن يتصل التطبيق بالخادم. يمكنك أيضًا استخدام قسم «تحديث التطبيق» لتحديد الحد الأدنى المطلوب لجميع النسخ الأقدم.</p></div>\`;
+ <div class="owner-info-note"><b>معلومة مهمة</b><p>الإصدارات تظهر في السجل بعد أن يتصل التطبيق بالخادم. يمكنك أيضًا استخدام قسم «تحديث التطبيق» لتحديد الحد الأدنى المطلوب لجميع النسخ الأقدم.</p></div>`;
 }
 async function ownerVersionsBind(m){
  if(!U()||U().role!=='owner')return toast('هذا التحكم للمالك فقط');
@@ -1561,7 +1561,7 @@ async function ownerVersionsBind(m){
   m.querySelector('#ov-blocked').textContent=blocked.size;
   m.querySelector('#ov-latest').textContent=observed.slice().sort((a,b)=>String(b.version).localeCompare(String(a.version),undefined,{numeric:true}))[0]?.version||'—';
   state.textContent=versions.length?'تم تحميل سجل الإصدارات بنجاح':'لا توجد إصدارات مرصودة بعد؛ ستظهر النسخة بعد اتصالها بالخادم.';
-  list.innerHTML=versions.map(v=>\`<label class="owner-version-row"><span class="owner-version-main"><b class="owner-version-number" dir="ltr">\${esc(v.version)}</b><small class="owner-version-meta">\${v.seenCount?('عدد مرات الاتصال: '+fmt(v.seenCount)):'إصدار محظور يدويًا وغير مرصود'} · آخر ظهور: \${v.lastSeenAt?new Date(v.lastSeenAt).toLocaleString('ar-EG'):'—'}</small></span><span class="owner-version-toggle"><input type="checkbox" data-block-version="\${esc(v.version)}" \${blocked.has(v.version)?'checked':''}><b>حظر</b></span></label>\`).join('')||'<div class="owner-empty-state"><span>📦</span><b>لا توجد إصدارات مسجلة</b><p>سيظهر الإصدار تلقائيًا عندما يتصل التطبيق بالخادم.</p></div>';
+  list.innerHTML=versions.map(v=>`<label class="owner-version-row"><span class="owner-version-main"><b class="owner-version-number" dir="ltr">${esc(v.version)}</b><small class="owner-version-meta">${v.seenCount?('عدد مرات الاتصال: '+fmt(v.seenCount)):'إصدار محظور يدويًا وغير مرصود'} · آخر ظهور: ${v.lastSeenAt?new Date(v.lastSeenAt).toLocaleString('ar-EG'):'—'}</small></span><span class="owner-version-toggle"><input type="checkbox" data-block-version="${esc(v.version)}" ${blocked.has(v.version)?'checked':''}><b>حظر</b></span></label>`).join('')||'<div class="owner-empty-state"><span>📦</span><b>لا توجد إصدارات مسجلة</b><p>سيظهر الإصدار تلقائيًا عندما يتصل التطبيق بالخادم.</p></div>';
  }catch(e){state.classList.add('is-error');state.textContent='تعذر تحميل الإصدارات: '+(e.message||'خطأ اتصال');}
  saveBtn.onclick=async()=>{
   if(!U()||U().role!=='owner')return toast('هذا التحكم للمالك فقط');
@@ -1578,12 +1578,12 @@ async function ownerVersionsBind(m){
  };
 }
 function ownerDevicesHTML(){
- return \`<section class="owner-control-hero"><span class="owner-control-icon">📱</span><div class="owner-control-title"><span class="owner-eyebrow">DEVICE SECURITY</span><h4>إدارة الأجهزة والحظر</h4><p>اعرف نوع الهاتف وطرازه ونظام التشغيل، وراجع الأجهزة النشطة والمحظورة. حظر الجهاز يمنع استخدامه للوصول إلى الحسابات من خلال معرّف التطبيق المسجل.</p></div></section>
+ return `<section class="owner-control-hero"><span class="owner-control-icon">📱</span><div class="owner-control-title"><span class="owner-eyebrow">DEVICE SECURITY</span><h4>إدارة الأجهزة والحظر</h4><p>اعرف نوع الهاتف وطرازه ونظام التشغيل، وراجع الأجهزة النشطة والمحظورة. حظر الجهاز يمنع استخدامه للوصول إلى الحسابات من خلال معرّف التطبيق المسجل.</p></div></section>
  <div class="owner-control-stats"><div class="owner-control-stat"><span>إجمالي الأجهزة</span><b id="od-total">—</b></div><div class="owner-control-stat"><span>أجهزة نشطة</span><b id="od-active">—</b></div><div class="owner-control-stat"><span>أجهزة محظورة</span><b id="od-blocked">—</b></div></div>
  <section class="card owner-control-card"><div class="owner-card-heading"><div><b>سجل الأجهزة</b><p class="mu">ابحث بالطراز أو رقم العضو أو إصدار التطبيق</p></div><button class="btn o s" id="od-refresh">↻ تحديث</button></div>
  <div class="owner-device-filters"><input class="in" id="od-q" placeholder="ابحث عن جهاز…" aria-label="البحث عن جهاز"><select class="in" id="od-status" aria-label="تصفية الأجهزة"><option value="all">كل الأجهزة</option><option value="active">النشطة فقط</option><option value="blocked">المحظورة فقط</option></select></div>
  <div id="od-state" class="owner-inline-state">جارٍ تحميل الأجهزة…</div><div id="od-list" class="owner-device-list"></div></section>
- <div class="owner-info-note"><b>تنبيه بخصوص الحظر</b><p>الحظر مرتبط بمعرّف التطبيق على الهاتف، وليس بقفل مادي دائم لمكونات الهاتف. قد يتغير المعرّف بعد حذف بيانات التطبيق أو إعادة ضبط الجهاز.</p></div>\`;
+ <div class="owner-info-note"><b>تنبيه بخصوص الحظر</b><p>الحظر مرتبط بمعرّف التطبيق على الهاتف، وليس بقفل مادي دائم لمكونات الهاتف. قد يتغير المعرّف بعد حذف بيانات التطبيق أو إعادة ضبط الجهاز.</p></div>`;
 }
 async function ownerDevicesBind(m){
  if(!U()||U().role!=='owner')return toast('إدارة الأجهزة للمالك فقط');
@@ -1597,10 +1597,10 @@ async function ownerDevicesBind(m){
   });
   list.innerHTML=filtered.map(d=>{
    const blocked=!!d.blocked,platform=String(d.platform||'').toLowerCase(),symbol=platform.includes('android')?'🤖':platform.includes('ios')?'🍎':'🌐';
-   return \`<article class="owner-device-row \${blocked?'is-blocked':''}"><div class="owner-device-top"><span class="owner-device-symbol">\${symbol}</span><span class="owner-device-name"><b>\${esc([d.manufacturer,d.model].filter(Boolean).join(' ')||'جهاز غير معروف')}</b><small dir="ltr">\${esc(d.platform||'منصة غير معروفة')}</small></span><span class="owner-device-status \${blocked?'blocked':'active'}">\${blocked?'محظور':'نشط'}</span></div>
-   <div class="owner-device-details"><span>نظام التشغيل<b>\${esc(d.osVersion||'غير معروف')}</b></span><span>إصدار التطبيق<b dir="ltr">\${esc(d.appVersion||'غير معروف')}</b></span><span>رقم العضو الأخير<b>\${d.uid?('ID '+esc(d.uid)):'غير مرتبط'}</b></span><span>آخر ظهور<b>\${d.lastSeenAt?new Date(d.lastSeenAt).toLocaleString('ar-EG'):'—'}</b></span><span>أول ظهور<b>\${d.firstSeenAt?new Date(d.firstSeenAt).toLocaleDateString('ar-EG'):'—'}</b></span><span>حالة الجهاز<b>\${blocked?'الوصول موقوف':'يسمح بالوصول'}</b></span></div>
-   \${d.blockReason?'<div class="owner-device-reason">سبب الحظر: '+esc(d.blockReason)+'</div>':''}
-   <button class="btn \${blocked?'o':'r'} s w" data-device-action="\${blocked?'unblock':'block'}" data-device-id="\${esc(d.id)}">\${blocked?'رفع حظر هذا الجهاز':'حظر الهاتف ومنع دخوله'}</button></article>\`;
+   return `<article class="owner-device-row ${blocked?'is-blocked':''}"><div class="owner-device-top"><span class="owner-device-symbol">${symbol}</span><span class="owner-device-name"><b>${esc([d.manufacturer,d.model].filter(Boolean).join(' ')||'جهاز غير معروف')}</b><small dir="ltr">${esc(d.platform||'منصة غير معروفة')}</small></span><span class="owner-device-status ${blocked?'blocked':'active'}">${blocked?'محظور':'نشط'}</span></div>
+   <div class="owner-device-details"><span>نظام التشغيل<b>${esc(d.osVersion||'غير معروف')}</b></span><span>إصدار التطبيق<b dir="ltr">${esc(d.appVersion||'غير معروف')}</b></span><span>رقم العضو الأخير<b>${d.uid?('ID '+esc(d.uid)):'غير مرتبط'}</b></span><span>آخر ظهور<b>${d.lastSeenAt?new Date(d.lastSeenAt).toLocaleString('ar-EG'):'—'}</b></span><span>أول ظهور<b>${d.firstSeenAt?new Date(d.firstSeenAt).toLocaleDateString('ar-EG'):'—'}</b></span><span>حالة الجهاز<b>${blocked?'الوصول موقوف':'يسمح بالوصول'}</b></span></div>
+   ${d.blockReason?'<div class="owner-device-reason">سبب الحظر: '+esc(d.blockReason)+'</div>':''}
+   <button class="btn ${blocked?'o':'r'} s w" data-device-action="${blocked?'unblock':'block'}" data-device-id="${esc(d.id)}">${blocked?'رفع حظر هذا الجهاز':'حظر الهاتف ومنع دخوله'}</button></article>`;
   }).join('')||'<div class="owner-empty-state"><span>📱</span><b>لا توجد أجهزة مطابقة</b><p>جرّب تغيير كلمات البحث أو فلتر الحالة.</p></div>';
  };
  const load=async()=>{
