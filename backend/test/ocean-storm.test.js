@@ -43,3 +43,22 @@ test("Ocean Storm buy-feature is settled as a paid feature, not a free-spin awar
   assert.equal(result.outcome.freeSpinsAwarded, 0);
   assert.equal(result.freeSpinRounds.length, 0);
 });
+
+test("Ocean Storm keeps the same cascade wire format at the maximum tumble depth", () => {
+  // This deterministic draw makes every board cell the same regular symbol,
+  // exercising the full 50-step cascade and the optimized removal lookup.
+  const result = ocean.play({ bet: 500, random: () => 0.5 });
+  assert.equal(result.steps.length, 50);
+  for (const step of result.steps) {
+    assert.equal(step.grid.length, 6);
+    assert.ok(step.grid.every(column => column.length === 5));
+    assert.ok(step.removed.length > 0);
+    assert.ok(step.removed.every(position => {
+      const [column, row] = position.split(":").map(Number);
+      return Number.isInteger(column) && column >= 0 && column < 6 &&
+        Number.isInteger(row) && row >= 0 && row < 5;
+    }));
+  }
+  assert.ok(Number.isSafeInteger(result.payout));
+  assert.ok(result.payout >= 0);
+});
