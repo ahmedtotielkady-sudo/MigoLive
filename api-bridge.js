@@ -828,6 +828,70 @@
   document.addEventListener('click',event=>{if(event.target.closest('#migo-member-admin'))return;let n=event.target;for(let i=0;n&&i<7;i++,n=n.parentElement){const t=String(n.innerText||n.textContent||'').replace(/[›❯>]/g,'').trim();if(t==='الأعضاء'||(t.startsWith('الأعضاء')&&t.length<45)){event.preventDefault();event.stopImmediatePropagation();openMemberManagement();return}}},true);
 
 
+  // Automatically guide a selected recharge package to payment and receipt upload.
+  // The original package selection handler still owns package state and pricing.
+  // This enhancement only scrolls to the existing payment/receipt controls.
+  (function installRechargePackageScroll() {
+    function isVisible(element) {
+      if (!element || !element.isConnected) return false;
+      const style = getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden' &&
+        element.getClientRects().length > 0;
+    }
+    function findPaymentTarget() {
+      const receiptInputs = Array.from(document.querySelectorAll(
+        'input[type="file"], input[accept*="image"], input[accept*="pdf"]'
+      )).filter(isVisible);
+      const labels = Array.from(document.querySelectorAll(
+        'button, label, h2, h3, h4, p, span, div'
+      )).filter(element => {
+        if (!isVisible(element) || element.children.length > 4) return false;
+        const text = (element.textContent || '').replace(/\\s+/g, ' ').trim();
+        return text.length < 100 && /(?:نسخ\\s*(?:الرقم|رقم)|إرسال\\s*(?:مستند|إيصال)|إرفاق\\s*(?:مستند|إيصال)|رفع\\s*(?:مستند|إيصال)|إثبات\\s*(?:التحويل|الدفع))/i.test(text);
+      });
+      const candidates = [...labels, ...receiptInputs];
+      if (!candidates.length) return null;
+      // Prefer the payment number/copy control, otherwise the receipt upload.
+      const copy = labels.find(element => /نسخ\\s*(?:الرقم|رقم)/.test(element.textContent || ''));
+      const target = copy || receiptInputs[0] || labels[0];
+      let section = target;
+      for (let depth = 0; depth < 4 && section.parentElement; depth++) {
+        const parent = section.parentElement;
+        const text = (parent.textContent || '').slice(0, 1800);
+        if (parent.querySelector('input[type="file"]') &&
+            /(?:نسخ|رقم\\s*الشحن|التحويل|إيصال|مستند)/.test(text)) {
+          section = parent;
+          break;
+        }
+        if (parent.tagName === 'SECTION' || parent.tagName === 'FORM') {
+          section = parent;
+          break;
+        }
+        section = parent;
+      }
+      return section;
+    }
+    document.addEventListener('click', event => {
+      const button = event.target && event.target.closest &&
+        event.target.closest('button, [role="button"], input[type="button"]');
+      if (!button || !isVisible(button)) return;
+      const label = String(button.textContent || button.value || '').trim();
+      if (label !== 'اختيار') return;
+      // Restrict this to package cards, not unrelated "اختيار" controls.
+      const card = button.closest('article, .pack, .package, .pkg, .card') ||
+        button.parentElement && button.parentElement.parentElement;
+      if (!card || !/1,?000|5,?000|10,?000|50,?000|100,?000/.test(card.textContent || '')) return;
+      // Allow the application's existing click handler to render the selected
+      // package before locating the receipt section.
+      [120, 450].forEach((delay, index) => setTimeout(() => {
+        const target = findPaymentTarget();
+        if (!target) return;
+        if (index === 0 || !isVisible(target)) return;
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, delay));
+    }, false);
+  })();
+
   // Shared owner settings: persisted centrally and pushed to every connected app.
   let sharedPublicSettings = {};
   let sharedSettingsRevision = 0;
