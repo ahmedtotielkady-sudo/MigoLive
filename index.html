@@ -1542,55 +1542,96 @@ async function appUpdateOwnerBind(m){
 }
 
 function ownerVersionsHTML(){
- return `<div class="card"><b>📦 التحكم في جميع إصدارات ميجو لايف</b><p class="mu">الإصدارات التي سجلت دخولها للتطبيق تظهر هنا تلقائياً. ضع علامة حظر بجانب أي إصدار قديم لمنعه من الدخول وإظهار شاشة التحديث له.</p><div id="ov-state" class="mu">جارٍ تحميل الإصدارات…</div><div id="ov-list"></div><button class="btn g w" id="ov-save">حفظ حظر الإصدارات المحددة</button><div class="err" id="ov-error"></div></div><div class="card"><b>ملاحظة</b><p class="mu">حظر إصدار محدد لا يغيّر ملفات APK المنشورة، لكنه يمنع التطبيق الذي يحمل رقم هذا الإصدار من الاستمرار عند اتصاله بالخادم.</p></div>`;
+ return \`<section class="owner-control-hero"><span class="owner-control-icon">📦</span><div class="owner-control-title"><span class="owner-eyebrow">VERSION MANAGEMENT</span><h4>إدارة إصدارات ميجو لايف</h4><p>راقب الإصدارات التي اتصلت بالخادم، وحدد النسخ التي تريد إيقافها. الحظر يظهر للمستخدم شاشة التحديث عند اتصاله.</p></div></section>
+ <div class="owner-control-stats"><div class="owner-control-stat"><span>إصدارات مرصودة</span><b id="ov-total">—</b></div><div class="owner-control-stat"><span>إصدارات محظورة</span><b id="ov-blocked">—</b></div><div class="owner-control-stat"><span>أحدث إصدار مرصود</span><b id="ov-latest" dir="ltr">—</b></div></div>
+ <section class="card owner-control-card"><div class="owner-card-heading"><div><b>قائمة الإصدارات</b><p class="mu">حدد الحظر بجوار كل إصدار ثم احفظ التغييرات</p></div><span class="badge">تحكم المالك</span></div>
+ <div id="ov-state" class="owner-inline-state">جارٍ تحميل سجل الإصدارات…</div><div id="ov-list" class="owner-version-list"></div>
+ <div class="owner-sticky-action"><p class="mu">لن يُطبق التغيير إلا بعد حفظ القائمة على الخادم.</p><button class="btn g w" id="ov-save">حفظ إعدادات حظر الإصدارات</button><div class="err" id="ov-error" role="alert"></div></div></section>
+ <div class="owner-info-note"><b>معلومة مهمة</b><p>الإصدارات تظهر في السجل بعد أن يتصل التطبيق بالخادم. يمكنك أيضًا استخدام قسم «تحديث التطبيق» لتحديد الحد الأدنى المطلوب لجميع النسخ الأقدم.</p></div>\`;
 }
 async function ownerVersionsBind(m){
  if(!U()||U().role!=='owner')return toast('هذا التحكم للمالك فقط');
  const state=m.querySelector('#ov-state'),list=m.querySelector('#ov-list'),saveBtn=m.querySelector('#ov-save'),error=m.querySelector('#ov-error');
  try{
-  const data=await window.migoApi('/app-update/status'),p=data.policy||{},blocked=new Set(p.blockedVersions||[]),versions=p.versions||[];
-  state.textContent=versions.length?'الإصدارات التي رصدها الخادم: '+versions.length:'لم يسجل الخادم إصدارات بعد. ستظهر النسخة الحالية بعد فتحها بهذا التحديث.';
-  list.innerHTML=versions.slice().sort((a,b)=>String(b.version).localeCompare(String(a.version),undefined,{numeric:true})).map(v=>`<label class="row card" style="justify-content:space-between"><span class="grow"><b dir="ltr">${esc(v.version)}</b><small class="mu" style="display:block">مرات الظهور: ${fmt(v.seenCount||0)} · آخر ظهور: ${v.lastSeenAt?new Date(v.lastSeenAt).toLocaleString('ar-EG'):'-'}</small></span><span><input type="checkbox" data-block-version="${esc(v.version)}" ${blocked.has(v.version)?'checked':''} style="width:22px;height:22px"></span><b class="mu">حظر</b></label>`).join('')||'<p class="mu">لا توجد إصدارات مسجلة حتى الآن.</p>';
- }catch(e){state.textContent='تعذر تحميل الإصدارات: '+(e.message||'خطأ اتصال');}
+  const data=await window.migoApi('/app-update/status'),p=data.policy||{},blocked=new Set(p.blockedVersions||[]),observed=Array.isArray(p.versions)?p.versions:[];
+  const byVersion=new Map(observed.map(v=>[v.version,v]));
+  for(const version of blocked)if(!byVersion.has(version))byVersion.set(version,{version,seenCount:0,lastSeenAt:null});
+  const versions=Array.from(byVersion.values()).sort((a,b)=>String(b.version).localeCompare(String(a.version),undefined,{numeric:true}));
+  m.querySelector('#ov-total').textContent=observed.length;
+  m.querySelector('#ov-blocked').textContent=blocked.size;
+  m.querySelector('#ov-latest').textContent=observed.slice().sort((a,b)=>String(b.version).localeCompare(String(a.version),undefined,{numeric:true}))[0]?.version||'—';
+  state.textContent=versions.length?'تم تحميل سجل الإصدارات بنجاح':'لا توجد إصدارات مرصودة بعد؛ ستظهر النسخة بعد اتصالها بالخادم.';
+  list.innerHTML=versions.map(v=>\`<label class="owner-version-row"><span class="owner-version-main"><b class="owner-version-number" dir="ltr">\${esc(v.version)}</b><small class="owner-version-meta">\${v.seenCount?('عدد مرات الاتصال: '+fmt(v.seenCount)):'إصدار محظور يدويًا وغير مرصود'} · آخر ظهور: \${v.lastSeenAt?new Date(v.lastSeenAt).toLocaleString('ar-EG'):'—'}</small></span><span class="owner-version-toggle"><input type="checkbox" data-block-version="\${esc(v.version)}" \${blocked.has(v.version)?'checked':''}><b>حظر</b></span></label>\`).join('')||'<div class="owner-empty-state"><span>📦</span><b>لا توجد إصدارات مسجلة</b><p>سيظهر الإصدار تلقائيًا عندما يتصل التطبيق بالخادم.</p></div>';
+ }catch(e){state.classList.add('is-error');state.textContent='تعذر تحميل الإصدارات: '+(e.message||'خطأ اتصال');}
  saveBtn.onclick=async()=>{
   if(!U()||U().role!=='owner')return toast('هذا التحكم للمالك فقط');
   saveBtn.disabled=true;error.textContent='';
   try{
    const blockedVersions=Array.from(list.querySelectorAll('[data-block-version]:checked')).map(x=>x.dataset.blockVersion);
    const result=await window.migoApi('/app-update/versions',{method:'PUT',body:JSON.stringify({blockedVersions})});
+   const count=(result.policy.blockedVersions||[]).length;
+   m.querySelector('#ov-blocked').textContent=count;
+   state.classList.remove('is-error');state.textContent='تم حفظ الإعدادات بنجاح · عدد الإصدارات المحظورة: '+count;
    toast('تم حفظ قائمة الإصدارات المحظورة');
-   state.textContent='تم الحفظ · الإصدارات المحظورة: '+(result.policy.blockedVersions||[]).length;
   }catch(e){error.textContent=e.message||'تعذر حفظ الإصدارات';}
   finally{saveBtn.disabled=false;}
  };
 }
 function ownerDevicesHTML(){
- return `<div class="card"><b>📱 الأجهزة المسجلة والحظر النهائي</b><p class="mu">يعرض نوع الهاتف وطرازه ونظام التشغيل والإصدار الذي يستخدمه. حظر الجهاز يمنع تسجيل الدخول من معرّف هذا الجهاز حتى لو حاول استخدام حساب آخر.</p><div class="row"><input class="in grow" id="od-q" placeholder="بحث بالطراز أو ID العضو أو الإصدار" style="margin:0"><select class="in" id="od-status" style="width:auto;margin:0"><option value="all">كل الأجهزة</option><option value="active">غير محظورة</option><option value="blocked">محظورة</option></select></div><button class="btn o w" id="od-refresh" style="margin-top:10px">تحديث القائمة</button></div><div id="od-state" class="mu">جارٍ تحميل الأجهزة…</div><div id="od-list"></div>`;
+ return \`<section class="owner-control-hero"><span class="owner-control-icon">📱</span><div class="owner-control-title"><span class="owner-eyebrow">DEVICE SECURITY</span><h4>إدارة الأجهزة والحظر</h4><p>اعرف نوع الهاتف وطرازه ونظام التشغيل، وراجع الأجهزة النشطة والمحظورة. حظر الجهاز يمنع استخدامه للوصول إلى الحسابات من خلال معرّف التطبيق المسجل.</p></div></section>
+ <div class="owner-control-stats"><div class="owner-control-stat"><span>إجمالي الأجهزة</span><b id="od-total">—</b></div><div class="owner-control-stat"><span>أجهزة نشطة</span><b id="od-active">—</b></div><div class="owner-control-stat"><span>أجهزة محظورة</span><b id="od-blocked">—</b></div></div>
+ <section class="card owner-control-card"><div class="owner-card-heading"><div><b>سجل الأجهزة</b><p class="mu">ابحث بالطراز أو رقم العضو أو إصدار التطبيق</p></div><button class="btn o s" id="od-refresh">↻ تحديث</button></div>
+ <div class="owner-device-filters"><input class="in" id="od-q" placeholder="ابحث عن جهاز…" aria-label="البحث عن جهاز"><select class="in" id="od-status" aria-label="تصفية الأجهزة"><option value="all">كل الأجهزة</option><option value="active">النشطة فقط</option><option value="blocked">المحظورة فقط</option></select></div>
+ <div id="od-state" class="owner-inline-state">جارٍ تحميل الأجهزة…</div><div id="od-list" class="owner-device-list"></div></section>
+ <div class="owner-info-note"><b>تنبيه بخصوص الحظر</b><p>الحظر مرتبط بمعرّف التطبيق على الهاتف، وليس بقفل مادي دائم لمكونات الهاتف. قد يتغير المعرّف بعد حذف بيانات التطبيق أو إعادة ضبط الجهاز.</p></div>\`;
 }
 async function ownerDevicesBind(m){
  if(!U()||U().role!=='owner')return toast('إدارة الأجهزة للمالك فقط');
  const state=m.querySelector('#od-state'),list=m.querySelector('#od-list'),q=m.querySelector('#od-q'),status=m.querySelector('#od-status');
- const load=async()=>{
-  state.textContent='جارٍ تحميل الأجهزة…';list.innerHTML='';
-  try{
-   const data=await window.migoApi('/admin/devices?status='+encodeURIComponent(status.value)+'&q='+encodeURIComponent(q.value.trim()));
-   const devices=data.devices||[];state.textContent='عدد الأجهزة: '+devices.length;
-   list.innerHTML=devices.map(d=>`<div class="card"><div class="row"><b class="grow">${esc(d.manufacturer||'')} ${esc(d.model||'جهاز غير معروف')}</b><span class="badge">${d.blocked?'محظور':'نشط'}</span></div><div class="mu">المنصة: ${esc(d.platform||'-')} · النظام: ${esc(d.osVersion||'-')} · إصدار التطبيق: <b dir="ltr">${esc(d.appVersion||'-')}</b></div><div class="mu">آخر حساب: ${d.uid?('ID '+d.uid):'غير معروف'} · آخر ظهور: ${d.lastSeenAt?new Date(d.lastSeenAt).toLocaleString('ar-EG'):'-'}</div>${d.blockReason?'<div class="mu">سبب الحظر: '+esc(d.blockReason)+'</div>':''}<button class="btn ${d.blocked?'o':'r'} s w" data-device-action="${d.blocked?'unblock':'block'}" data-device-id="${d.id}" style="margin-top:10px">${d.blocked?'رفع حظر الجهاز':'حظر هذا الهاتف نهائياً'}</button></div>`).join('')||'<div class="card mu">لا توجد أجهزة مطابقة للبحث.</div>';
-  }catch(e){state.textContent='تعذر تحميل الأجهزة: '+(e.message||'خطأ اتصال');}
+ let allDevices=[];
+ const renderList=()=>{
+  const term=q.value.trim().toLowerCase();
+  const filtered=allDevices.filter(d=>{
+   const text=[d.manufacturer,d.model,d.platform,d.osVersion,d.appVersion,d.uid].join(' ').toLowerCase();
+   return (!term||text.includes(term))&&(status.value==='all'||(status.value==='blocked'?d.blocked:!d.blocked));
+  });
+  list.innerHTML=filtered.map(d=>{
+   const blocked=!!d.blocked,platform=String(d.platform||'').toLowerCase(),symbol=platform.includes('android')?'🤖':platform.includes('ios')?'🍎':'🌐';
+   return \`<article class="owner-device-row \${blocked?'is-blocked':''}"><div class="owner-device-top"><span class="owner-device-symbol">\${symbol}</span><span class="owner-device-name"><b>\${esc([d.manufacturer,d.model].filter(Boolean).join(' ')||'جهاز غير معروف')}</b><small dir="ltr">\${esc(d.platform||'منصة غير معروفة')}</small></span><span class="owner-device-status \${blocked?'blocked':'active'}">\${blocked?'محظور':'نشط'}</span></div>
+   <div class="owner-device-details"><span>نظام التشغيل<b>\${esc(d.osVersion||'غير معروف')}</b></span><span>إصدار التطبيق<b dir="ltr">\${esc(d.appVersion||'غير معروف')}</b></span><span>رقم العضو الأخير<b>\${d.uid?('ID '+esc(d.uid)):'غير مرتبط'}</b></span><span>آخر ظهور<b>\${d.lastSeenAt?new Date(d.lastSeenAt).toLocaleString('ar-EG'):'—'}</b></span><span>أول ظهور<b>\${d.firstSeenAt?new Date(d.firstSeenAt).toLocaleDateString('ar-EG'):'—'}</b></span><span>حالة الجهاز<b>\${blocked?'الوصول موقوف':'يسمح بالوصول'}</b></span></div>
+   \${d.blockReason?'<div class="owner-device-reason">سبب الحظر: '+esc(d.blockReason)+'</div>':''}
+   <button class="btn \${blocked?'o':'r'} s w" data-device-action="\${blocked?'unblock':'block'}" data-device-id="\${esc(d.id)}">\${blocked?'رفع حظر هذا الجهاز':'حظر الهاتف ومنع دخوله'}</button></article>\`;
+  }).join('')||'<div class="owner-empty-state"><span>📱</span><b>لا توجد أجهزة مطابقة</b><p>جرّب تغيير كلمات البحث أو فلتر الحالة.</p></div>';
  };
- m.querySelector('#od-refresh').onclick=load;status.onchange=load;
- q.onkeydown=e=>{if(e.key==='Enter')load()};
+ const load=async()=>{
+  state.classList.remove('is-error');state.textContent='جارٍ تحميل الأجهزة…';list.innerHTML='';
+  try{
+   const data=await window.migoApi('/admin/devices?status=all');
+   allDevices=data.devices||[];
+   const blocked=allDevices.filter(d=>d.blocked).length;
+   m.querySelector('#od-total').textContent=allDevices.length;
+   m.querySelector('#od-active').textContent=allDevices.length-blocked;
+   m.querySelector('#od-blocked').textContent=blocked;
+   state.textContent='تم تحميل سجل الأجهزة · '+allDevices.length+' جهاز';
+   renderList();
+  }catch(e){state.classList.add('is-error');state.textContent='تعذر تحميل الأجهزة: '+(e.message||'خطأ اتصال');}
+ };
+ m.querySelector('#od-refresh').onclick=load;status.onchange=renderList;
+ q.oninput=renderList;
  list.onclick=async e=>{
   const btn=e.target.closest('[data-device-action]');if(!btn)return;
   if(!U()||U().role!=='owner')return toast('الحظر للمالك فقط');
   const action=btn.dataset.deviceAction,id=btn.dataset.deviceId;
-  if(action==='block'&&!confirm('تأكيد حظر هذا الجهاز من استخدام ميجو لايف؟'))return;
+  if(action==='block'&&!confirm('تأكيد حظر هذا الهاتف؟ سيتم رفض تسجيل الدخول منه حتى لو استخدم حسابًا آخر.'))return;
   btn.disabled=true;
-  try{await window.migoApi('/admin/devices/'+encodeURIComponent(id)+'/'+action,{method:'POST',body:JSON.stringify({reason:action==='block'?'حظر من لوحة المالك':''})});toast(action==='block'?'تم حظر الجهاز':'تم رفع حظر الجهاز');await load();}
-  catch(err){toast(err.message||'تعذر تنفيذ العملية');btn.disabled=false;}
+  try{
+   await window.migoApi('/admin/devices/'+encodeURIComponent(id)+'/'+action,{method:'POST',body:JSON.stringify({reason:action==='block'?'حظر نهائي من لوحة المالك':''})});
+   toast(action==='block'?'تم حظر الجهاز':'تم رفع حظر الجهاز');await load();
+  }catch(err){toast(err.message||'تعذر تنفيذ العملية');btn.disabled=false;}
  };
  await load();
 }
+
 
 /* ===== مركز الإدارة الموسع: شحن، رسائل، فعاليات، دفاتر ===== */
 
