@@ -1605,11 +1605,13 @@ function ownerTotalBadge(){const n=ownerPendingTotal();return n?'<span class="ow
 function ownerDashboardHTML(tabsO=[]){
  const us=Object.values(DB.users),pending=ownerPendingCount('tp'),allPending=ownerPendingTotal();
  const icons={tp:'🧾',set:'⚙️',coins:'🪙',agents:'🛡️',users:'👥',hosts:'🎙️',alog:'📋',ag:'🏢',ship:'🏦',ledger:'📒',vip:'💎',gifts:'🎁',broadcast:'📣',events:'🎉',staff:'🔐',appupdate:'📲',versions:'📦',devices:'📱',countries:'🌍',support:'🆘',hostapps:'🎤',referrals:'🎟️',vipplans:'💠',localsec:'🛡️'};
- const cards=tabsO.filter(([k])=>k!=='dash').map(([k,label])=>`<button type="button" class="owner-menu-item" data-jump="${k}"><span class="owner-menu-icon">${icons[k]||'📂'}</span><span class="owner-menu-label">${label.replace(/^\S+\s/,'')}</span>${ownerPendingBadge(k)}<span class="owner-menu-arrow">‹</span></button>`).join('');
+ const renderOwnerCard=([k,label],featured=false)=>`<button type="button" class="owner-menu-item ${featured?'owner-feature-item':''}" data-jump="${k}"><span class="owner-menu-icon">${icons[k]||'📂'}</span><span class="owner-menu-copy"><span class="owner-menu-label">${label.replace(/^\\S+\\s/,'')}</span><small>${k==='versions'?'عرض النسخ والتحكم في إتاحتها':k==='devices'?'مراجعة الهواتف وحظر الأجهزة':'فتح القسم وإدارة إعداداته'}</small></span>${ownerPendingBadge(k)}<span class="owner-menu-arrow">‹</span></button>`;
+ const cards=tabsO.filter(([k])=>k!=='dash'&&!['versions','devices'].includes(k)).map(x=>renderOwnerCard(x)).join('');
+ const securityCards=tabsO.filter(([k])=>['versions','devices'].includes(k)).map(x=>renderOwnerCard(x,true)).join('');
  return `<section class="owner-summary card"><b>📊 ملخص التطبيق</b><div class="owner-stats">
  <div><span>الحسابات</span><b>${us.length}</b></div><div><span>إجمالي العملات</span><b>${fmt(us.reduce((a,x)=>a+(+x.coins||0),0))}</b></div><div><span>طلبات الشحن المعلقة</span><b>${pending}</b></div><div class="owner-pending-summary"><span>كل الإجراءات المعلقة</span><b>${allPending}</b></div>
  <div><span>الهدايا</span><b>${DB.giftCat.length}</b></div><div><span>الغرف</span><b>${DB.rooms.length}</b></div><div><span>وكالات المضيفين</span><b>${DB.agencies.length}</b></div><div><span>وكالات الشحن</span><b>${DB.shippingAgencies.length}</b></div><div><span>الفعاليات النشطة</span><b>${DB.events.filter(e=>e.active!==false&&(!e.until||e.until>Date.now())).length}</b></div>
- </div></section><section class="owner-menu-section"><h4>أقسام الإدارة</h4><p class="mu">اختار القسم المطلوب؛ كل قسم هيفتح في صفحة مستقلة.</p><div class="owner-menu-grid">${cards}</div></section>
+ </div></section><section class="owner-menu-section owner-security-section"><div class="owner-section-heading"><span class="owner-section-icon">🛡️</span><div><h4>إدارة التطبيق والأمان</h4><p class="mu">تحكم مركزي في إصدارات ميجو لايف والأجهزة المستخدمة</p></div></div><div class="owner-menu-grid owner-feature-grid">${securityCards}</div></section><section class="owner-menu-section"><h4>باقي أقسام الإدارة</h4><p class="mu">اختار القسم المطلوب لفتح أدوات الإدارة.</p><div class="owner-menu-grid">${cards}</div></section>
  <section class="card"><b>آخر سجل إداري</b><div class="sp"></div>${(DB.audit||[]).slice(0,8).map(x=>`<div class="mu" style="padding:6px 0;border-bottom:1px solid var(--line)">${new Date(x.t).toLocaleString('ar-EG')} · ${esc(x.type)} · ${esc(x.detail)}</div>`).join('')||'<span class="mu">لا توجد عمليات بعد</span>'}</section>`;
 }
 function ownerDashboardBind(m){m.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{ot=b.dataset.jump;banFor=null;render()})}
@@ -1776,6 +1778,34 @@ body.auth-screen #auth .or{flex:0 0 auto!important;margin:12px 0!important}
 .owner-menu-label{flex:1;min-width:0;font-size:13px;font-weight:800;line-height:1.45}
 .owner-menu-arrow{color:var(--gd);font-size:24px}
 @media(min-width:430px){.owner-menu-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+</style>
+
+<style id="migolive-owner-security-v2">
+.owner-security-section{padding:14px;border:1px solid rgba(190,155,80,.28);border-radius:18px;background:linear-gradient(145deg,rgba(124,58,237,.13),rgba(193,155,72,.07))}
+.owner-section-heading{display:flex;align-items:center;gap:11px}.owner-section-heading h4{margin:0!important;font-size:17px}.owner-section-heading p{margin:4px 0 0}
+.owner-section-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:13px;background:rgba(190,155,80,.15);font-size:23px}
+.owner-feature-grid{grid-template-columns:1fr 1fr}.owner-feature-item{min-height:112px;align-items:flex-start;flex-wrap:wrap;border-color:rgba(190,155,80,.32);background:linear-gradient(145deg,rgba(124,58,237,.2),rgba(193,155,72,.12))}.owner-feature-item .owner-menu-icon{background:rgba(190,155,80,.16)}
+.owner-menu-copy{display:flex;min-width:0;flex:1;flex-direction:column;gap:5px}.owner-menu-copy small{color:var(--mu);font-size:11px;line-height:1.4}
+.owner-control-hero{display:flex;gap:13px;align-items:flex-start;padding:17px;border-radius:18px;border:1px solid rgba(190,155,80,.28);background:linear-gradient(135deg,rgba(124,58,237,.2),rgba(193,155,72,.1));margin-bottom:12px}
+.owner-control-icon{width:52px;height:52px;flex:none;display:grid;place-items:center;border-radius:16px;background:rgba(190,155,80,.17);font-size:28px}.owner-control-title{min-width:0}
+.owner-eyebrow{font-size:9px;letter-spacing:1.4px;color:var(--gd);font-weight:900}.owner-control-title h4{margin:4px 0 5px;font-size:18px}.owner-control-title p{margin:0;color:var(--mu);font-size:12px;line-height:1.65}
+.owner-control-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 12px}.owner-control-stat{min-width:0;padding:12px 8px;border:1px solid var(--line);border-radius:13px;background:var(--card);text-align:center}
+.owner-control-stat span{display:block;font-size:10px;color:var(--mu);line-height:1.4}.owner-control-stat b{display:block;margin-top:6px;font-size:20px;color:var(--gd)}
+.owner-control-card{padding:14px}.owner-card-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.owner-card-heading p{font-size:11px;margin:4px 0 0;line-height:1.5}
+.owner-inline-state{padding:9px 11px;border-radius:10px;background:rgba(124,58,237,.08);font-size:12px;color:var(--mu);margin-bottom:10px}.owner-inline-state.is-error{color:#ff8e8e;background:rgba(220,50,70,.09)}
+.owner-version-list,.owner-device-list{display:grid;gap:9px}.owner-version-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.025)}
+.owner-version-main{display:grid;gap:4px;min-width:0}.owner-version-number{font-weight:900;font-size:15px;color:var(--gd)}.owner-version-meta{font-size:10px;color:var(--mu)}
+.owner-version-toggle{display:flex;align-items:center;gap:6px;flex:none;font-size:11px;color:var(--mu)}.owner-version-toggle input{width:20px;height:20px;accent-color:#9a72ec}
+.owner-sticky-action{position:sticky;bottom:0;padding:12px 0 2px;margin-top:12px;background:linear-gradient(180deg,transparent,var(--bg) 24%)}.owner-sticky-action .mu{font-size:10px;margin-bottom:7px}
+.owner-info-note{padding:13px 14px;margin-top:12px;border-radius:13px;border:1px solid rgba(190,155,80,.2);background:rgba(190,155,80,.06);font-size:12px}.owner-info-note p{margin:6px 0 0;color:var(--mu);line-height:1.65}
+.owner-device-filters{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-bottom:10px}.owner-device-filters .in{margin:0;min-width:0}.owner-device-filters select{max-width:145px}
+.owner-device-row{padding:13px;border:1px solid var(--line);border-radius:15px;background:var(--card)}.owner-device-row.is-blocked{border-color:rgba(220,70,80,.42);background:linear-gradient(145deg,rgba(180,40,55,.09),var(--card))}
+.owner-device-top{display:flex;align-items:center;gap:10px}.owner-device-symbol{width:43px;height:43px;display:grid;place-items:center;border-radius:13px;background:rgba(124,58,237,.14);font-size:23px;flex:none}
+.owner-device-name{display:grid;gap:4px;min-width:0;flex:1}.owner-device-name b{font-size:13px;overflow-wrap:anywhere}.owner-device-name small{font-size:10px;color:var(--mu)}
+.owner-device-status{font-size:10px;font-weight:900;padding:5px 8px;border-radius:20px;white-space:nowrap}.owner-device-status.active{color:#55d69b;background:rgba(40,180,120,.12)}.owner-device-status.blocked{color:#ff858e;background:rgba(220,50,70,.13)}
+.owner-device-details{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0;padding:10px;border-radius:11px;background:rgba(124,58,237,.06)}.owner-device-details span{display:grid;gap:3px;color:var(--mu);font-size:10px;min-width:0}.owner-device-details b{font-size:11px;color:var(--tx);overflow-wrap:anywhere}
+.owner-device-reason{font-size:11px;color:#ff9ba2;margin-bottom:8px}.owner-empty-state{padding:25px 12px;text-align:center;border:1px dashed var(--line);border-radius:14px;color:var(--mu)}.owner-empty-state>span{display:block;font-size:30px;margin-bottom:8px}.owner-empty-state b{display:block;color:var(--tx);font-size:13px}.owner-empty-state p{font-size:11px;line-height:1.6;margin:6px 0 0}
+@media(max-width:380px){.owner-feature-grid{grid-template-columns:1fr}.owner-device-filters{grid-template-columns:1fr}.owner-device-filters select{max-width:none}}
 </style>
 <script src="api-bridge.js"></script>
 </body>
