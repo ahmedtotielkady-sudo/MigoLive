@@ -63,3 +63,13 @@ test("owner version inventory merges app-update sightings with versions stored o
   assert.match(html, /migoApi\('\/app-update\/versions'\)/);
   assert.match(html, /الأجهزة:/);
 });
+
+
+test("owner can persist manually added legacy versions in the server version catalog", () => {
+  const route = read("routes/app-update.js");
+  const html = fs.readFileSync(path.join(__dirname, "..", "..", "index.html"), "utf8");
+  assert.match(route, /catalogInput/);
+  assert.match(route, /versions: Array\.from\(versionMap\.values\(\)\)/);
+  assert.match(html, /versions:versionCatalog/);
+  assert.match(html, /إضافة إصدار قديم/);
+});

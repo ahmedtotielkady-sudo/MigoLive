@@ -1575,8 +1575,9 @@ async function ownerVersionsBind(m){
   if(!U()||U().role!=='owner')return toast('هذا التحكم للمالك فقط');
   saveBtn.disabled=true;error.textContent='';
   try{
+   const versionCatalog=Array.from(list.querySelectorAll('[data-block-version]')).map(x=>x.dataset.blockVersion);
    const blockedVersions=Array.from(list.querySelectorAll('[data-block-version]:checked')).map(x=>x.dataset.blockVersion);
-   const result=await window.migoApi('/app-update/versions',{method:'PUT',body:JSON.stringify({blockedVersions})});
+   const result=await window.migoApi('/app-update/versions',{method:'PUT',body:JSON.stringify({blockedVersions,versions:versionCatalog})});
    const count=(result.policy.blockedVersions||[]).length;
    m.querySelector('#ov-blocked').textContent=count;
    state.classList.remove('is-error');state.textContent='تم حفظ الإعدادات بنجاح · عدد الإصدارات المحظورة: '+count;
