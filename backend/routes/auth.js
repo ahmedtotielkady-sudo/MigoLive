@@ -5,6 +5,7 @@ const User = require("../models/User");
 const Wallet = require("../models/Wallet");
 const Counter = require("../models/Counter");
 const requireAuth = require("../middleware/requireAuth");
+const { getDeviceIdentity, registerDevice } = require("../utils/device");
 const rateLimit = require("express-rate-limit");
 const crypto = require("crypto");
 const { getCountries, getCountryCallingCode, parsePhoneNumberFromString } = require("libphonenumber-js/max");
@@ -66,9 +67,9 @@ function publicUser(user) {
   };
 }
 
-function issueToken(user, sessionId) {
+function issueToken(user, sessionId, deviceKey) {
   return jwt.sign(
-    { sub: String(user._id), uid: user.uid, sid: sessionId },
+    { sub: String(user._id), uid: user.uid, sid: sessionId, ...(deviceKey ? { did: deviceKey } : {}) },
     process.env.JWT_SECRET,
     { expiresIn: TOKEN_TTL, issuer: "migolive-api", audience: "migolive-app" }
   );
@@ -112,6 +113,14 @@ router.post("/register", async (req, res, next) => {
       return res.status(409).json({ ok: false, code: "CONTACT_TAKEN", message: "رقم الهاتف أو البريد الإلكتروني مستخدم بالفعل" });
     }
 
+    const deviceIdentity = getDeviceIdentity(req);
+    if (deviceIdentity) {
+      const Device = require("../models/Device");
+      if (await Device.exists({ deviceKey: deviceIdentity.deviceKey, blocked: true })) {
+        return res.status(403).json({ ok: false, code: "DEVICE_BANNED", message: "هذا الجهاز محظور من استخدام ميجو لايف" });
+      }
+    }
+
     // Hash before opening the transaction so CPU work does not hold MongoDB locks.
     const passwordHash = await bcrypt.hash(password, 12);
     const sessionId = crypto.randomUUID();
@@ -150,7 +159,9 @@ router.post("/register", async (req, res, next) => {
       createdUser = user;
     });
 
-    const token = issueToken(createdUser, sessionId);
+    const registeredDevice = await registerDevice(req, createdUser);
+    if (registeredDevice.blocked) return res.status(403).json({ ok: false, code: "DEVICE_BANNED", message: "هذا الجهاز محظور من استخدام ميجو لايف" });
+    const token = issueToken(createdUser, sessionId, registeredDevice.deviceKey);
     return res.status(201).json({ ok: true, token, user: publicUser(createdUser) });
   } catch (error) {
     if (error && error.code === 11000) {
@@ -191,6 +202,10 @@ router.post("/login", async (req, res, next) => {
     if (user.status === "banned") {
       return res.status(403).json({ ok: false, message: "هذا الحساب موقوف، تواصل مع الدعم" });
     }
+    const registeredDevice = await registerDevice(req, user);
+    if (registeredDevice.blocked) {
+      return res.status(403).json({ ok: false, code: "DEVICE_BANNED", message: "هذا الجهاز محظور من استخدام ميجو لايف" });
+    }
     // Rotate the active session atomically. A later login immediately invalidates
     // every token issued to the previous device, even if two logins race.
     const sessionId = crypto.randomUUID();
@@ -211,7 +226,7 @@ router.post("/login", async (req, res, next) => {
       io.to(userRoom).emit("auth:session-replaced", { message: "تم تسجيل الدخول من جهاز آخر" });
       io.in(userRoom).disconnectSockets(true);
     }
-    return res.json({ ok: true, token: issueToken(activeUser, sessionId), user: publicUser(activeUser) });
+    return res.json({ ok: true, token: issueToken(activeUser, sessionId, registeredDevice.deviceKey), user: publicUser(activeUser) });
   } catch (error) {
     return next(error);
   }
