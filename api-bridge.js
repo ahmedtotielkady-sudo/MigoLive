@@ -839,31 +839,44 @@
         element.getClientRects().length > 0;
     }
     function findPaymentTarget() {
-      const receiptInputs = Array.from(document.querySelectorAll(
-        'input[type="file"], input[accept*="image"], input[accept*="pdf"]'
-      )).filter(isVisible);
-      const labels = Array.from(document.querySelectorAll(
-        'button, label, h2, h3, h4, p, span, div'
-      )).filter(element => {
-        if (!isVisible(element) || element.children.length > 4) return false;
-        const text = (element.textContent || '').replace(/\s+/g, ' ').trim();
-        return text.length < 100 && /(?:نسخ\s*(?:الرقم|رقم)|إرسال\s*(?:مستند|إيصال)|إرفاق\s*(?:مستند|إيصال)|رفع\s*(?:مستند|إيصال)|إثبات\s*(?:التحويل|الدفع))/i.test(text);
-      });
-      const candidates = [...labels, ...receiptInputs];
-      if (!candidates.length) return null;
-      // Prefer the payment number/copy control, otherwise the receipt upload.
-      const copy = labels.find(element => /نسخ\s*(?:الرقم|رقم)/.test(element.textContent || ''));
-      const target = copy || receiptInputs[0] || labels[0];
-      let section = target;
-      for (let depth = 0; depth < 4 && section.parentElement; depth++) {
-        const parent = section.parentElement;
-        const text = (parent.textContent || '').slice(0, 1800);
-        if (parent.querySelector('input[type="file"]') &&
-            /(?:نسخ|رقم\s*الشحن|التحويل|إيصال|مستند)/.test(text)) {
-          section = parent;
-          break;
+      // The live wallet screen labels this exact destination section
+      // "شحن العملات بالتحويل". Locate its heading and scroll the whole card
+      // into view, even when the file input itself is visually hidden.
+      const headings = Array.from(document.querySelectorAll('h1,h2,h3,h4,[role="heading"],strong,b'))
+        .filter(isVisible);
+      const heading = headings.find(element =>
+        /شحن\\s*العملات\\s*بالتحويل/.test((element.textContent || '').replace(/\\s+/g, ' ').trim())
+      );
+      if (heading) {
+        let section = heading;
+        for (let depth = 0; depth < 5 && section.parentElement; depth++) {
+          const parent = section.parentElement;
+          const text = (parent.textContent || '').slice(0, 2400);
+          if (/(?:رقم\\s*المحفظة|لم\\s*يحدد\\s*المالك|رفع\\s*المرفق|صورة\\s*الإيصال|إرسال\\s*طلب\\s*الشحن)/.test(text)) {
+            section = parent;
+            if (parent.tagName === 'SECTION' || parent.tagName === 'FORM' ||
+                parent.classList.contains('card')) break;
+          }
         }
-        if (parent.tagName === 'SECTION' || parent.tagName === 'FORM') {
+        return section;
+      }
+      // Fallback for older UI wording or layouts without a semantic heading.
+      const candidates = Array.from(document.querySelectorAll(
+        'button,label,h2,h3,h4,p,span,div,input[type="file"]'
+      )).filter(element => {
+        if (!isVisible(element) || (element.children && element.children.length > 5)) return false;
+        const text = (element.textContent || '').replace(/\\s+/g, ' ').trim();
+        return text.length < 130 &&
+          /(?:نسخ\\s*(?:الرقم|رقم)|رقم\\s*المحفظة|لم\\s*يحدد\\s*المالك|رفع\\s*(?:المرفق|مستند|إيصال)|إرسال\\s*طلب\\s*الشحن)/i.test(text);
+      });
+      if (!candidates.length) return null;
+      let section = candidates[0];
+      for (let depth = 0; depth < 5 && section.parentElement; depth++) {
+        const parent = section.parentElement;
+        const text = (parent.textContent || '').slice(0, 2400);
+        if (/(?:رقم\\s*المحفظة|رفع\\s*المرفق|إرسال\\s*طلب\\s*الشحن)/.test(text) &&
+            (parent.tagName === 'SECTION' || parent.tagName === 'FORM' ||
+             parent.querySelector('input[type="file"]'))) {
           section = parent;
           break;
         }
