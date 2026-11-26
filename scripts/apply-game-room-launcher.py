@@ -192,7 +192,6 @@ js = r"""
     (g.name==="عجلة الحيوانات"&&/wheel-animals/.test(raw))||
     (g.name==="عاصفة المحيط"&&/slot-ocean-storm/.test(raw))||
     (g.name==="سلوت 777"&&/slot-777/.test(raw))||
-    (g.name==="بيتزا يم"&&(/pizza-yam/.test(raw)||/بيتزا\s*يم/.test(label))));
  }
  function bindGamesEverywhere(){
   if(document.documentElement.dataset.migoGamesEverywhere==="1")return;
