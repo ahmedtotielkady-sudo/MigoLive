@@ -55,7 +55,7 @@ router.get("/state", async (req, res) => {
         const user = await User.findOne({ _id: req.auth.sub, status: "active" }).session(session).select("coins");
         if (!user) throw Object.assign(new Error("الحساب غير موجود أو غير نشط"), { status: 404 });
         const pendingRounds = await VeggieRound.find({
-          "bets.userId": user._id, resultAt: { $lte: now }
+          "bets.userId": user._id, spinEndAt: { $lte: now }
         }).session(session);
         for (const oldRound of pendingRounds) {
           const bet = oldRound.bets.find(item => String(item.userId) === String(user._id));
