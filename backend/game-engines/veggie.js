@@ -52,6 +52,17 @@ function validateBets(value) {
   }
   return { amounts, total };
 }
+function additionalBet(previousAmounts, nextAmounts) {
+  if (!Array.isArray(previousAmounts) || !Array.isArray(nextAmounts) ||
+      previousAmounts.length !== 8 || nextAmounts.length !== 8) {
+    throw Object.assign(new Error("بيانات الرهان غير صالحة"), { status: 400 });
+  }
+  if (nextAmounts.some((amount, lane) => Number(amount) < Number(previousAmounts[lane]))) {
+    throw Object.assign(new Error("لا يمكن تغيير أو سحب رهان تم تأكيده"), { status: 409 });
+  }
+  return nextAmounts.reduce((sum, amount, lane) =>
+    sum + Number(amount) - Number(previousAmounts[lane]), 0);
+}
 function winners(outcome) {
   if (outcome.type === "single") return [outcome.index];
   return FOODS.map((food, index) => food.group === outcome.group ? index : -1).filter(index => index >= 0);
@@ -60,4 +71,4 @@ function payoutFor(amounts, outcome) {
   return winners(outcome).reduce((sum, index) => sum + amounts[index] * FOODS[index].multiplier, 0);
 }
 module.exports = { FOODS, CHIPS, BET_SECONDS, SPIN_SECONDS, RESULT_SECONDS, CYCLE_SECONDS,
-  createOutcome, validateBets, winners, payoutFor };
+  createOutcome, validateBets, additionalBet, winners, payoutFor };
