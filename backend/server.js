@@ -110,9 +110,9 @@ async function start() {
   const GameState = require("./models/GameState");
   const VeggieRound = require("./models/VeggieRound");
   await Promise.all([MicLease.init(), GameRound.init(), GameState.init(), VeggieRound.init()]);
-  require("./services/veggie-settlement").startVeggieSettlementWorker();
   const io = attachRealtime(httpServer, allowedOrigins);
   app.set("io", io);
+  require("./services/veggie-settlement").startVeggieSettlementWorker(io);
   httpServer.listen(port, "0.0.0.0", () => console.log(`MigoLive API + realtime listening on port ${port}`));
 }
 start().catch((error) => {
