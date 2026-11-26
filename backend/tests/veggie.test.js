@@ -18,6 +18,13 @@ test("validates eight bet lanes and accepted chip denominations", () => {
   assert.throws(() => game.validateBets([-10, 0, 0, 0, 0, 0, 0, 0]), /قيمة الرهان/);
 });
 
+test("additional bets only increase existing lanes and never reallocate stakes", () => {
+  assert.equal(game.additionalBet(Array(8).fill(0), [10, 50, 0, 0, 0, 0, 0, 0]), 60);
+  assert.equal(game.additionalBet([10, 50, 0, 0, 0, 0, 0, 0], [10, 100, 20, 0, 0, 0, 0, 0]), 70);
+  assert.throws(() => game.additionalBet([100, 0, 0, 0, 0, 0, 0, 0], [0, 100, 0, 0, 0, 0, 0, 0]), /لا يمكن تغيير أو سحب/);
+  assert.throws(() => game.additionalBet([100, 0, 0, 0, 0, 0, 0, 0], [50, 150, 0, 0, 0, 0, 0, 0]), /لا يمكن تغيير أو سحب/);
+});
+
 test("single outcome pays only its matching lane", () => {
   assert.equal(game.payoutFor([10, 20, 30, 40, 50, 60, 70, 80],
     { type: "single", index: 6 }), 70 * 25);
