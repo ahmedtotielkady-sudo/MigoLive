@@ -14,16 +14,18 @@ router.post("/pizza-yam/spin", async (req, res) => {
   const key = String(req.get("idempotency-key") || "");
   if (!/^[A-Za-z0-9_-]{16,80}$/.test(key))
     return res.status(400).json({ ok: false, message: "معرّف الجولة مطلوب" });
-  const input = { foodIndex: req.body && req.body.foodIndex, bet: req.body && req.body.bet };
+  let normalized;
+  try { normalized = pizzaYam.normalizeBets(req.body || {}); }
+  catch (error) { return res.status(error.status || 400).json({ ok: false, message: error.message }); }
   const session = await mongoose.startSession();
   try {
     let response;
     await session.withTransaction(async () => {
       const prior = await GameRound.findOne({ idempotencyKey: key }).session(session);
       if (prior) {
+        const priorBets = prior.outcome && prior.outcome.requestedBets;
         if (String(prior.userId) !== req.auth.sub || prior.gameId !== "pizza-yam" ||
-            Number(prior.outcome && prior.outcome.selectedIndex) !== Number(input.foodIndex) ||
-            Number(prior.outcome && prior.outcome.requestedBet) !== Number(input.bet))
+            JSON.stringify(priorBets) !== JSON.stringify(normalized.bets))
           throw Object.assign(new Error("معرّف الجولة مستخدم لطلب مختلف"), { status: 409 });
         const current = await User.findById(req.auth.sub).session(session).select("coins");
         if (!current) throw Object.assign(new Error("الحساب غير موجود"), { status: 404 });
@@ -32,9 +34,9 @@ router.post("/pizza-yam/spin", async (req, res) => {
       }
       const user = await User.findOne({ _id: req.auth.sub, status: "active" }).session(session).select("coins");
       if (!user) throw Object.assign(new Error("الحساب غير موجود أو غير نشط"), { status: 404 });
-      const outcome = pizzaYam.play(input);
-      if (user.coins < outcome.totalBet)
+      if (user.coins < normalized.totalBet)
         throw Object.assign(new Error("رصيدك غير كافٍ"), { status: 409, currentCoins: user.coins });
+      const outcome = pizzaYam.play({ bets: normalized.bets });
       user.coins -= outcome.totalBet;
       await WalletTransaction.create([{
         from: user._id, amount: outcome.totalBet, type: "game_bet",
@@ -50,7 +52,7 @@ router.post("/pizza-yam/spin", async (req, res) => {
       await user.save({ session });
       await Wallet.updateOne({ userId: user._id }, { $set: { balance: user.coins } }, { upsert: true, session });
       const roundId = crypto.randomUUID();
-      const savedOutcome = { ...outcome, requestedBet: input.bet };
+      const savedOutcome = { ...outcome, requestedBets: normalized.bets };
       const [round] = await GameRound.create([{
         userId: user._id, gameId: "pizza-yam", roundId, idempotencyKey: key,
         bet: outcome.totalBet, payout: outcome.payout,
