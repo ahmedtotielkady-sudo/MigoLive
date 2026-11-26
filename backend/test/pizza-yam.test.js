@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { play, normalizeBets, FOODS, MAX_BET } = require("../game-engines/pizza-yam");
+const { play, normalizeBets, getRoundClock, BET_TIME_SECONDS, SPIN_TIME_SECONDS, RESULT_TIME_SECONDS, ROUND_TIME_SECONDS, FOODS, MAX_BET } = require("../game-engines/pizza-yam");
 test("Pizza Yam accepts eight simultaneous bets and calculates their total", () => {
   const normalized = normalizeBets({ bets: [10, 20, 0, 0, 5, 0, 0, 1] });
   assert.equal(normalized.totalBet, 36);
@@ -35,4 +35,19 @@ test("meat group result applies each food's own multiplier", () => {
 });
 test("legacy single-food request remains supported during client rollout", () => {
   assert.deepEqual(normalizeBets({ foodIndex: 6, bet: 25 }).bets, [0,0,0,0,0,0,25,0]);
+});
+
+test("Pizza Yam server clock uses 20 seconds betting, 4 seconds spin, 4 seconds result", () => {
+  assert.equal(BET_TIME_SECONDS, 20);
+  assert.equal(SPIN_TIME_SECONDS, 4);
+  assert.equal(RESULT_TIME_SECONDS, 4);
+  assert.equal(ROUND_TIME_SECONDS, 28);
+  assert.equal(getRoundClock(0).phase, "bet");
+  assert.equal(getRoundClock(19999).phase, "bet");
+  assert.equal(getRoundClock(20000).phase, "spin");
+  assert.equal(getRoundClock(23999).phase, "spin");
+  assert.equal(getRoundClock(24000).phase, "result");
+  assert.equal(getRoundClock(27999).phase, "result");
+  assert.equal(getRoundClock(28000).round, 1);
+  assert.equal(getRoundClock(28000).phase, "bet");
 });
