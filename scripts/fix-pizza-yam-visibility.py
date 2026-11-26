@@ -20,6 +20,10 @@ replacements = [
         "const items=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k]))",
         "const items=Object.entries(GM).filter(([k])=>!available||!available.has(idMap[k]))"
     ),
+    (
+        "draw(new Set((p.games||[]).filter(x=>x.enabled!==false).map(x=>x.id)))",
+        "draw(new Set((p.games||[]).filter(x=>x.enabled===false).map(x=>x.id)))"
+    ),
 ]
 for old, new in replacements:
     count = html.count(old)
