@@ -13,7 +13,7 @@ async function settleRoundBet(roundId, userId) {
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      const round = await VeggieRound.findOne({ roundId, resultAt: { $lte: new Date() } }).session(session);
+      const round = await VeggieRound.findOne({ roundId, spinEndAt: { $lte: new Date() } }).session(session);
       if (!round) return;
       const bet = round.bets.find(item => String(item.userId) === String(userId));
       if (!bet || bet.settled) return;
@@ -55,7 +55,7 @@ async function tick() {
   running = true;
   try {
     const due = await VeggieRound.find({
-      resultAt: { $lte: new Date() },
+      spinEndAt: { $lte: new Date() },
       "bets.settled": false
     }).select("roundId bets.userId bets.settled").limit(40).lean();
     for (const round of due) {
