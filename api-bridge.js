@@ -691,7 +691,9 @@
     'rocket-crash:start': '/games/rocket-crash/start',
     'rocket-crash:state': '/games/rocket-crash/state',
     'rocket-crash:cashout': '/games/rocket-crash/cashout',
-    'rocket-crash:cancel': '/games/rocket-crash/cancel'
+    'rocket-crash:cancel': '/games/rocket-crash/cancel',
+    'veggie:state': '/games/veggie/state',
+    'veggie:bet': '/games/veggie/bet'
   };
   function gameFrameFor(source) {
     const frames = [$id('gf'), document.querySelector('#migo-game-overlay iframe')].filter(Boolean);
