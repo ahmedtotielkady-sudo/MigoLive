@@ -35,7 +35,9 @@ jobs:
           node --check backend/models/VeggieRound.js
           node --check backend/routes/veggie.js
           node --check backend/services/veggie-settlement.js
+          node --check backend/server.js
           node --test backend/tests/veggie.test.js
+          node --test backend/test/veggie.test.js
           python3 - <<'PY'
           from html.parser import HTMLParser
           from pathlib import Path
