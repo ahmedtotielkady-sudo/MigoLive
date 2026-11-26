@@ -31,7 +31,7 @@ function publicRound(round, now, playerBet) {
   const elapsed = Math.max(0, (now.getTime() - round.startsAt.getTime()) / 1000);
   const phase = elapsed < veggie.BET_SECONDS ? "bet" :
     elapsed < veggie.BET_SECONDS + veggie.SPIN_SECONDS ? "spin" : "result";
-  const showOutcome = phase === "result";
+  const showOutcome = phase !== "bet";
   return {
     roundId: round.roundId, roundNumber: round.roundNumber, phase,
     startsAt: round.startsAt.getTime(), betCloseAt: round.betCloseAt.getTime(),
