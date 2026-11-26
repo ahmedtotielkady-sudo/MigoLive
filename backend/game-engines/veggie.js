@@ -12,7 +12,7 @@ const FOODS = Object.freeze([
 ]);
 const CHIPS = Object.freeze([10, 50, 100, 1000, 10000]);
 const BET_SECONDS = 20;
-const SPIN_SECONDS = 8;
+const SPIN_SECONDS = 4;
 const RESULT_SECONDS = 4;
 const CYCLE_SECONDS = BET_SECONDS + SPIN_SECONDS + RESULT_SECONDS;
 
