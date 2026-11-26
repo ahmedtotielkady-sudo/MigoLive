@@ -10,7 +10,23 @@ const FOODS = Object.freeze([
   { emoji: "🍕", multiplier: 25, group: "m" },
   { emoji: "🍗", multiplier: 45, group: "m" }
 ]);
+const BET_TIME_SECONDS = 20;
+const SPIN_TIME_SECONDS = 4;
+const RESULT_TIME_SECONDS = 4;
+const ROUND_TIME_SECONDS = BET_TIME_SECONDS + SPIN_TIME_SECONDS + RESULT_TIME_SECONDS;
 const MAX_BET = 10000000;
+function getRoundClock(nowMs = Date.now()) {
+  const round = Math.floor(nowMs / (ROUND_TIME_SECONDS * 1000));
+  const elapsedMs = nowMs - round * ROUND_TIME_SECONDS * 1000;
+  const elapsedSeconds = elapsedMs / 1000;
+  const phase = elapsedSeconds < BET_TIME_SECONDS ? "bet"
+    : elapsedSeconds < BET_TIME_SECONDS + SPIN_TIME_SECONDS ? "spin" : "result";
+  const phaseEndsAt = (round * ROUND_TIME_SECONDS + (phase === "bet" ? BET_TIME_SECONDS : phase === "spin" ? BET_TIME_SECONDS + SPIN_TIME_SECONDS : ROUND_TIME_SECONDS)) * 1000;
+  return { round, phase, elapsedMs, remainingMs: Math.max(0, phaseEndsAt - nowMs), serverTime: nowMs,
+    roundStartsAt: round * ROUND_TIME_SECONDS * 1000, betEndsAt: (round * ROUND_TIME_SECONDS + BET_TIME_SECONDS) * 1000,
+    spinEndsAt: (round * ROUND_TIME_SECONDS + BET_TIME_SECONDS + SPIN_TIME_SECONDS) * 1000,
+    roundEndsAt: (round + 1) * ROUND_TIME_SECONDS * 1000 };
+}
 function normalizeBets(input) {
   let bets;
   if (Array.isArray(input && input.bets)) bets = input.bets;
@@ -49,4 +65,4 @@ function play(input, randomInt = crypto.randomInt) {
     payout, totalBet: normalized.totalBet
   };
 }
-module.exports = { play, normalizeBets, FOODS, MAX_BET };
+module.exports = { play, normalizeBets, getRoundClock, BET_TIME_SECONDS, SPIN_TIME_SECONDS, RESULT_TIME_SECONDS, ROUND_TIME_SECONDS, FOODS, MAX_BET };
