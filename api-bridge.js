@@ -686,7 +686,9 @@
     'ocean-storm:spin': '/games/ocean-storm/spin',
     'wheel-animals:spin': '/games/wheel-animals/spin',
     'fruit-luck:spin': '/games/fruit-luck/spin',
-    'pizza-yam:spin': '/games/pizza-yam/spin',
+    'pizza-yam:spin': '/games/pizza-yam/bet',
+    'pizza-yam:bet': '/games/pizza-yam/bet',
+    'pizza-yam:state': '/games/pizza-yam/state',
     'pizza-yam:wallet': '/wallet',
     'big-warrior:fight': '/games/big-warrior/fight',
     'cleopatra-gold:spin': '/games/cleopatra-gold/spin',
@@ -704,7 +706,7 @@
         !Number.isSafeInteger(Number(result.coins)) || Number(result.coins) < 0) {
       throw new Error('رد الخادم غير مكتمل: لم يتم تأكيد رصيد الجولة');
     }
-    if (action === 'state' || action === 'wallet') return result;
+    if (action === 'state' || action === 'wallet' || (gameId === 'pizza-yam' && action === 'bet')) return result;
     if (typeof result.roundId !== 'string' || !result.roundId) {
       throw new Error('رد الخادم لا يحتوي على رقم الجولة');
     }
@@ -763,7 +765,7 @@
       return;
     }
     try {
-      const options = request.action === 'wallet' ? { method: 'GET' } : {
+      const options = (request.action === 'wallet' || request.action === 'state') ? { method: 'GET' } : {
         method: 'POST',
         body: JSON.stringify(request.payload && typeof request.payload === 'object' ? request.payload : {})
       };
