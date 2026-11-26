@@ -767,7 +767,7 @@
       };
       if (request.action !== 'state' && request.action !== 'wallet') options.headers = { 'Idempotency-Key': requestId };
       const rawResult = await api(endpoint, options);
-      const result = request.action === 'wallet' ? { gameId: 'pizza-yam', coins: Number(rawResult && rawResult.coins) } : validateGameServerResult(String(request.gameId), String(request.action), rawResult);
+      const result = validateGameServerResult(String(request.gameId), String(request.action), rawResult);
       if (result && Number.isFinite(Number(result.coins))) {
         const coins = applyServerWalletCoins(result.coins);
         window.dispatchEvent(new CustomEvent('migo:wallet-updated', {
