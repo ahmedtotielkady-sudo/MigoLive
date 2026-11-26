@@ -235,6 +235,29 @@ jobs:
           PY
           for file in /tmp/server-wallet-*.js; do node --check "$file"; done
 
+      - name: Fix Pizza Yam visibility and validate its game asset
+        run: |
+          python3 scripts/fix-pizza-yam-visibility.py
+          test -s www/games/pizza-yam.html
+          grep -q "pizza-yam" www/index.html
+          python3 - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          class Scripts(HTMLParser):
+              def __init__(self): super().__init__(); self.active=False; self.parts=[]; self.current=[]
+              def handle_starttag(self,tag,attrs):
+                  if tag.lower()=='script': self.active='src' not in dict(attrs); self.current=[]
+              def handle_data(self,data):
+                  if self.active:self.current.append(data)
+              def handle_endtag(self,tag):
+                  if tag.lower()=='script' and self.active:self.parts.append(''.join(self.current));self.active=False
+          parser=Scripts()
+          parser.feed(Path('www/games/pizza-yam.html').read_text(encoding='utf-8'))
+          for i,source in enumerate(parser.parts):
+              if source.strip(): Path(f'/tmp/pizza-yam-{i}.js').write_text(source,encoding='utf-8')
+          PY
+          for file in /tmp/pizza-yam-*.js; do node --check "$file"; done
+
       - name: Install Capacitor
         run: npm install @capacitor/core@^8 @capacitor/cli@^8 @capacitor/android@^8 @capacitor/app@^8 @capacitor/device@^8
 
