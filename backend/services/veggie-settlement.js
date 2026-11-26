@@ -9,10 +9,13 @@ const veggie = require("../game-engines/veggie");
 let timer = null;
 let running = false;
 
-async function settleRoundBet(roundId, userId) {
+async function settleRoundBet(roundId, userId, io) {
   const session = await mongoose.startSession();
+  let settledCoins = null;
   try {
     await session.withTransaction(async () => {
+      // The transaction callback may be retried; only notify after commit.
+      settledCoins = null;
       const round = await VeggieRound.findOne({ roundId, spinEndAt: { $lte: new Date() } }).session(session);
       if (!round) return;
       const bet = round.bets.find(item => String(item.userId) === String(userId));
@@ -44,13 +47,17 @@ async function settleRoundBet(roundId, userId) {
         description: "مكسب لعبة خضار",
         idempotencyKey: "veggie_" + round.roundId + "_" + String(user._id) + "_win"
       }], { session });
+      settledCoins = user.coins;
     });
+    if (settledCoins !== null && io) {
+      io.to("user:" + String(userId)).emit("wallet:updated", { coins: settledCoins });
+    }
   } finally {
     await session.endSession();
   }
 }
 
-async function tick() {
+async function tick(io) {
   if (running) return;
   running = true;
   try {
@@ -61,7 +68,7 @@ async function tick() {
     for (const round of due) {
       for (const bet of round.bets || []) {
         if (bet && !bet.settled) {
-          try { await settleRoundBet(round.roundId, bet.userId); }
+          try { await settleRoundBet(round.roundId, bet.userId, io); }
           catch (error) { console.error("Veggie settlement failed:", error.message); }
         }
       }
@@ -73,10 +80,10 @@ async function tick() {
   }
 }
 
-function startVeggieSettlementWorker() {
+function startVeggieSettlementWorker(io) {
   if (timer) return;
-  timer = setInterval(tick, 2000);
+  timer = setInterval(() => tick(io), 2000);
   if (typeof timer.unref === "function") timer.unref();
-  tick();
+  tick(io);
 }
 module.exports = { startVeggieSettlementWorker, tick };
