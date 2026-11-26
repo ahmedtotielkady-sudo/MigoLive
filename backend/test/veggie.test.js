@@ -2,11 +2,11 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const veggie = require("../game-engines/veggie");
 
-test("Veggie round uses the requested shared cycle", () => {
+test("Veggie round uses the requested shared 20/4/4 cycle", () => {
   assert.equal(veggie.BET_SECONDS, 20);
-  assert.equal(veggie.SPIN_SECONDS, 8);
+  assert.equal(veggie.SPIN_SECONDS, 4);
   assert.equal(veggie.RESULT_SECONDS, 4);
-  assert.equal(veggie.CYCLE_SECONDS, 32);
+  assert.equal(veggie.CYCLE_SECONDS, 28);
 });
 
 test("Veggie accepts eight valid bet slots and totals them", () => {
