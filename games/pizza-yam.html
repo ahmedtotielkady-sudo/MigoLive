@@ -6,16 +6,16 @@
 <script>
 (()=>{"use strict";
 const foods=[["🥕",5],["🥑",5],["🥬",5],["🍅",5],["🌯",10],["🌭",15],["🍕",25],["🍗",45]];
-const chips=[10,50,100,1000,10000];let bets=Array(8).fill(0),bet=10,busy=false,coins=0,pending="",statePending=false;
+const chips=[10,50,100,1000,10000];let bets=Array(8).fill(0),bet=10,busy=false,coins=0,pending="",statePending=false,requestInFlight=false;
 const $=id=>document.getElementById(id),board=$("board");
 function renderBets(){let total=bets.reduce((a,b)=>a+b,0);[...board.children].forEach((el,i)=>el.querySelector(".stake").textContent=bets[i]?("🪙 "+bets[i].toLocaleString("en-US")):"بدون رهان");$("total").textContent=total.toLocaleString("en-US");$("spin").disabled=busy||total===0}
 foods.forEach((f,i)=>{const b=document.createElement("button");b.className="food";b.innerHTML=f[0]+"<small>"+f[1]+"×</small><span class=\"stake\">بدون رهان</span>";b.onclick=()=>{if(busy)return;bets[i]+=bet;renderBets()};board.append(b)});
 const chipsEl=$("chips");chips.forEach(v=>{const b=document.createElement("button");b.className="chip"+(v===bet?" active":"");b.textContent=v.toLocaleString("en-US");b.onclick=()=>{if(busy)return;bet=v;[...chipsEl.children].forEach(x=>x.classList.toggle("active",x===b))};chipsEl.append(b)});
 function key(){const a=new Uint8Array(24);crypto.getRandomValues(a);return "pizza-yam-"+[...a].map(x=>x.toString(16).padStart(2,"0")).join("")}
 function send(action,payload,id){parent.postMessage({t:"migo:game:request",gameId:"pizza-yam",action,requestId:id,payload:payload||{}},"*")}
-function syncState(){if(statePending||busy)return;statePending=true;pending=key();send("state",{},pending)}
+function syncState(){if(statePending||requestInFlight)return;statePending=true;pending=key();send("state",{},pending)}
 $("clear").onclick=()=>{if(busy)return;bets=Array(8).fill(0);renderBets();$("status").textContent="تم مسح الرهانات"};
-$("spin").onclick=()=>{if(busy||bets.every(v=>v===0))return;busy=true;$("spin").disabled=true;$("clear").disabled=true;$("status").textContent="جاري تسجيل رهاناتك على الخادم…";pending=key();send("spin",{bets:bets.slice()},pending)};
+$("spin").onclick=()=>{if(busy||requestInFlight||bets.every(v=>v===0))return;requestInFlight=true;busy=true;$("spin").disabled=true;$("clear").disabled=true;$("status").textContent="جاري تسجيل رهاناتك على الخادم…";pending=key();send("spin",{bets:bets.slice()},pending)};
 window.addEventListener("message",e=>{const d=e.data;if(!d||d.t!=="migo:game:response"||d.requestId!==pending)return;
 if(!d.ok){busy=false;$("clear").disabled=false;if(Number.isSafeInteger(Number(d.coins))){coins=Number(d.coins);$("coins").textContent=coins.toLocaleString("en-US")} $("status").textContent=d.message||"تعذر تنفيذ الجولة";renderBets();return}
 const r=d.result||{};if(r.gameId!=="pizza-yam"||!Number.isSafeInteger(Number(r.coins)))return;
