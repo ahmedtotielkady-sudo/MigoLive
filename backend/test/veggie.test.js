@@ -21,6 +21,12 @@ test("Veggie rejects malformed, fractional, and oversized bets", () => {
   assert.throws(() => veggie.validateBets([1000010, 0, 0, 0, 0, 0, 0, 0]), /إجمالي الرهان/);
 });
 
+test("Veggie top-up bets cannot move or withdraw a previously confirmed lane", () => {
+  assert.equal(veggie.additionalBet(Array(8).fill(0), [10, 50, 0, 0, 0, 0, 0, 0]), 60);
+  assert.equal(veggie.additionalBet([10, 50, 0, 0, 0, 0, 0, 0], [10, 100, 20, 0, 0, 0, 0, 0]), 70);
+  assert.throws(() => veggie.additionalBet([100, 0, 0, 0, 0, 0, 0, 0], [0, 100, 0, 0, 0, 0, 0, 0]), /لا يمكن تغيير أو سحب/);
+});
+
 test("Veggie single and group outcomes settle using server multipliers", () => {
   assert.equal(veggie.payoutFor([10, 0, 0, 0, 0, 0, 0, 0], {
     type: "single", index: 0, group: null, target: 0
