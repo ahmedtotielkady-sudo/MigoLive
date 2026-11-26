@@ -48,6 +48,32 @@ if "k==='rocket'" not in html:
             # fullscreen launcher; an optional tab hook must not block APK builds.
             print("Games-tab loader variant not found; keeping room launcher")
 
+# Route the Veggie catalog entry to its standalone server-connected HTML asset.
+if "k==='veggie'" not in html:
+    rocket_condition = "if(k==='cleopatra'||k==='warrior'||k==='rocket'){"
+    rocket_path = "const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':(k==='warrior'?'games/big-warrior.html':'games/rocket-crash.html');"
+    legacy_condition = "if(k==='cleopatra'||k==='warrior'){"
+    legacy_path = "const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':'games/big-warrior.html';"
+    veggie_condition = "if(k==='cleopatra'||k==='warrior'||k==='rocket'||k==='veggie'){"
+    veggie_path = "const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':(k==='warrior'?'games/big-warrior.html':(k==='rocket'?'games/rocket-crash.html':'games/veggie.html'));"
+    if rocket_condition in html and rocket_path in html:
+        html = html.replace(rocket_condition, veggie_condition, 1)
+        html = html.replace(rocket_path, veggie_path, 1)
+    elif legacy_condition in html and legacy_path in html:
+        html = html.replace(legacy_condition, veggie_condition, 1)
+        html = html.replace(legacy_path, veggie_path, 1)
+    else:
+        old_open = "let gameSource;if(k==='cleopatra'){const response=await fetch('games/cleopatra-gold.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
+        new_open = "let gameSource;if(k==='cleopatra'||k==='warrior'||k==='rocket'||k==='veggie'){const file=k==='cleopatra'?'cleopatra-gold.html':(k==='warrior'?'big-warrior.html':(k==='rocket'?'rocket-crash.html':'veggie.html'));const response=await fetch('games/'+file);if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
+        if old_open in html:
+            html = html.replace(old_open, new_open, 1)
+        else:
+            print("Games-tab Veggie loader variant not found; room picker still includes Veggie")
+
+veggie_asset = Path("games/veggie.html")
+if not veggie_asset.is_file() or veggie_asset.stat().st_size < 1000:
+    raise SystemExit("Veggie game asset is missing or incomplete")
+
 style_id = "migo-game-room-launcher-style-v1"
 script_id = "migo-game-room-launcher-script-v1"
 
