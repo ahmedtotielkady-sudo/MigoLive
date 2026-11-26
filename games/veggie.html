@@ -173,7 +173,7 @@ async function placeBet(i){
 
 function clearMarks(){cards.forEach(function(d){d.classList.remove("hl","win","dim")});$("plateM").classList.remove("on");$("plateV").classList.remove("on")}
 
-var SPIN_TIME=8,CYCLE=BET_TIME+SPIN_TIME+WAIT_TIME,lastKey="",lastWin=0,settledRound=0;
+var SPIN_TIME=4,CYCLE=BET_TIME+SPIN_TIME+WAIT_TIME,lastKey="",lastWin=0,settledRound=0;
 function clock(){
   if(!serverState)return{r:0,o:0};
   var now=Date.now()+serverOffset,elapsed=Math.max(0,(now-serverState.startsAt)/1000);
