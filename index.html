@@ -1120,9 +1120,12 @@ function renderRoom(m){
   m.dataset.rid=r.id;const ns=m.querySelector('.seats');if(ns&&sy)ns.scrollTop=sy;
   const ch=$('#ch');ch.scrollTop=ch.scrollHeight;
   $('#lv').onclick=showRoomCloseChoice;
-  $('#roomGames').onclick=()=>{
-    const items=Object.entries(GM).map(([k,g])=>`<button type="button" class="gt" data-room-game="${k}" style="width:100%;margin:6px 0"><span class="gi">${gicon(k)}</span><b>${g.n}</b><small class="mu">${g.d}</small></button>`).join('');
-    const gd=dlg('🎮 ألعاب الغرفة',`<p class="mu">اختر اللعبة التي تريد فتحها داخل الغرفة</p><div class="gg" style="grid-template-columns:1fr;gap:8px">${items}</div>`,()=>false,'إغلاق');
+  $('#roomGames').onclick=async()=>{
+    let available=null;
+    try{const policy=await window.migoApi('/game-control/status');available=new Set((policy.games||[]).filter(x=>x.enabled!==false).map(x=>x.id))}catch(_){}
+    const idMap={slot:'ocean-storm',wheel:'wheel-animals',slot777:'slot-777',cleopatra:'cleopatra-gold',warrior:'big-warrior',fruit:'fruit-luck',pizza:'pizza-yam'};
+    const items=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k])).map(([k,g])=>`<button type="button" class="gt" data-room-game="${k}" style="width:100%;margin:6px 0"><span class="gi">${gicon(k)}</span><b>${g.n}</b><small class="mu">${g.d}</small></button>`).join('');
+    const gd=dlg('🎮 ألعاب الغرفة',`<p class="mu">اختر اللعبة التي تريد فتحها داخل الغرفة</p><div class="gg" style="grid-template-columns:1fr;gap:8px">${items||'<p class="mu">لا توجد ألعاب متاحة حاليًا</p>'}</div>`,()=>false,'إغلاق');
     gd.querySelectorAll('[data-room-game]').forEach(b=>b.onclick=()=>{const k=b.dataset.roomGame;gd.remove();openGame(k)});
     gd.querySelector('#dok').onclick=()=>gd.remove();
   };
@@ -1195,9 +1198,14 @@ function showRoomCloseChoice(){if(!room||document.querySelector('.room-exit-choi
 function leaveRoom(silent){if(!room)return;roomMinimized=false;const leavingRoom=room,leavingUser=U();if(leavingUser){leavingRoom.chat=leavingRoom.chat||[];leavingRoom.chat.push({n:'النظام',m:`خرج ${leavingUser.name} من الغرفة`,system:true,t:Date.now()});leavingRoom.chat=leavingRoom.chat.slice(-60)}room.online=(room.online||[]).filter(x=>x!==me);const i=room.seats.indexOf(me);if(i>-1){room.seats[i]=null;if(i===0)closeHost()}if(room.hostUser===me){room.hostUser=null;room.hostTalk=false;closeHost()}talk=false;sel=null;showAdm=false;rsReset();room=null;save();if(!silent)render()}
 
 function rGames(m){
-  // تم حذف لعبة عجلة الحظ من صفحة الألعاب؛ تبقى الألعاب المسجلة في GM فقط.
-  m.innerHTML=gamesGrid();
-  m.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>openGame(b.dataset.g));
+  const draw=available=>{
+    const idMap={slot:'ocean-storm',wheel:'wheel-animals',slot777:'slot-777',cleopatra:'cleopatra-gold',warrior:'big-warrior',fruit:'fruit-luck',pizza:'pizza-yam'};
+    const list=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k]));
+    m.innerHTML=`<b>🎮 ألعاب العملات</b><p class="mu">تلعب بنفس رصيد حسابك، ولا يوجد رصيد تلقائي.</p><div class="gg">${list.map(([k,g])=>`<button class="gt" data-g="${k}"><span class="gi">${gicon(k)}</span><b>${g.n}</b><small class="mu">${g.d}</small></button>`).join('')||'<p class="mu">لا توجد ألعاب متاحة حاليًا</p>'}</div><div class="sp"></div>`;
+    m.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>openGame(b.dataset.g));
+  };
+  draw(null);
+  window.migoApi('/game-control/status').then(p=>draw(new Set((p.games||[]).filter(x=>x.enabled!==false).map(x=>x.id)))).catch(()=>{});
 }
 function rMsgs(m){
   const mine=DB.msgs.filter(x=>(x.to===me||x.from===me)&&!(U().blocked||[]).includes(x.from));
@@ -1420,7 +1428,7 @@ function agencyOwnerBind(m){
 }
 const logTable=a=>a.length?`<div class="tbw"><table><tr><th>الوقت</th><th>التفاصيل</th></tr>${a.map(l=>`<tr><td>${l.t}</td><td>${esc(l.txt)}</td></tr>`).join('')}</table></div>`:'<p class="mu">لا يوجد سجل</p>';
 let ot='tp';
-async function ownerGamesHTML(){
+function ownerGamesHTML(){
  return '<div class="card"><b>🎮 إدارة إتاحة الألعاب</b><p class="mu" style="margin-top:6px">تشغيل أو إيقاف اللعبة من الخادم، وينعكس التغيير على قسم الألعاب والغرف.</p><div id="owner-games-list" class="mu" style="padding:12px">جارٍ تحميل حالة الألعاب…</div></div>';
 }
 async function ownerGamesBind(m){
