@@ -58,6 +58,8 @@ router.get("/state", async (req, res) => {
     let previousPayout = 0;
     try {
       await session.withTransaction(async () => {
+        // withTransaction may retry its callback; keep response totals retry-safe.
+        previousPayout = 0;
         const user = await User.findOne({ _id: req.auth.sub, status: "active" }).session(session).select("coins");
         if (!user) throw Object.assign(new Error("الحساب غير موجود أو غير نشط"), { status: 404 });
         const pendingRounds = await VeggieRound.find({
