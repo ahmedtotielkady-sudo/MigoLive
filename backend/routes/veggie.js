@@ -118,10 +118,7 @@ router.post("/bet", async (req, res) => {
       const oldAmounts = old ? old.amounts.map(Number) : Array(8).fill(0);
       // A player may add chips to any lane, but cannot move or withdraw an
       // already accepted stake by replacing one lane with another.
-      if (parsed.amounts.some((amount, lane) => amount < oldAmounts[lane])) {
-        throw Object.assign(new Error("لا يمكن تغيير أو سحب رهان تم تأكيده"), { status: 409 });
-      }
-      const additional = parsed.amounts.reduce((sum, amount, lane) => sum + amount - oldAmounts[lane], 0);
+      const additional = veggie.additionalBet(oldAmounts, parsed.amounts);
       if (additional > user.coins) throw Object.assign(new Error("رصيدك غير كافٍ"), { status: 409 });
       if (index >= 0) {
         old.amounts = parsed.amounts;
