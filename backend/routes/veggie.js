@@ -14,18 +14,24 @@ function roundNumberAt(now) {
 }
 async function getRound(number, now) {
   const startsAt = new Date(EPOCH + number * veggie.CYCLE_SECONDS * 1000);
-  const round = await VeggieRound.findOneAndUpdate(
-    { roundNumber: number },
-    { $setOnInsert: {
-      roundNumber: number, roundId: crypto.randomUUID(), startsAt,
-      betCloseAt: new Date(startsAt.getTime() + veggie.BET_SECONDS * 1000),
-      spinEndAt: new Date(startsAt.getTime() + (veggie.BET_SECONDS + veggie.SPIN_SECONDS) * 1000),
-      resultAt: new Date(startsAt.getTime() + veggie.CYCLE_SECONDS * 1000),
-      outcome: veggie.createOutcome(), bets: []
-    } },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
-  return round;
+  const update = { $setOnInsert: {
+    roundNumber: number, roundId: crypto.randomUUID(), startsAt,
+    betCloseAt: new Date(startsAt.getTime() + veggie.BET_SECONDS * 1000),
+    spinEndAt: new Date(startsAt.getTime() + (veggie.BET_SECONDS + veggie.SPIN_SECONDS) * 1000),
+    resultAt: new Date(startsAt.getTime() + veggie.CYCLE_SECONDS * 1000),
+    outcome: veggie.createOutcome(), bets: []
+  } };
+  try {
+    return await VeggieRound.findOneAndUpdate({ roundNumber: number }, update,
+      { upsert: true, new: true, setDefaultsOnInsert: true });
+  } catch (error) {
+    // Concurrent first visitors may race to create the same global round.
+    if (error && error.code === 11000) {
+      const existing = await VeggieRound.findOne({ roundNumber: number });
+      if (existing) return existing;
+    }
+    throw error;
+  }
 }
 function publicRound(round, now, playerBet) {
   const elapsed = Math.max(0, (now.getTime() - round.startsAt.getTime()) / 1000);
