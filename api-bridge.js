@@ -691,7 +691,9 @@
     'rocket-crash:start': '/games/rocket-crash/start',
     'rocket-crash:state': '/games/rocket-crash/state',
     'rocket-crash:cashout': '/games/rocket-crash/cashout',
-    'rocket-crash:cancel': '/games/rocket-crash/cancel'
+    'rocket-crash:cancel': '/games/rocket-crash/cancel',
+    'pizza-yam:spin': '/games/pizza-yam/spin',
+    'pizza-yam:state': '/games/pizza-yam/state'
   };
   function gameFrameFor(source) {
     const frames = [$id('gf'), document.querySelector('#migo-game-overlay iframe')].filter(Boolean);
@@ -738,6 +740,9 @@
     if (gameId === 'fruit-luck' && !['m', '77', 'o'].includes(o.result)) {
       throw new Error('رمز نتيجة الفواكه غير صحيح');
     }
+    if (gameId === 'pizza-yam' && (!Number.isSafeInteger(Number(o.target)) || Number(o.target) < 0 || Number(o.target) > 7 || !['single', 'group'].includes(o.type) || !Array.isArray(o.requestedBets) || o.requestedBets.length !== 8)) {
+      throw new Error('نتيجة بيتزا يم غير مكتملة من الخادم');
+    }
     if (gameId === 'big-warrior' && !['lion', 'tiger', 'draw'].includes(o.winner)) {
       throw new Error('الفائز في المحارب الكبير غير محدد من الخادم');
     }
@@ -761,11 +766,11 @@
       return;
     }
     try {
-      const options = {
+      const options = request.action === 'state' ? { method: 'GET' } : {
         method: 'POST',
+        headers: { 'Idempotency-Key': requestId },
         body: JSON.stringify(request.payload && typeof request.payload === 'object' ? request.payload : {})
       };
-      if (request.action !== 'state') options.headers = { 'Idempotency-Key': requestId };
       const result = validateGameServerResult(String(request.gameId), String(request.action), await api(endpoint, options));
       if (result && Number.isFinite(Number(result.coins))) {
         const coins = applyServerWalletCoins(result.coins);
