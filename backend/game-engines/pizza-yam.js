@@ -11,14 +11,21 @@ const FOODS = Object.freeze([
   { emoji: "🍗", multiplier: 45, group: "m" }
 ]);
 const MAX_BET = 10000000;
+function normalizeBets(input) {
+  let bets;
+  if (Array.isArray(input && input.bets)) bets = input.bets;
+  else if (input && Number.isInteger(Number(input.foodIndex)) && input.bet !== undefined) {
+    bets = Array.from({ length: FOODS.length }, (_, i) => i === Number(input.foodIndex) ? Number(input.bet) : 0);
+  } else throw Object.assign(new Error("قائمة الرهانات غير صحيحة"), { status: 400 });
+  if (bets.length !== FOODS.length || bets.some(v => !Number.isSafeInteger(v) || v < 0))
+    throw Object.assign(new Error("كل رهان يجب أن يكون عددًا صحيحًا غير سالب"), { status: 400 });
+  const totalBet = bets.reduce((sum, value) => sum + value, 0);
+  if (!Number.isSafeInteger(totalBet) || totalBet < 1 || totalBet > MAX_BET)
+    throw Object.assign(new Error("إجمالي الرهان خارج الحد المسموح"), { status: 400 });
+  return { bets: bets.slice(), totalBet };
+}
 function play(input, randomInt = crypto.randomInt) {
-  const foodIndex = Number(input && input.foodIndex);
-  const bet = Number(input && input.bet);
-  if (!Number.isInteger(foodIndex) || foodIndex < 0 || foodIndex >= FOODS.length)
-    throw Object.assign(new Error("اختيار الطعام غير صحيح"), { status: 400 });
-  if (!Number.isSafeInteger(bet) || bet < 1 || bet > MAX_BET)
-    throw Object.assign(new Error("قيمة الرهان خارج الحد المسموح"), { status: 400 });
-  // The server chooses either a group result (salad/meat plate) or one food.
+  const normalized = normalizeBets(input);
   const groupRoll = randomInt(0, 500);
   let group = null, targetIndex;
   if (groupRoll === 0) {
@@ -32,13 +39,14 @@ function play(input, randomInt = crypto.randomInt) {
     targetIndex = weights.findIndex(weight => (draw -= weight) <= 0);
     if (targetIndex < 0) targetIndex = FOODS.length - 1;
   }
-  const wins = group ? FOODS[foodIndex].group === group : foodIndex === targetIndex;
-  const payout = wins ? bet * FOODS[foodIndex].multiplier : 0;
+  const winningIndices = group
+    ? FOODS.map((food, index) => food.group === group ? index : -1).filter(index => index >= 0)
+    : [targetIndex];
+  const payout = winningIndices.reduce((sum, index) => sum + normalized.bets[index] * FOODS[index].multiplier, 0);
   return {
-    selectedIndex: foodIndex, targetIndex, group,
-    winningIndices: group ? FOODS.map((food, index) => food.group === group ? index : -1).filter(index => index >= 0) : [targetIndex],
-    multiplier: wins ? FOODS[foodIndex].multiplier : 0,
-    payout, totalBet: bet
+    bets: normalized.bets, selectedIndex: targetIndex, targetIndex, group,
+    winningIndices, multiplier: group ? null : (normalized.bets[targetIndex] ? FOODS[targetIndex].multiplier : 0),
+    payout, totalBet: normalized.totalBet
   };
 }
-module.exports = { play, FOODS, MAX_BET };
+module.exports = { play, normalizeBets, FOODS, MAX_BET };
