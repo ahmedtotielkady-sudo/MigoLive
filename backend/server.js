@@ -108,7 +108,14 @@ async function start() {
   const MicLease = require("./models/MicLease");
   const GameRound = require("./models/GameRound");
   const GameState = require("./models/GameState");
-  await Promise.all([MicLease.init(), GameRound.init(), GameState.init()]);
+  const PizzaYamRound = require("./models/PizzaYamRound");
+  await Promise.all([MicLease.init(), GameRound.init(), GameState.init(), PizzaYamRound.init()]);
+  // Settlement runs on the server independently of connected game clients.
+  const pizzaYamSettlement = require("./services/pizza-yam-settlement");
+  pizzaYamSettlement.settleDueRounds().catch((error) => console.error("Pizza Yam settlement startup:", error.message));
+  setInterval(() => {
+    pizzaYamSettlement.settleDueRounds().catch((error) => console.error("Pizza Yam settlement worker:", error.message));
+  }, 1000).unref();
   const io = attachRealtime(httpServer, allowedOrigins);
   app.set("io", io);
   httpServer.listen(port, "0.0.0.0", () => console.log(`MigoLive API + realtime listening on port ${port}`));
