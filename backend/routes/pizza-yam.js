@@ -97,7 +97,9 @@ router.post("/pizza-yam/bet", async (req, res) => {
     });
     const freshClock = pizzaYam.getRoundClock();
     const round = await PizzaYamRound.findOne({ roundNumber: freshClock.round });
-    return res.json({ ok: true, gameId: "pizza-yam", ...response, ...publicState(freshClock, round) });
+    const userBets = round ? round.bets.filter(item => String(item.userId) === req.auth.sub) : [];
+    const aggregateBets = userBets.reduce((sum, item) => sum.map((v, i) => v + item.bets[i]), Array(8).fill(0));
+    return res.json({ ok: true, gameId: "pizza-yam", ...response, ...publicState(freshClock, round), bets: aggregateBets });
   } catch (error) {
     return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر تسجيل الرهان" });
   } finally { await session.endSession(); }
