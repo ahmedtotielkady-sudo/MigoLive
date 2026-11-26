@@ -14,7 +14,8 @@ const GAMES = [
   { id: "cleopatra-gold", name: "ذهب كليوباترا" },
   { id: "fruit-luck", name: "حظ الفواكه" },
   { id: "rocket-crash", name: "الصاروخ" },
-  { id: "big-warrior", name: "المحارب الكبير" }
+  { id: "big-warrior", name: "المحارب الكبير" },
+  { id: "pizza-yam", name: "بيتزا يم" }
 ];
 
 async function ownerOnly(req, res, next) {
