@@ -706,7 +706,7 @@
         !Number.isSafeInteger(Number(result.coins)) || Number(result.coins) < 0) {
       throw new Error('رد الخادم غير مكتمل: لم يتم تأكيد رصيد الجولة');
     }
-    if (action === 'state' || action === 'wallet' || (gameId === 'pizza-yam' && action === 'bet')) return result;
+    if (action === 'state' || action === 'wallet' || (gameId === 'pizza-yam' && (action === 'bet' || action === 'spin'))) return result;
     if (typeof result.roundId !== 'string' || !result.roundId) {
       throw new Error('رد الخادم لا يحتوي على رقم الجولة');
     }
