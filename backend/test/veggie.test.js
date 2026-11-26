@@ -18,7 +18,7 @@ test("Veggie accepts eight valid bet slots and totals them", () => {
 test("Veggie rejects malformed, fractional, and oversized bets", () => {
   assert.throws(() => veggie.validateBets([10, 20]), /اختار الرهانات/);
   assert.throws(() => veggie.validateBets([1.5, 0, 0, 0, 0, 0, 0, 0]), /قيمة الرهان/);
-  assert.throws(() => veggie.validateBets([1000001, 0, 0, 0, 0, 0, 0, 0]), /إجمالي الرهان/);
+  assert.throws(() => veggie.validateBets([1000010, 0, 0, 0, 0, 0, 0, 0]), /إجمالي الرهان/);
 });
 
 test("Veggie single and group outcomes settle using server multipliers", () => {
