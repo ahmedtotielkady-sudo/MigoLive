@@ -4,7 +4,7 @@ const gameRoundSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
   gameId: { type: String, required: true, enum: [
     "slot-777", "ocean-storm", "wheel-animals", "cleopatra-gold",
-    "fruit-luck", "rocket-crash", "big-warrior"
+    "fruit-luck", "rocket-crash", "big-warrior", "pizza-yam"
   ] },
   roundId: { type: String, required: true },
   idempotencyKey: { type: String, required: true, unique: true },
