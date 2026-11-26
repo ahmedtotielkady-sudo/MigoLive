@@ -15,7 +15,8 @@ const GAMES = [
   { id: "fruit-luck", name: "حظ الفواكه" },
   { id: "rocket-crash", name: "الصاروخ" },
   { id: "big-warrior", name: "المحارب الكبير" },
-  { id: "pizza-yam", name: "بيتزا يم" }
+  { id: "pizza-yam", name: "بيتزا يم" },
+  { id: "veggie", name: "خضار" }
 ];
 async function ownerOnly(req, res, next) {
   try {
