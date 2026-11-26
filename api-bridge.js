@@ -704,7 +704,22 @@
         !Number.isSafeInteger(Number(result.coins)) || Number(result.coins) < 0) {
       throw new Error('رد الخادم غير مكتمل: لم يتم تأكيد رصيد الجولة');
     }
-    if (action === 'state' || action === 'wallet') return result;
+    if (action === 'state' || action === 'wallet') {
+      if (gameId === 'veggie' && action === 'state' &&
+          (!result.roundId || !Number.isFinite(Number(result.startsAt)) ||
+           !['bet', 'spin', 'result'].includes(result.phase) ||
+           (result.outcome && !['single', 'group'].includes(result.outcome.type)))) {
+        throw new Error('بيانات جولة الخضار غير مكتملة');
+      }
+      return result;
+    }
+    if (gameId === 'veggie' && action === 'bet') {
+      if (!Array.isArray(result.outcome && result.outcome.amounts) ||
+          result.outcome.amounts.length !== 8 || !Number.isFinite(Number(result.bet))) {
+        throw new Error('تأكيد رهان الخضار غير مكتمل');
+      }
+      return result;
+    }
     if (typeof result.roundId !== 'string' || !result.roundId) {
       throw new Error('رد الخادم لا يحتوي على رقم الجولة');
     }
