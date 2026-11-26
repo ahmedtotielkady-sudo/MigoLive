@@ -2,11 +2,11 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const game = require("../game-engines/veggie");
 
-test("Veggie round uses the requested 20/8/4 timing", () => {
+test("Veggie round uses the requested 20/4/4 timing", () => {
   assert.equal(game.BET_SECONDS, 20);
-  assert.equal(game.SPIN_SECONDS, 8);
+  assert.equal(game.SPIN_SECONDS, 4);
   assert.equal(game.RESULT_SECONDS, 4);
-  assert.equal(game.CYCLE_SECONDS, 32);
+  assert.equal(game.CYCLE_SECONDS, 28);
 });
 
 test("validates eight bet lanes and accepted chip denominations", () => {
