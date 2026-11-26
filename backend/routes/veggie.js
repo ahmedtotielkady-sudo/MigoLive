@@ -47,7 +47,6 @@ router.get("/state", async (req, res) => {
     const now = new Date();
     const number = roundNumberAt(now);
     const current = await getRound(number, now);
-    const previous = number > 0 ? await VeggieRound.findOne({ roundNumber: number - 1 }) : null;
     const session = await mongoose.startSession();
     let coins = 0;
     let previousPayout = 0;
@@ -55,27 +54,31 @@ router.get("/state", async (req, res) => {
       await session.withTransaction(async () => {
         const user = await User.findOne({ _id: req.auth.sub, status: "active" }).session(session).select("coins");
         if (!user) throw Object.assign(new Error("الحساب غير موجود أو غير نشط"), { status: 404 });
-        coins = user.coins;
-        if (previous) {
-          const bet = previous.bets.find(item => String(item.userId) === String(user._id));
-          if (bet && !bet.settled && now >= previous.resultAt) {
-            previousPayout = veggie.payoutFor(bet.amounts, previous.outcome);
-            bet.payout = previousPayout;
-            bet.settled = true;
-            bet.settledAt = now;
-            if (previousPayout > 0) {
-              user.coins += previousPayout;
-              await WalletTransaction.create([{
-                to: user._id, amount: previousPayout, type: "game_reward",
-                description: "مكسب لعبة خضار", idempotencyKey: "veggie_" + previous.roundId + "_" + String(user._id) + "_win"
-              }], { session });
-            }
-            await previous.save({ session });
-            await user.save({ session });
-            await Wallet.updateOne({ userId: user._id }, { $set: { balance: user.coins } }, { upsert: true, session });
-            coins = user.coins;
+        const pendingRounds = await VeggieRound.find({
+          "bets.userId": user._id, resultAt: { $lte: now }
+        }).session(session);
+        for (const oldRound of pendingRounds) {
+          const bet = oldRound.bets.find(item => String(item.userId) === String(user._id));
+          if (!bet || bet.settled) continue;
+          const payout = veggie.payoutFor(bet.amounts, oldRound.outcome);
+          bet.payout = payout;
+          bet.settled = true;
+          bet.settledAt = now;
+          previousPayout += payout;
+          if (payout > 0) {
+            user.coins += payout;
+            await WalletTransaction.create([{
+              to: user._id, amount: payout, type: "game_reward",
+              description: "مكسب لعبة خضار", idempotencyKey: "veggie_" + oldRound.roundId + "_" + String(user._id) + "_win"
+            }], { session });
           }
+          await oldRound.save({ session });
         }
+        if (previousPayout > 0) {
+          await user.save({ session });
+          await Wallet.updateOne({ userId: user._id }, { $set: { balance: user.coins } }, { upsert: true, session });
+        }
+        coins = user.coins;
       });
     } finally { await session.endSession(); }
     const playerBet = current.bets.find(item => String(item.userId) === String(req.auth.sub)) || null;
@@ -120,7 +123,7 @@ router.post("/bet", async (req, res) => {
         user.coins -= additional;
         await WalletTransaction.create([{
           from: user._id, amount: additional, type: "game_bet",
-          description: "رهان لعبة خضار", idempotencyKey: "veggie_" + round.roundId + "_" + String(user._id) + "_bet"
+          description: "رهان لعبة خضار", idempotencyKey: "veggie_" + round.roundId + "_" + String(user._id) + "_bet_" + parsed.total
         }], { session });
       }
       await round.save({ session });
