@@ -687,6 +687,7 @@
     'wheel-animals:spin': '/games/wheel-animals/spin',
     'fruit-luck:spin': '/games/fruit-luck/spin',
     'pizza-yam:spin': '/games/pizza-yam/spin',
+    'pizza-yam:wallet': '/wallet',
     'big-warrior:fight': '/games/big-warrior/fight',
     'cleopatra-gold:spin': '/games/cleopatra-gold/spin',
     'rocket-crash:start': '/games/rocket-crash/start',
@@ -703,7 +704,7 @@
         !Number.isSafeInteger(Number(result.coins)) || Number(result.coins) < 0) {
       throw new Error('رد الخادم غير مكتمل: لم يتم تأكيد رصيد الجولة');
     }
-    if (action === 'state') return result;
+    if (action === 'state' || action === 'wallet') return result;
     if (typeof result.roundId !== 'string' || !result.roundId) {
       throw new Error('رد الخادم لا يحتوي على رقم الجولة');
     }
@@ -762,11 +763,11 @@
       return;
     }
     try {
-      const options = {
+      const options = request.action === 'wallet' ? { method: 'GET' } : {
         method: 'POST',
         body: JSON.stringify(request.payload && typeof request.payload === 'object' ? request.payload : {})
       };
-      if (request.action !== 'state') options.headers = { 'Idempotency-Key': requestId };
+      if (request.action !== 'state' && request.action !== 'wallet') options.headers = { 'Idempotency-Key': requestId };
       const result = validateGameServerResult(String(request.gameId), String(request.action), await api(endpoint, options));
       if (result && Number.isFinite(Number(result.coins))) {
         const coins = applyServerWalletCoins(result.coins);
