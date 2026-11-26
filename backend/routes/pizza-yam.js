@@ -10,6 +10,15 @@ const pizzaYam = require("../game-engines/pizza-yam");
 
 const router = express.Router();
 
+router.get("/pizza-yam/state", async (req, res, next) => {
+  try {
+    const user = await User.findById(req.auth.sub).select("coins status").lean();
+    if (!user || user.status !== "active") return res.status(403).json({ ok: false, message: "الحساب غير نشط" });
+    return res.json({ ok: true, gameId: "pizza-yam", coins: Number(user.coins) || 0,
+      clock: pizzaYam.currentRound(), foods: pizzaYam.FOODS });
+  } catch (error) { return next(error); }
+});
+
 router.post("/pizza-yam/spin", async (req, res) => {
   const key = String(req.get("idempotency-key") || "");
   if (!/^[A-Za-z0-9_-]{16,80}$/.test(key)) {
@@ -22,8 +31,7 @@ router.post("/pizza-yam/spin", async (req, res) => {
   const clock = pizzaYam.currentRound();
   // Only accept the result submission during the result window. The server's
   // clock and RNG decide the outcome; client input contains bets only.
-  if (clock.offset < pizzaYam.BET_SECONDS + pizzaYam.SPIN_SECONDS ||
-      clock.offset > pizzaYam.CYCLE_SECONDS + 2) {
+  if (clock.offset < pizzaYam.BET_SECONDS + pizzaYam.SPIN_SECONDS && clock.offset > 2) {
     return res.status(409).json({ ok: false, message: "لم تنتهِ الجولة بعد أو انتهت مهلة اعتمادها" });
   }
 
