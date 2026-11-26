@@ -20,7 +20,7 @@ elif "window.__migoGetGameProfile" not in html:
 
 # Register Rocket Space without disturbing existing game entries.
 rocket_entry = "rocket:{n:'صاروخ الفضاء',i:'🚀',d:'لعبة الصاروخ · عملات المحفظة'}"
-cleopatra_entry = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'}"
+cleopatra_entry = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'},veggie:{n:'خضار',i:'🥗',d:'عجلة الخضار والبيتزا · عملات المحفظة'}"
 if rocket_entry not in html:
     if cleopatra_entry not in html:
         raise SystemExit("Could not find Cleopatra entry to register Rocket Space")
