@@ -46,7 +46,13 @@ router.get("/pizza-yam/state", async (req, res, next) => {
     const userBets = round.bets.filter(item => String(item.userId) === req.auth.sub);
     const user = await User.findById(req.auth.sub).select("coins");
     if (!user) return res.status(404).json({ ok: false, message: "الحساب غير موجود" });
-    return res.json({ ...publicState(clock, round), coins: user.coins,
+    const userSettlement = {
+      hasBets: userBets.length > 0,
+      settled: userBets.length > 0 && userBets.every(item => item.settled === true),
+      totalBet: userBets.reduce((sum, item) => sum + Number(item.totalBet || 0), 0),
+      payout: userBets.reduce((sum, item) => sum + Number(item.payout || 0), 0)
+    };
+    return res.json({ ...publicState(clock, round), coins: user.coins, userSettlement,
       bets: userBets.reduce((sum, item) => sum.map((v, i) => v + item.bets[i]), Array(8).fill(0)) });
   } catch (error) { return next(error); }
 });
