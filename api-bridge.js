@@ -686,6 +686,7 @@
     'ocean-storm:spin': '/games/ocean-storm/spin',
     'wheel-animals:spin': '/games/wheel-animals/spin',
     'fruit-luck:spin': '/games/fruit-luck/spin',
+    'pizza-yam:spin': '/games/pizza-yam/spin',
     'big-warrior:fight': '/games/big-warrior/fight',
     'cleopatra-gold:spin': '/games/cleopatra-gold/spin',
     'rocket-crash:start': '/games/rocket-crash/start',
