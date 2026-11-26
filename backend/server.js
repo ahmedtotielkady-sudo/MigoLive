@@ -68,7 +68,6 @@ app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ocean-storm"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/cleopatra-gold"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/rocket-crash"));
-app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/pizza-yam"));
 
 app.use("/api/rooms/ice-config", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ice-config"));
 app.use("/api/rooms/livekit", rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), require("./routes/livekit"));
@@ -108,14 +107,7 @@ async function start() {
   const MicLease = require("./models/MicLease");
   const GameRound = require("./models/GameRound");
   const GameState = require("./models/GameState");
-  const PizzaYamRound = require("./models/PizzaYamRound");
-  await Promise.all([MicLease.init(), GameRound.init(), GameState.init(), PizzaYamRound.init()]);
-  // Settlement runs on the server independently of connected game clients.
-  const pizzaYamSettlement = require("./services/pizza-yam-settlement");
-  pizzaYamSettlement.settleDueRounds().catch((error) => console.error("Pizza Yam settlement startup:", error.message));
-  setInterval(() => {
-    pizzaYamSettlement.settleDueRounds().catch((error) => console.error("Pizza Yam settlement worker:", error.message));
-  }, 1000).unref();
+  await Promise.all([MicLease.init(), GameRound.init(), GameState.init()]);
   const io = attachRealtime(httpServer, allowedOrigins);
   app.set("io", io);
   httpServer.listen(port, "0.0.0.0", () => console.log(`MigoLive API + realtime listening on port ${port}`));
