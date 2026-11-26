@@ -34,6 +34,7 @@ jobs:
           node --check backend/game-engines/veggie.js
           node --check backend/models/VeggieRound.js
           node --check backend/routes/veggie.js
+          node --check backend/services/veggie-settlement.js
           node --test backend/tests/veggie.test.js
           python3 - <<'PY'
           from html.parser import HTMLParser
