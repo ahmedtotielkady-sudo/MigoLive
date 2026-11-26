@@ -828,6 +828,83 @@
   document.addEventListener('click',event=>{if(event.target.closest('#migo-member-admin'))return;let n=event.target;for(let i=0;n&&i<7;i++,n=n.parentElement){const t=String(n.innerText||n.textContent||'').replace(/[›❯>]/g,'').trim();if(t==='الأعضاء'||(t.startsWith('الأعضاء')&&t.length<45)){event.preventDefault();event.stopImmediatePropagation();openMemberManagement();return}}},true);
 
 
+  // Automatically guide a selected recharge package to payment and receipt upload.
+  // The original package selection handler still owns package state and pricing.
+  // This enhancement only scrolls to the existing payment/receipt controls.
+  (function installRechargePackageScroll() {
+    function isVisible(element) {
+      if (!element || !element.isConnected) return false;
+      const style = getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden' &&
+        element.getClientRects().length > 0;
+    }
+    function findPaymentTarget() {
+      // The live wallet screen labels this exact destination section
+      // "شحن العملات بالتحويل". Locate its heading and scroll the whole card
+      // into view, even when the file input itself is visually hidden.
+      const headings = Array.from(document.querySelectorAll('h1,h2,h3,h4,[role="heading"],strong,b'))
+        .filter(isVisible);
+      const heading = headings.find(element =>
+        /شحن\\s*العملات\\s*بالتحويل/.test((element.textContent || '').replace(/\\s+/g, ' ').trim())
+      );
+      if (heading) {
+        let section = heading;
+        for (let depth = 0; depth < 5 && section.parentElement; depth++) {
+          const parent = section.parentElement;
+          const text = (parent.textContent || '').slice(0, 2400);
+          if (/(?:رقم\\s*المحفظة|لم\\s*يحدد\\s*المالك|رفع\\s*المرفق|صورة\\s*الإيصال|إرسال\\s*طلب\\s*الشحن)/.test(text)) {
+            section = parent;
+            if (parent.tagName === 'SECTION' || parent.tagName === 'FORM' ||
+                parent.classList.contains('card')) break;
+          }
+        }
+        return section;
+      }
+      // Fallback for older UI wording or layouts without a semantic heading.
+      const candidates = Array.from(document.querySelectorAll(
+        'button,label,h2,h3,h4,p,span,div,input[type="file"]'
+      )).filter(element => {
+        if (!isVisible(element) || (element.children && element.children.length > 5)) return false;
+        const text = (element.textContent || '').replace(/\\s+/g, ' ').trim();
+        return text.length < 130 &&
+          /(?:نسخ\\s*(?:الرقم|رقم)|رقم\\s*المحفظة|لم\\s*يحدد\\s*المالك|رفع\\s*(?:المرفق|مستند|إيصال)|إرسال\\s*طلب\\s*الشحن)/i.test(text);
+      });
+      if (!candidates.length) return null;
+      let section = candidates[0];
+      for (let depth = 0; depth < 5 && section.parentElement; depth++) {
+        const parent = section.parentElement;
+        const text = (parent.textContent || '').slice(0, 2400);
+        if (/(?:رقم\\s*المحفظة|رفع\\s*المرفق|إرسال\\s*طلب\\s*الشحن)/.test(text) &&
+            (parent.tagName === 'SECTION' || parent.tagName === 'FORM' ||
+             parent.querySelector('input[type="file"]'))) {
+          section = parent;
+          break;
+        }
+        section = parent;
+      }
+      return section;
+    }
+    document.addEventListener('click', event => {
+      const button = event.target && event.target.closest &&
+        event.target.closest('button, [role="button"], input[type="button"]');
+      if (!button || !isVisible(button)) return;
+      const label = String(button.textContent || button.value || '').trim();
+      if (label !== 'اختيار') return;
+      // Restrict this to package cards, not unrelated "اختيار" controls.
+      const card = button.closest('article, .pack, .package, .pkg, .card') ||
+        button.parentElement && button.parentElement.parentElement;
+      if (!card || !/1,?000|5,?000|10,?000|50,?000|100,?000/.test(card.textContent || '')) return;
+      // Allow the application's existing click handler to render the selected
+      // package before locating the receipt section.
+      [120, 450].forEach((delay, index) => setTimeout(() => {
+        const target = findPaymentTarget();
+        if (!target) return;
+        if (index === 0 || !isVisible(target)) return;
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, delay));
+    }, false);
+  })();
+
   // Shared owner settings: persisted centrally and pushed to every connected app.
   let sharedPublicSettings = {};
   let sharedSettingsRevision = 0;
