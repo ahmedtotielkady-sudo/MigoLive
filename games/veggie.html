@@ -194,7 +194,7 @@ async function refreshServerState(){
   try{
     var data=await gameRequest("state",{});
     if(!data||data.gameId!=="veggie"||!Number.isSafeInteger(Number(data.coins)))throw new Error("بيانات الجولة غير مكتملة");
-    if(lastDisplayedRound&&lastDisplayedRound!==data.roundId)lastWin=0;lastDisplayedRound=data.roundId;serverState=data;serverOffset=Number(data.serverNow)-Date.now();applyWallet(data.coins);
+    if(lastDisplayedRound&&lastDisplayedRound!==data.roundId)lastWin=0;lastDisplayedRound=data.roundId;serverState=data;serverOffset=Number(data.serverNow)-Date.now();if(Array.isArray(data.history))hist=data.history.slice(-8);applyWallet(data.coins);
     phase=data.phase==="bet"?"bet":data.phase==="spin"?"spin":"result";
     var pb=data.playerBet;
     bets=pb&&Array.isArray(pb.amounts)?pb.amounts.map(Number):[0,0,0,0,0,0,0,0];
