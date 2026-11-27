@@ -90,8 +90,12 @@ router.get("/state", async (req, res) => {
       });
     } finally { await session.endSession(); }
     const playerBet = current.bets.find(item => String(item.userId) === String(req.auth.sub)) || null;
+    const previousRounds = await VeggieRound.find({ roundNumber: { $lt: number } })
+      .sort({ roundNumber: -1 }).limit(8).select("roundNumber outcome").lean();
+    const history = previousRounds.reverse().map(item => item.outcome && item.outcome.type === "group"
+      ? item.outcome.group : String(item.outcome && item.outcome.index));
     return res.json({ ok: true, gameId: "veggie", coins, ...publicRound(current, now, playerBet),
-      previousPayout });
+      history, previousPayout });
   } catch (error) {
     return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر تحميل الجولة" });
   }
