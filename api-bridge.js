@@ -657,7 +657,9 @@
     'rocket-crash:start': '/games/rocket-crash/start',
     'rocket-crash:state': '/games/rocket-crash/state',
     'rocket-crash:cashout': '/games/rocket-crash/cashout',
-    'rocket-crash:cancel': '/games/rocket-crash/cancel'
+    'rocket-crash:cancel': '/games/rocket-crash/cancel',
+    'veggie:state': '/games/veggie/state',
+    'veggie:bet': '/games/veggie/bet'
   };
   function gameFrameFor(source) {
     const frames = [$id('gf'), document.querySelector('#migo-game-overlay iframe')].filter(Boolean);
@@ -668,7 +670,22 @@
         !Number.isSafeInteger(Number(result.coins)) || Number(result.coins) < 0) {
       throw new Error('رد الخادم غير مكتمل: لم يتم تأكيد رصيد الجولة');
     }
-    if (action === 'state') return result;
+    if (action === 'state' || action === 'wallet') {
+      if (gameId === 'veggie' && action === 'state' &&
+          (!result.roundId || !Number.isFinite(Number(result.startsAt)) ||
+           !['bet', 'spin', 'result'].includes(result.phase) ||
+           (result.outcome && !['single', 'group'].includes(result.outcome.type)))) {
+        throw new Error('بيانات جولة الخضار غير مكتملة');
+      }
+      return result;
+    }
+    if (gameId === 'veggie' && action === 'bet') {
+      if (!Array.isArray(result.outcome && result.outcome.amounts) ||
+          result.outcome.amounts.length !== 8 || !Number.isFinite(Number(result.bet))) {
+        throw new Error('تأكيد رهان الخضار غير مكتمل');
+      }
+      return result;
+    }
     if (typeof result.roundId !== 'string' || !result.roundId) {
       throw new Error('رد الخادم لا يحتوي على رقم الجولة');
     }
@@ -727,12 +744,13 @@
       return;
     }
     try {
-      const options = {
+      const options = (request.action === 'wallet' || request.action === 'state') ? { method: 'GET' } : {
         method: 'POST',
         body: JSON.stringify(request.payload && typeof request.payload === 'object' ? request.payload : {})
       };
-      if (request.action !== 'state') options.headers = { 'Idempotency-Key': requestId };
-      const result = validateGameServerResult(String(request.gameId), String(request.action), await api(endpoint, options));
+      if (request.action !== 'state' && request.action !== 'wallet') options.headers = { 'Idempotency-Key': requestId };
+      const rawResult = await api(endpoint, options);
+      const result = validateGameServerResult(String(request.gameId), String(request.action), rawResult);
       if (result && Number.isFinite(Number(result.coins))) {
         const coins = applyServerWalletCoins(result.coins);
         window.dispatchEvent(new CustomEvent('migo:wallet-updated', {
