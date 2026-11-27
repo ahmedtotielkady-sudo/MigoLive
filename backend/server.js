@@ -65,7 +65,7 @@ app.use("/api/games", (req, res, next) => {
 });
 
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/games"));
-app.use("/api/games/veggie", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), require("./routes/veggie"));
+app.use("/api/games/veggie", rateLimit({ windowMs: 60_000, limit: 600, standardHeaders: true, legacyHeaders: false }), require("./routes/veggie"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ocean-storm"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/cleopatra-gold"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/rocket-crash"));
