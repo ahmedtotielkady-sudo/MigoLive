@@ -64,8 +64,11 @@ app.use("/api/games", (req, res, next) => {
   next();
 });
 
-app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/games"));
+// Mount the high-frequency Veggie state/bet API before the generic games limiter.
+// Otherwise /api/games also matches /api/games/veggie and its 30/min limit
+// blocks the one-second polling with HTTP 429 before the 600/min Veggie limiter runs.
 app.use("/api/games/veggie", rateLimit({ windowMs: 60_000, limit: 600, standardHeaders: true, legacyHeaders: false }), require("./routes/veggie"));
+app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/games"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ocean-storm"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/cleopatra-gold"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/rocket-crash"));
