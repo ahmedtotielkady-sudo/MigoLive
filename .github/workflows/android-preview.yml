@@ -256,7 +256,7 @@ jobs:
                   if self.active:self.current.append(data)
               def handle_endtag(self,tag):
                   if tag.lower()=='script' and self.active:self.parts.append(''.join(self.current));self.active=False
-          files=['www/index.html','www/slot-777.html','www/slot-ocean-storm.html','www/wheel-animals.html','www/games/fruit-luck.html','www/games/cleopatra-gold.html','www/games/big-warrior.html','www/games/rocket-crash.html']
+          files=['www/index.html','www/slot-777.html','www/slot-ocean-storm.html','www/wheel-animals.html','www/games/fruit-luck.html','www/games/cleopatra-gold.html','www/games/big-warrior.html','www/games/rocket-crash.html','www/games/veggie.html']
           for file in files:
               parser=Scripts();parser.feed(Path(file).read_text(encoding='utf-8'))
               for i,source in enumerate(parser.parts):
