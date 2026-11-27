@@ -1,4 +1,5 @@
 name: Build MigoLive local Android APK
+# Rebuild Android preview for the current Veggie game integration.
 
 on:
   push:
