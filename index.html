@@ -1199,7 +1199,7 @@ function leaveRoom(silent){if(!room)return;roomMinimized=false;const leavingRoom
 
 function rGames(m){
   const draw=available=>{
-    const idMap={slot:'ocean-storm',wheel:'wheel-animals',slot777:'slot-777',cleopatra:'cleopatra-gold',warrior:'big-warrior',fruit:'fruit-luck',pizza:'pizza-yam'};
+    const idMap={slot:'ocean-storm',wheel:'wheel-animals',slot777:'slot-777',cleopatra:'cleopatra-gold',warrior:'big-warrior',fruit:'fruit-luck',pizza:'pizza-yam',veggie:'veggie'};
     const list=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k]));
     m.innerHTML=`<b>🎮 ألعاب العملات</b><p class="mu">تلعب بنفس رصيد حسابك، ولا يوجد رصيد تلقائي.</p><div class="gg">${list.map(([k,g])=>`<button class="gt" data-g="${k}"><span class="gi">${gicon(k)}</span><b>${g.n}</b><small class="mu">${g.d}</small></button>`).join('')||'<p class="mu">لا توجد ألعاب متاحة حاليًا</p>'}</div><div class="sp"></div>`;
     m.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>openGame(b.dataset.g));
