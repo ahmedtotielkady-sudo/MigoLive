@@ -200,7 +200,7 @@ async function refreshServerState(){
     bets=pb&&Array.isArray(pb.amounts)?pb.amounts.map(Number):[0,0,0,0,0,0,0,0];
     if(data.previousPayout>0){today+=Number(data.previousPayout);toast("مبروك! أضيف مكسبك إلى المحفظة");}
     render();
-  }catch(e){gameReady=false;phase="wait";toast("تعذر الاتصال بالخادم");}
+  }catch(e){gameReady=false;phase="wait";toast(e&&e.message?e.message:"تعذر الاتصال بالخادم");}
   finally{serverBusy=false;}
 }
 function sync(){
@@ -212,7 +212,6 @@ function sync(){
 }
 
 function loop(){sync();requestAnimationFrame(loop)}
-setInterval(sync,200);
 document.addEventListener("visibilitychange",function(){if(!document.hidden)refreshServerState()});
 
 $("helpBtn").addEventListener("click",function(){$("modal").classList.add("show")});
