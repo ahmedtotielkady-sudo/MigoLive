@@ -162,12 +162,16 @@ async function placeBet(i){
   if(busy)return;
   var next=bets.slice();next[i]+=chip;
   if(next.reduce(function(a,b){return a+b},0)>1000000){toast("تجاوزت الحد الأقصى للرهان");return}
-  busy=true;try{
+  busy=true;var confirmedBets=bets.slice();
+  // Show the selected chip immediately; only the server may change the wallet.
+  bets=next;render();
+  try{
     var result=await gameRequest("bet",{roundId:serverState.roundId,amounts:next});
     if(!result||!Number.isSafeInteger(Number(result.coins)))throw new Error("لم يتم تأكيد الرصيد من الخادم");
-    bets=next;applyWallet(result.coins);if(navigator.vibrate)try{navigator.vibrate(10)}catch(e){}
+    bets=Array.isArray(result.outcome&&result.outcome.amounts)?result.outcome.amounts.map(Number):next;
+    applyWallet(result.coins);if(navigator.vibrate)try{navigator.vibrate(10)}catch(e){}
     toast("تم تأكيد الرهان");
-  }catch(e){toast(e.message||"تعذر تسجيل الرهان");await refreshServerState()}
+  }catch(e){bets=confirmedBets;render();toast(e.message||"تعذر تسجيل الرهان");await refreshServerState()}
   finally{busy=false;}
 }
 
