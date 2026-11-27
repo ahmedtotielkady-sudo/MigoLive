@@ -130,6 +130,7 @@ js = r"""
   {name:"فواكه الحظ",url:"games/fruit-luck.html"},
   {name:"خضار",url:"games/veggie.html"},
  ];
+ const uniqueGames = [...new Map(games.map(g=>[g.url,g])).values()];
  const cleanText=()=>{
   const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
   const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
@@ -146,7 +147,7 @@ js = r"""
    picker.innerHTML='<div class="migo-picker-card"><div class="migo-picker-title">الألعاب</div><div class="migo-picker-grid"></div><button class="migo-picker-close" type="button">إغلاق</button></div>';
    const grid=picker.querySelector(".migo-picker-grid");
    const visuals={"عجلة الحيوانات":["🐯","اختر حيوانك"],"عاصفة المحيط":["🌊","سلوت 5×6"],"سلوت 777":["🎰","سلوت 3×5"],"ذهب كليوباترا":["👑","سلوت 5×4 · رصيد المحفظة"],"المحارب الكبير":["🦁","الأسد ضد النمر · رصيد المحفظة"],"صاروخ الفضاء":["🚀","لعبة الصاروخ · رصيد المحفظة"],"فواكه الحظ":["🍉","عجلة الفواكه · رصيد المحفظة"],"خضار":["🥗","عجلة الخضار والبيتزا · رصيد المحفظة"]};
-   games.forEach(g=>{const v=visuals[g.name]||["🎮",""];const b=document.createElement("button");b.type="button";b.className="migo-game-card";b.innerHTML='<span class="migo-game-icon">'+v[0]+'</span><span class="migo-game-name"></span><span class="migo-game-desc"></span>';b.querySelector(".migo-game-name").textContent=g.name;b.querySelector(".migo-game-desc").textContent=v[1];b.addEventListener("click",()=>openGame(g));grid.appendChild(b)});
+   uniqueGames.forEach(g=>{const v=visuals[g.name]||["🎮",""];const b=document.createElement("button");b.type="button";b.className="migo-game-card";b.innerHTML='<span class="migo-game-icon">'+v[0]+'</span><span class="migo-game-name"></span><span class="migo-game-desc"></span>';b.querySelector(".migo-game-name").textContent=g.name;b.querySelector(".migo-game-desc").textContent=v[1];b.addEventListener("click",()=>openGame(g));grid.appendChild(b)});
    picker.querySelector(".migo-picker-close").onclick=()=>picker.hidden=true;
    document.body.appendChild(picker);
   }
