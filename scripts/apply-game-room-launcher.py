@@ -20,7 +20,7 @@ elif "window.__migoGetGameProfile" not in html:
 
 # Register Rocket Space without disturbing existing game entries.
 rocket_entry = "rocket:{n:'صاروخ الفضاء',i:'🚀',d:'لعبة الصاروخ · عملات المحفظة'}"
-cleopatra_entry = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'},veggie:{n:'خضار',i:'🥗',d:'عجلة الخضار والبيتزا · عملات المحفظة'}"
+cleopatra_entry = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'},veggie:{n:'خضار',i:'🥗',d:'عجلة الخضار · عملات المحفظة'}"
 if rocket_entry not in html:
     if cleopatra_entry in html:
         html = html.replace(cleopatra_entry, cleopatra_entry + "," + rocket_entry, 1)
@@ -76,6 +76,25 @@ if "k==='veggie'" not in html:
 veggie_asset = Path("games/veggie.html")
 if not veggie_asset.is_file() or veggie_asset.stat().st_size < 1000:
     raise SystemExit("Veggie game asset is missing or incomplete")
+
+# Make food and chip controls respond on the first touch instead of waiting for
+# the synthetic click event. Keep the action guarded by the game's busy state.
+veggie_html = veggie_asset.read_text(encoding="utf-8")
+veggie_touch_style = """<style id="migo-veggie-fast-touch-v1">
+.food,.chip{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+</style>
+"""
+if "migo-veggie-fast-touch-v1" not in veggie_html:
+    if "</head>" not in veggie_html:
+        raise SystemExit("Missing </head> in veggie.html")
+    veggie_html = veggie_html.replace("</head>", veggie_touch_style + "\n</head>", 1)
+old_food_click = 'd.addEventListener("click",function(){placeBet(i)});'
+new_food_click = 'd.addEventListener("pointerdown",function(e){if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();placeBet(i)},{passive:false});'
+if old_food_click in veggie_html:
+    veggie_html = veggie_html.replace(old_food_click, new_food_click, 1)
+elif new_food_click not in veggie_html:
+    raise SystemExit("Veggie food touch handler signature not found")
+veggie_asset.write_text(veggie_html, encoding="utf-8")
 
 style_id = "migo-game-room-launcher-style-v1"
 script_id = "migo-game-room-launcher-script-v1"
@@ -282,12 +301,12 @@ if script_id not in html:
     if "</body>" not in html: raise SystemExit("Missing </body>")
     html = html.replace("</body>", js + "\n</body>", 1)
 
-# Keep the Veggie tile visible when an older game-policy API omits this newly
-# registered game; respect an explicit disabled=false/true policy when present.
+# Keep Veggie and Fruit Luck visible when older policy APIs omit either entry.
+# An explicit disabled policy remains authoritative.
 html = html.replace("const draw=available=>{", "const draw=(available,known)=>{", 1)
 html = html.replace(
     "const list=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k]));",
-    "const list=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k])||(k==='veggie'&&known&&!known.has('veggie')));",
+    "const list=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k])||(['veggie','fruit-luck'].includes(k)&&known&&!known.has(idMap[k])));",
     1
 )
 html = html.replace(
