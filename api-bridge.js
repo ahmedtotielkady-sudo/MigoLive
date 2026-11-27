@@ -5,7 +5,7 @@
 (() => {
   'use strict';
   const API = 'https://migolive-api-production.up.railway.app/api';
-  const TOKEN_KEY = 'migolive_token';
+  const TOKEN_KEY = 'migolive_api_token_v1';
   const DEVICE_KEY = 'migolive_device_id_v1';
   let deviceInfoPromise = null;
   async function deviceHeaders() {
