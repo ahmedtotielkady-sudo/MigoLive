@@ -214,14 +214,10 @@ js = r"""
     const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{name:"",avatar:"",coins:0};
     e.source.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
     e.source.postMessage({t:"me",name:profile.name||"",avatar:profile.avatar||""},"*");
-   }else if(d.t==="set"&&Number.isFinite(d.v)&&d.v>=0){
-    const u=typeof U==="function"?U():null;
-    if(!u)return;
-    u.coins=Math.floor(d.v);
-    if(typeof save==="function")save();
-    const coinNode=document.querySelector("#mycoins");
-    if(coinNode)coinNode.textContent=u.coins;
-    window.dispatchEvent(new CustomEvent("migo:wallet-updated",{detail:{coins:u.coins}}));
+   }else if(d.t==="set"){
+    // Never accept client-side balance writes from a game iframe.
+    // Game wagers and payouts must be committed by the authenticated backend.
+    console.warn("Ignored client-side game wallet write; server settlement is required");
    }else if(d.t==="wallet"){
     window.dispatchEvent(new CustomEvent("migo:open-wallet"));
    }
