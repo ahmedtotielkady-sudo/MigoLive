@@ -223,7 +223,7 @@ $("closeM").addEventListener("click",function(){$("modal").classList.remove("sho
 $("modal").addEventListener("click",function(e){if(e.target===$("modal"))$("modal").classList.remove("show")});
 $("resetBtn").style.display="none";
 build();render();
-refreshServerState();setInterval(refreshServerState,2000);loop();
+refreshServerState();setInterval(refreshServerState,1000);loop();
 })();
 </script>
 </body>
