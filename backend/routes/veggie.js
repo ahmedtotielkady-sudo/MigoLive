@@ -94,6 +94,11 @@ router.get("/state", async (req, res) => {
       .sort({ roundNumber: -1 }).limit(8).select("roundNumber outcome").lean();
     const history = previousRounds.reverse().map(item => item.outcome && item.outcome.type === "group"
       ? item.outcome.group : String(item.outcome && item.outcome.index));
+    // Include the live round as soon as its server-owned spin has completed.
+    if (current.spinEndAt <= now && current.outcome) {
+      history.push(current.outcome.type === "group" ? current.outcome.group : String(current.outcome.index));
+      if (history.length > 8) history.shift();
+    }
     return res.json({ ok: true, gameId: "veggie", coins, ...publicRound(current, now, playerBet),
       history, previousPayout });
   } catch (error) {
