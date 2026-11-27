@@ -67,6 +67,7 @@ app.use("/api/games", (req, res, next) => {
 });
 
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/games"));
+app.use("/api/games/veggie", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), require("./routes/veggie"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ocean-storm"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/cleopatra-gold"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/rocket-crash"));
@@ -108,9 +109,11 @@ async function start() {
   const MicLease = require("./models/MicLease");
   const GameRound = require("./models/GameRound");
   const GameState = require("./models/GameState");
-  await Promise.all([MicLease.init(), GameRound.init(), GameState.init()]);
+  const VeggieRound = require("./models/VeggieRound");
+  await Promise.all([MicLease.init(), GameRound.init(), GameState.init(), VeggieRound.init()]);
   const io = attachRealtime(httpServer, allowedOrigins);
   app.set("io", io);
+  require("./services/veggie-settlement").startVeggieSettlementWorker(io);
   httpServer.listen(port, "0.0.0.0", () => console.log(`MigoLive API + realtime listening on port ${port}`));
 }
 start().catch((error) => {
