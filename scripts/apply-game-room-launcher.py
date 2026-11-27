@@ -222,6 +222,11 @@ js = r"""
     (g.name==="عجلة الحيوانات"&&/wheel-animals/.test(raw))||
     (g.name==="عاصفة المحيط"&&/slot-ocean-storm/.test(raw))||
     (g.name==="سلوت 777"&&/slot-777/.test(raw))||
+    (g.name==="ذهب كليوباترا"&&/cleopatra-gold/.test(raw))||
+    (g.name==="المحارب الكبير"&&/big-warrior/.test(raw))||
+    (g.name==="صاروخ الفضاء"&&/rocket-crash/.test(raw))||
+    (g.name==="فواكه الحظ"&&/fruit-luck/.test(raw))||
+    (g.name==="خضار"&&/veggie/.test(raw)))||null;
  }
  function bindGamesEverywhere(){
   if(document.documentElement.dataset.migoGamesEverywhere==="1")return;
