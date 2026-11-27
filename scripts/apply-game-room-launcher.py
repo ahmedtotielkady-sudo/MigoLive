@@ -281,6 +281,21 @@ if style_id not in html:
 if script_id not in html:
     if "</body>" not in html: raise SystemExit("Missing </body>")
     html = html.replace("</body>", js + "\n</body>", 1)
+
+# Keep the Veggie tile visible when an older game-policy API omits this newly
+# registered game; respect an explicit disabled=false/true policy when present.
+html = html.replace("const draw=available=>{", "const draw=(available,known)=>{", 1)
+html = html.replace(
+    "const list=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k]));",
+    "const list=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k])||(k==='veggie'&&known&&!known.has('veggie')));",
+    1
+)
+html = html.replace(
+    "window.migoApi('/game-control/status').then(p=>draw(new Set((p.games||[]).filter(x=>x.enabled!==false).map(x=>x.id)))).catch(()=>{});",
+    "window.migoApi('/game-control/status').then(p=>{const games=Array.isArray(p.games)?p.games:[];draw(new Set(games.filter(x=>x.enabled!==false).map(x=>x.id)),new Set(games.map(x=>x.id)));}).catch(()=>{});",
+    1
+)
+
 p.write_text(html, encoding="utf-8")
 
 # Slightly compact the warrior game's controls and fighter cards without changing artwork.
