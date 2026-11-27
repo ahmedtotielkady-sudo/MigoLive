@@ -1123,7 +1123,7 @@ function renderRoom(m){
   $('#roomGames').onclick=async()=>{
     let available=null;
     try{const policy=await window.migoApi('/game-control/status');available=new Set((policy.games||[]).filter(x=>x.enabled!==false).map(x=>x.id))}catch(_){}
-    const idMap={slot:'ocean-storm',wheel:'wheel-animals',slot777:'slot-777',cleopatra:'cleopatra-gold',warrior:'big-warrior',fruit:'fruit-luck',pizza:'pizza-yam'};
+    const idMap={slot:'ocean-storm',wheel:'wheel-animals',slot777:'slot-777',cleopatra:'cleopatra-gold',warrior:'big-warrior',fruit:'fruit-luck',pizza:'pizza-yam',veggie:'veggie'};
     const items=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k])).map(([k,g])=>`<button type="button" class="gt" data-room-game="${k}" style="width:100%;margin:6px 0"><span class="gi">${gicon(k)}</span><b>${g.n}</b><small class="mu">${g.d}</small></button>`).join('');
     const gd=dlg('🎮 ألعاب الغرفة',`<p class="mu">اختر اللعبة التي تريد فتحها داخل الغرفة</p><div class="gg" style="grid-template-columns:1fr;gap:8px">${items||'<p class="mu">لا توجد ألعاب متاحة حاليًا</p>'}</div>`,()=>false,'إغلاق');
     gd.querySelectorAll('[data-room-game]').forEach(b=>b.onclick=()=>{const k=b.dataset.roomGame;gd.remove();openGame(k)});
