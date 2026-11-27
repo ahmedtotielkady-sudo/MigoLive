@@ -9,7 +9,8 @@ const ROUTE_GAME = [
   [/^\/(?:cleopatra-gold)\//, "cleopatra-gold"],
   [/^\/(?:fruit-luck)\//, "fruit-luck"],
   [/^\/(?:rocket-crash)\//, "rocket-crash"],
-  [/^\/(?:big-warrior)\//, "big-warrior"]
+  [/^\/(?:big-warrior)\//, "big-warrior"],
+  [/^\/(?:veggie)\//, "veggie"]
 ];
 
 module.exports = async function requireGameEnabled(req, res, next) {
