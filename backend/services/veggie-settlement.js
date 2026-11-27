@@ -6,6 +6,25 @@ const WalletTransaction = require("../models/WalletTransaction");
 const VeggieRound = require("../models/VeggieRound");
 const veggie = require("../game-engines/veggie");
 
+// Keep the shared round clock alive even when no player has the game open.
+const EPOCH = Date.UTC(2026, 0, 1);
+async function ensureCurrentRound(now = new Date()) {
+  const roundNumber = Math.max(0, Math.floor((now.getTime() - EPOCH) / (veggie.CYCLE_SECONDS * 1000)));
+  const startsAt = new Date(EPOCH + roundNumber * veggie.CYCLE_SECONDS * 1000);
+  try {
+    await VeggieRound.findOneAndUpdate({ roundNumber }, { $setOnInsert: {
+      roundNumber, roundId: require("crypto").randomUUID(), startsAt,
+      betCloseAt: new Date(startsAt.getTime() + veggie.BET_SECONDS * 1000),
+      spinEndAt: new Date(startsAt.getTime() + (veggie.BET_SECONDS + veggie.SPIN_SECONDS) * 1000),
+      resultAt: new Date(startsAt.getTime() + veggie.CYCLE_SECONDS * 1000),
+      outcome: veggie.createOutcome(), bets: []
+    } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+  } catch (error) {
+    if (!error || error.code !== 11000) throw error;
+    // Another worker/request created this round concurrently.
+  }
+}
+
 let timer = null;
 let running = false;
 
@@ -61,6 +80,8 @@ async function tick(io) {
   if (running) return;
   running = true;
   try {
+    const now = new Date();
+    await ensureCurrentRound(now);
     const due = await VeggieRound.find({
       spinEndAt: { $lte: new Date() },
       "bets.settled": false
@@ -82,7 +103,7 @@ async function tick(io) {
 
 function startVeggieSettlementWorker(io) {
   if (timer) return;
-  timer = setInterval(() => tick(io), 2000);
+  timer = setInterval(() => tick(io), 1000);
   if (typeof timer.unref === "function") timer.unref();
   tick(io);
 }
