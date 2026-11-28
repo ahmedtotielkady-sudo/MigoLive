@@ -800,6 +800,53 @@
   });
 
 
+  function openPasswordResetDialog(user) {
+    const existing = document.getElementById('migo-password-reset');
+    if (existing) existing.remove();
+    const overlay = document.createElement('section');
+    overlay.id = 'migo-password-reset';
+    overlay.dir = 'rtl';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483600;background:#080414dd;display:flex;align-items:center;justify-content:center;padding:18px;font-family:system-ui,sans-serif';
+    const card = document.createElement('form');
+    card.style.cssText = 'width:100%;max-width:420px;background:#1b1032;border:1px solid #8052b8;border-radius:18px;padding:20px;color:#fff;box-shadow:0 18px 60px #000b';
+    card.innerHTML = '<h3 style="margin:0 0 8px;color:#f4d48b">إعادة تعيين كلمة المرور</h3><p id="mpr-user" style="margin:0 0 16px;color:#cbb9e9;font-size:13px"></p><label style="display:block;margin:10px 0 6px">كلمة المرور الجديدة</label><input id="mpr-pass" type="password" minlength="8" maxlength="72" autocomplete="new-password" required style="width:100%;box-sizing:border-box;padding:13px;border-radius:10px;border:1px solid #6940a6;background:#100827;color:#fff"><label style="display:block;margin:12px 0 6px">تأكيد كلمة المرور</label><input id="mpr-confirm" type="password" minlength="8" maxlength="72" autocomplete="new-password" required style="width:100%;box-sizing:border-box;padding:13px;border-radius:10px;border:1px solid #6940a6;background:#100827;color:#fff"><p id="mpr-note" style="min-height:20px;color:#f0b4b4;font-size:12px"></p><div style="display:flex;gap:8px"><button id="mpr-submit" type="submit" style="flex:1;padding:12px;border:0;border-radius:10px;background:#7040b2;color:#fff;font-weight:800">حفظ كلمة المرور</button><button id="mpr-cancel" type="button" style="padding:12px;border:1px solid #6940a6;border-radius:10px;background:#28134b;color:#fff">إلغاء</button></div>';
+    card.querySelector('#mpr-user').textContent = 'العضو: ' + String(user.displayName || '') + ' · ID: ' + String(user.uid);
+    const pass = card.querySelector('#mpr-pass');
+    const confirmPass = card.querySelector('#mpr-confirm');
+    const note = card.querySelector('#mpr-note');
+    const submit = card.querySelector('#mpr-submit');
+    const close = () => overlay.remove();
+    card.querySelector('#mpr-cancel').onclick = close;
+    overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+    card.addEventListener('submit', async event => {
+      event.preventDefault();
+      const password = pass.value;
+      if (password.length < 8 || password.length > 72) { note.textContent = 'كلمة المرور يجب أن تكون من 8 إلى 72 حرفًا'; return; }
+      if (password !== confirmPass.value) { note.textContent = 'تأكيد كلمة المرور غير متطابق'; return; }
+      if (!confirm('تأكيد تغيير كلمة مرور العضو رقم ' + user.uid + '؟ سيتم إنهاء جلساته الحالية.')) return;
+      submit.disabled = true;
+      submit.textContent = 'جارٍ الحفظ…';
+      note.textContent = '';
+      try {
+        await api('/admin/users/' + encodeURIComponent(user.uid) + '/reset-password', {
+          method: 'POST',
+          body: JSON.stringify({ newPassword: password })
+        });
+        pass.value = '';
+        confirmPass.value = '';
+        close();
+        alert('تم تغيير كلمة المرور. يجب على العضو تسجيل الدخول من جديد.');
+      } catch (error) {
+        note.textContent = error && error.message ? error.message : 'تعذر تغيير كلمة المرور';
+        submit.disabled = false;
+        submit.textContent = 'حفظ كلمة المرور';
+      }
+    });
+    overlay.append(card);
+    document.body.append(overlay);
+    pass.focus();
+  }
+
   function openMemberManagement() {
     if (document.getElementById('migo-member-admin')) return;
     const root=document.createElement('section'); root.id='migo-member-admin'; root.dir='rtl';
@@ -817,6 +864,7 @@
             add('تعديل الاسم',async()=>{const v=prompt('اسم العرض الجديد:',u.displayName||'');if(v===null)return;try{await api('/admin/users/'+u.uid,{method:'PATCH',body:JSON.stringify({displayName:v})});load(true)}catch(e){alert(e.message)}});
             add(u.role==='admin'?'إلغاء المشرف':'جعله مشرفاً',async()=>{if(!confirm('تأكيد تغيير صلاحية العضو؟'))return;try{await api('/admin/users/'+u.uid,{method:'PATCH',body:JSON.stringify({role:u.role==='admin'?'user':'admin'})});load(true)}catch(e){alert(e.message)}});
             add('تسجيل خروج',async()=>{if(!confirm('إنهاء جلسة العضو على جميع الأجهزة؟'))return;try{await api('/admin/users/'+u.uid+'/logout',{method:'POST',body:'{}'});alert('تم إنهاء الجلسة')}catch(e){alert(e.message)}});
+            add('إعادة تعيين كلمة المرور',()=>openPasswordResetDialog(u));
             add(u.status==='banned'?'فك الحظر':'حظر العضو',async()=>{if(!confirm('تأكيد '+(u.status==='banned'?'فك حظر':'حظر')+' العضو؟'))return;try{await api('/admin/users/'+u.uid+'/'+(u.status==='banned'?'unban':'ban'),{method:'POST',body:'{}'});load(true)}catch(e){alert(e.message)}},u.status==='banned'?'good':'bad');c.append(a)}
           list.append(c)});
         stats.textContent='إجمالي الأعضاء: '+fmt(total)+' · المعروض: '+fmt(list.children.length);more.style.display=list.children.length<total?'block':'none';page++;

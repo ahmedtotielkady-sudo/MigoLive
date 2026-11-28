@@ -1,5 +1,7 @@
 const express = require("express");
 const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const rateLimit = require("express-rate-limit");
 const requireAuth = require("../middleware/requireAuth");
 const AdminAuditLog = require("../models/AdminAuditLog");
 async function audit(req, action, target, reason, metadata={}) { await AdminAuditLog.create({actorUserId:req.auth.sub,action,targetType:"user",targetId:String(target.uid),reason:String(reason||"").slice(0,500),metadata}); }
@@ -195,6 +197,52 @@ router.post("/:uid/logout", async (req, res, next) => {
       io.in(room).disconnectSockets(true);
     }
     return res.json({ ok: true, user: memberView(target) });
+  } catch (error) { return next(error); }
+});
+
+// POST /api/admin/users/:uid/reset-password
+// The owner can set a new password, but no endpoint ever returns the current
+// password or password hash. Revoke all existing sessions after the reset.
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, message: "محاولات كثيرة لإعادة تعيين كلمات المرور، حاول بعد 15 دقيقة" }
+});
+
+router.post("/:uid/reset-password", passwordResetLimiter, async (req, res, next) => {
+  try {
+    const uid = Number(req.params.uid);
+    if (!Number.isSafeInteger(uid) || uid < 1) {
+      return res.status(400).json({ ok: false, message: "رقم العضو غير صحيح" });
+    }
+    const password = String(req.body && req.body.newPassword || "");
+    if (password.length < 8 || Buffer.byteLength(password, "utf8") > 72) {
+      return res.status(400).json({ ok: false, message: "كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل وألا تتجاوز 72 بايتًا" });
+    }
+
+    const target = await User.findOne({ uid });
+    if (!target) return res.status(404).json({ ok: false, message: "العضو غير موجود" });
+    if (target.role === "owner") {
+      return res.status(403).json({ ok: false, message: "لا يمكن تغيير كلمة مرور مالك التطبيق من إدارة الأعضاء" });
+    }
+
+    // Hash the supplied new password; never log or return it or its hash.
+    target.passwordHash = await bcrypt.hash(password, 12);
+    target.activeSessionId = null;
+    target.activeSessionExpiresAt = null;
+    await target.save();
+    await audit(req, "user.password_reset", target, "إعادة تعيين كلمة المرور بواسطة المالك");
+
+    const io = req.app.get("io");
+    if (io) {
+      const room = "user:" + String(target._id);
+      io.emit("owner:member-updated", { uid: target.uid, action: "password-reset" });
+      io.to(room).emit("auth:session-replaced", { message: "تم تغيير كلمة مرور الحساب، سجّل الدخول مرة أخرى" });
+      io.in(room).disconnectSockets(true);
+    }
+    return res.json({ ok: true, message: "تم تغيير كلمة المرور بنجاح، يجب على المستخدم تسجيل الدخول من جديد" });
   } catch (error) { return next(error); }
 });
 
