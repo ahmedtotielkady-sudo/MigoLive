@@ -202,7 +202,27 @@ async function seatSnapshot(room) {
       try {
         const roomCode = Number(payload.roomCode);
         if (!Number.isSafeInteger(roomCode)) return ack({ ok: false, error: "INVALID_ROOM" });
-        const ctx = await memberContext(socket, roomCode);
+        let ctx = await memberContext(socket, roomCode);
+        // Public rooms can be joined directly from a deep link or a stale room card.
+        // Persist membership before registering presence so every device sees the same roster.
+        if (!ctx) {
+          const roomBeforeJoin = await Room.findOne({ roomCode, status: "open" })
+            .select("_id isPrivate capacity members").lean();
+          if (!roomBeforeJoin) return ack({ ok: false, error: "ROOM_NOT_FOUND" });
+          if (roomBeforeJoin.isPrivate) return ack({ ok: false, error: "NOT_ROOM_MEMBER" });
+          const joinedRoom = await Room.findOneAndUpdate(
+            {
+              _id: roomBeforeJoin._id, status: "open", isPrivate: false,
+              members: { $ne: socket.auth.sub },
+              $expr: { $lt: [{ $size: { $ifNull: ["$members", []] } }, "$capacity"] }
+            },
+            { $addToSet: { members: socket.auth.sub } },
+            { new: true }
+          );
+          const alreadyMember = await Room.exists({ _id: roomBeforeJoin._id, members: socket.auth.sub });
+          if (!joinedRoom && !alreadyMember) return ack({ ok: false, error: "SEATS_FULL" });
+          ctx = await memberContext(socket, roomCode);
+        }
         if (!ctx) return ack({ ok: false, error: "NOT_ROOM_MEMBER" });
         const key = String(roomCode);
         const previous = socketRooms.get(socket.id);
@@ -257,16 +277,17 @@ async function seatSnapshot(room) {
         for (const peer of activePresence) {
           onlineByUser.set(String(peer.userId), {
             uid: peer.uid,
-            displayName: String(peer.displayName || "")
+            displayName: String(peer.displayName || ""),
+            isOwner: String(peer.userId) === String(ctx.room.owner)
           });
         }
         const online = [...onlineByUser.values()];
         const peers = online.filter(peer => Number(peer.uid) !== Number(ctx.user.uid));
         /* Keep Socket.IO room membership for same-process signaling; MongoDB presence
            is the cross-replica source of truth for the visible online roster. */
-        ack({ ok: true, roomCode, socketId: socket.id, uid: ctx.user.uid, peers, online, seats: await seatSnapshot(ctx.room) });
+        ack({ ok: true, roomCode, socketId: socket.id, uid: ctx.user.uid, isOwner: ctx.isOwner, peers, online, seats: await seatSnapshot(ctx.room) });
         socket.to("room:" + key).emit("room:peer-joined", {
-          socketId: socket.id, uid: ctx.user.uid, displayName: ctx.user.displayName
+          socketId: socket.id, uid: ctx.user.uid, displayName: ctx.user.displayName, isOwner: ctx.isOwner
         });
       } catch (_error) { ack({ ok: false, error: "SERVER_ERROR" }); }
     });
