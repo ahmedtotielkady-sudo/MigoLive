@@ -74,7 +74,7 @@ app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: 
 app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/room-details"));
 
 app.use("/api/admin/users", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/admin-users"));
-app.use("/api/admin/devices", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/admin-devices"));
+app.use("/api/admin/devices", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/admin-devices"));\napp.use("/api/agencies", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/agencies"));
 
 app.use("/api/users", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), require("./routes/users"));
 
@@ -102,10 +102,10 @@ async function start() {
     throw new Error("JWT_SECRET must be configured with at least 32 characters");
   }
   await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10_000 });
-  const MicLease = require("./models/MicLease");
+  const MicLease = require("./models/MicLease");\n  const Agency = require("./models/Agency");\n  const AgencyMembership = require("./models/AgencyMembership");\n  const AgencyLedger = require("./models/AgencyLedger");\n  const AdminAuditLog = require("./models/AdminAuditLog");
   const GameRound = require("./models/GameRound");
   const GameState = require("./models/GameState");
-  await Promise.all([MicLease.init(), GameRound.init(), GameState.init()]);
+  await Promise.all([MicLease.init(), GameRound.init(), GameState.init(), Agency.init(), AgencyMembership.init(), AgencyLedger.init(), AdminAuditLog.init()]);
   const io = attachRealtime(httpServer, allowedOrigins);
   app.set("io", io);
   httpServer.listen(port, "0.0.0.0", () => console.log(`MigoLive API + realtime listening on port ${port}`));
