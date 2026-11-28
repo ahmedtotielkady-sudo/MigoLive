@@ -14,6 +14,7 @@ on:
       - feature/global-phone-registration-ui-2026-11-20
       - feature/signup-dark-wallet-integration-2026-11-20
       - feature/owner-version-device-controls-2026-11-26
+      - feat/livekit-client-room-audio
   workflow_dispatch:
 
 permissions:
