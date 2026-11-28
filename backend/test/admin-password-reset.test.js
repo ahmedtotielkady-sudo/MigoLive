@@ -32,7 +32,7 @@ test("password reset does not load the existing password hash", () => {
 });
 
 test("owner member panel provides a masked password reset form wired to the API", () => {
-  const bridge = fs.readFileSync(path.join(__dirname, "..", "..", "..", "api-bridge.js"), "utf8");
+  const bridge = fs.readFileSync(path.join(__dirname, "..", "..", "api-bridge.js"), "utf8");
   assert.match(bridge, /type="password"/);
   assert.match(bridge, /autocomplete="new-password"/);
   assert.match(bridge, /openPasswordResetDialog\(u\)/);
