@@ -103,3 +103,10 @@ test("host transfer is owner-only, validates target agency type and commits memb
   assert.match(route, /agency\.host\.transferred/);
   assert.match(route, /session\.withTransaction/);
 });
+
+test("host transfer history endpoint is owner-only and paginated", () => {
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /router\.get\("\/owner\/hosts\/:uid\/transfers"/);
+  assert.match(route, /await requireOwner\(req\.auth\.sub\)/);
+  assert.match(route, /HostAgencyTransfer\.find\(\{ hostUserId: host\._id \}\)/);
+});
