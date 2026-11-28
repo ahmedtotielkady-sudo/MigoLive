@@ -22,6 +22,7 @@ function view(d) {
   return {
     id: String(d._id), uid: d.lastUid, platform: d.platform, model: d.model,
     manufacturer: d.manufacturer, osVersion: d.osVersion, appVersion: d.appVersion,
+    versionHistory: Array.isArray(d.versionHistory) ? d.versionHistory.map(v => ({ platform:v.platform, model:v.model, manufacturer:v.manufacturer, osVersion:v.osVersion, appVersion:v.appVersion, recordedAt:v.recordedAt })) : [],
     firstSeenAt: d.firstSeenAt, lastSeenAt: d.lastSeenAt, blocked: !!d.blocked,
     blockedAt: d.blockedAt, blockReason: d.blockReason || ""
   };
