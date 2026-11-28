@@ -24,19 +24,23 @@ function getDeviceIdentity(req) {
 async function registerDevice(req, user) {
   const info = getDeviceIdentity(req);
   if (!info) return { deviceKey: null, blocked: false };
-  const existing = await Device.findOne({ deviceKey: info.deviceKey }).select("blocked").lean();
+  const existing = await Device.findOne({ deviceKey: info.deviceKey }).select("blocked platform model osVersion appVersion").lean();
   if (existing && existing.blocked) return { deviceKey: info.deviceKey, blocked: true };
+  const now = new Date();
+  const versionChanged = !existing || existing.appVersion !== info.appVersion || existing.osVersion !== info.osVersion || existing.platform !== info.platform || existing.model !== info.model;
+  const update = {
+    $set: {
+      platform: info.platform, model: info.model, manufacturer: info.manufacturer,
+      osVersion: info.osVersion, appVersion: info.appVersion,
+      userAgent: info.userAgent, lastUid: user.uid, lastSeenAt: now
+    },
+    $setOnInsert: { firstSeenAt: now },
+    $addToSet: { userIds: user._id }
+  };
+  if (versionChanged) update.$push = { versionHistory: { $each: [{ platform: info.platform, model: info.model, manufacturer: info.manufacturer, osVersion: info.osVersion, appVersion: info.appVersion, recordedAt: now }], $slice: -50 } };
   await Device.findOneAndUpdate(
     { deviceKey: info.deviceKey, blocked: { $ne: true } },
-    {
-      $set: {
-        platform: info.platform, model: info.model, manufacturer: info.manufacturer,
-        osVersion: info.osVersion, appVersion: info.appVersion,
-        userAgent: info.userAgent, lastUid: user.uid, lastSeenAt: new Date()
-      },
-      $setOnInsert: { firstSeenAt: new Date() },
-      $addToSet: { userIds: user._id }
-    },
+    update,
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
   const stillBlocked = await Device.exists({ deviceKey: info.deviceKey, blocked: true });

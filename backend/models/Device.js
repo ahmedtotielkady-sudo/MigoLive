@@ -1,6 +1,15 @@
 "use strict";
 const mongoose = require("mongoose");
 
+const DeviceVersionSchema = new mongoose.Schema({
+  platform: { type: String, default: "unknown", maxlength: 32 },
+  model: { type: String, default: "غير معروف", maxlength: 120 },
+  manufacturer: { type: String, default: "", maxlength: 80 },
+  osVersion: { type: String, default: "", maxlength: 40 },
+  appVersion: { type: String, default: "", maxlength: 32 },
+  recordedAt: { type: Date, default: Date.now }
+}, { _id: false });
+
 const DeviceSchema = new mongoose.Schema({
   deviceKey: { type: String, required: true, unique: true, index: true },
   userIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
@@ -10,6 +19,7 @@ const DeviceSchema = new mongoose.Schema({
   manufacturer: { type: String, default: "", maxlength: 80 },
   osVersion: { type: String, default: "", maxlength: 40 },
   appVersion: { type: String, default: "", maxlength: 32 },
+  versionHistory: { type: [DeviceVersionSchema], default: [] },
   userAgent: { type: String, default: "", maxlength: 400 },
   firstSeenAt: { type: Date, default: Date.now },
   lastSeenAt: { type: Date, default: Date.now },
