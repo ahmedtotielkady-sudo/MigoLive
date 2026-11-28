@@ -54,8 +54,7 @@ index.write_text(html, encoding="utf-8")
 files = [
     Path("www/slot-777.html"), Path("www/slot-ocean-storm.html"),
     Path("www/wheel-animals.html"), Path("www/games/fruit-luck.html"),
-    Path("www/games/cleopatra-gold.html"), Path("www/games/big-warrior.html"),
-    Path("www/games/rocket-crash.html")
+    Path("www/games/big-warrior.html")
 ]
 for path in files:
     if not path.is_file() or path.stat().st_size < 1000:
