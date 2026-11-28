@@ -10,6 +10,8 @@ test("Android room UI loads the LiveKit and Socket.IO audio bridge", () => {
   const bridge = fs.readFileSync(path.join(root, "voice-room.js"), "utf8");
   assert.ok(workflow.includes("livekit-client@2.25.0"));
   assert.ok(workflow.includes("cp voice-room.js www/voice-room.js"));
+  assert.ok(workflow.includes("android.permission.RECORD_AUDIO"));
+  assert.ok(workflow.includes("android.permission.MODIFY_AUDIO_SETTINGS"));
   assert.ok(bridge.includes("window.io(origin"));
   assert.ok(bridge.includes('"/rooms/livekit/" + roomCode + "/token"'));
 });
