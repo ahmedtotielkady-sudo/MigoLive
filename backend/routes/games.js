@@ -21,7 +21,9 @@ async function recoverDuplicateRound(key, userId, gameId, requestHash) {
       prior.gameId !== gameId || !prior.requestHash || prior.requestHash !== requestHash) return null;
   return {
     roundId: prior.roundId, coins: user.coins, bet: prior.bet,
-    payout: prior.payout, outcome: prior.outcome, repeated: true
+    payout: prior.payout, outcome: prior.outcome,
+    freeSpin: !!(prior.outcome && prior.outcome.freeSpin),
+    freeSpinsRemaining: Number(prior.outcome && prior.outcome.freeSpinsRemaining) || 0, repeated: true
   };
 }
 
@@ -108,7 +110,7 @@ router.post("/slot-777/spin", async (req, res) => {
   } catch (error) {
     if (error && error.code === 11000) {
       try {
-        const replay = await recoverDuplicateRound(key, req.auth.sub, slot-777, requestHash);
+        const replay = await recoverDuplicateRound(key, req.auth.sub, "slot-777", requestHash);
         if (replay) return res.json({ ok: true, gameId: slot-777, ...replay });
         return res.status(409).json({ ok: false, message: "معرّف الجولة مستخدم لطلب مختلف" });
       } catch (_) {
@@ -189,7 +191,7 @@ router.post("/wheel-animals/spin", async (req, res) => {
   } catch (error) {
     if (error && error.code === 11000) {
       try {
-        const replay = await recoverDuplicateRound(key, req.auth.sub, wheel-animals, requestHash);
+        const replay = await recoverDuplicateRound(key, req.auth.sub, "wheel-animals", requestHash);
         if (replay) return res.json({ ok: true, gameId: wheel-animals, ...replay });
         return res.status(409).json({ ok: false, message: "معرّف الجولة مستخدم لطلب مختلف" });
       } catch (_) {
@@ -267,7 +269,7 @@ router.post("/fruit-luck/spin", async (req, res) => {
   } catch (error) {
     if (error && error.code === 11000) {
       try {
-        const replay = await recoverDuplicateRound(key, req.auth.sub, fruit-luck, requestHash);
+        const replay = await recoverDuplicateRound(key, req.auth.sub, "fruit-luck", requestHash);
         if (replay) return res.json({ ok: true, gameId: fruit-luck, ...replay });
         return res.status(409).json({ ok: false, message: "معرّف الجولة مستخدم لطلب مختلف" });
       } catch (_) {
@@ -346,7 +348,7 @@ router.post("/big-warrior/fight", async (req, res) => {
   } catch (error) {
     if (error && error.code === 11000) {
       try {
-        const replay = await recoverDuplicateRound(key, req.auth.sub, big-warrior, requestHash);
+        const replay = await recoverDuplicateRound(key, req.auth.sub, "big-warrior", requestHash);
         if (replay) return res.json({ ok: true, gameId: big-warrior, ...replay });
         return res.status(409).json({ ok: false, message: "معرّف الجولة مستخدم لطلب مختلف" });
       } catch (_) {
