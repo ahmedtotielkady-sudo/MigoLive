@@ -315,6 +315,7 @@
       if (!Number.isSafeInteger(newId)) throw new Error("تعذر إنشاء الغرفة أونلاين");
       localRoom.id = newId;
       localRoom.serverManaged = true;
+      localRoom.serverMember = true;
       localRoom.members = [me];
       localRoom.seats = Array(SEATMAX).fill(null);
       localRoom.online = [me];
