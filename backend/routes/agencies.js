@@ -57,6 +57,53 @@ function safeAgency(agency) {
     packages: agency.packages, createdAt: agency.createdAt, updatedAt: agency.updatedAt
   };
 }
+
+function reportWindow(query) {
+  const period = String(query.period || "daily");
+  if (!["daily", "monthly"].includes(period)) throw httpError(400, "نوع التقرير غير صحيح");
+  const now = new Date();
+  let from = query.from ? new Date(query.from) : null;
+  let to = query.to ? new Date(query.to) : null;
+  if (query.from && (!from || Number.isNaN(from.getTime()))) throw httpError(400, "تاريخ البداية غير صحيح");
+  if (query.to && (!to || Number.isNaN(to.getTime()))) throw httpError(400, "تاريخ النهاية غير صحيح");
+  if (!from && !to) {
+    if (period === "monthly") {
+      from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    } else {
+      from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      to = new Date(from.getTime() + 24 * 60 * 60 * 1000);
+    }
+  } else if (!from || !to) {
+    throw httpError(400, "يجب إرسال تاريخ البداية والنهاية معًا");
+  }
+  if (to <= from || to.getTime() - from.getTime() > 366 * 24 * 60 * 60 * 1000) {
+    throw httpError(400, "نطاق التقرير غير صحيح أو يتجاوز 366 يومًا");
+  }
+  return { period, from, to };
+}
+
+async function aggregateAgencyReport(filter, period) {
+  const dateFormat = period === "monthly" ? "%Y-%m" : "%Y-%m-%d";
+  return AgencyLedger.aggregate([
+    { $match: filter },
+    { $group: {
+      _id: {
+        agencyId: "$agencyId",
+        bucket: { $dateToString: { format: dateFormat, date: "$createdAt", timezone: "UTC" } },
+        currency: "$currency"
+      },
+      chargeCount: { $sum: { $cond: [{ $eq: ["$type", "user_charge"] }, 1, 0] } },
+      chargedCoins: { $sum: { $cond: [{ $eq: ["$type", "user_charge"] }, "$amountCoins", 0] } },
+      salesMinor: { $sum: { $cond: [{ $eq: ["$type", "user_charge"] }, "$amountMinor", 0] } },
+      commissionMinor: { $sum: "$commissionMinor" },
+      ownerCreditCoins: { $sum: { $cond: [{ $eq: ["$type", "owner_credit"] }, "$amountCoins", 0] } },
+      lastTransactionAt: { $max: "$createdAt" }
+    } },
+    { $sort: { "_id.bucket": 1, "_id.agencyId": 1 } }
+  ]);
+}
+
 async function audit(session, actor, action, targetType, targetId, reason, metadata = {}) {
   await AdminAuditLog.create([{
     actorUserId: actor._id, action, targetType, targetId: String(targetId),
@@ -65,6 +112,66 @@ async function audit(session, actor, action, targetType, targetId, reason, metad
 }
 
 // Owner-only central registry.
+
+router.get("/owner/reports/agencies", async (req, res) => {
+  try {
+    await requireOwner(req.auth.sub);
+    const { period, from, to } = reportWindow(req.query);
+    const rows = await aggregateAgencyReport({ createdAt: { $gte: from, $lt: to } }, period);
+    const ids = [...new Set(rows.map(row => String(row._id.agencyId)))];
+    const agencies = await Agency.find({ _id: { $in: ids } }).select("agencyCode name type status").lean();
+    const byId = new Map(agencies.map(a => [String(a._id), a]));
+    const reports = rows.map(row => ({
+      agency: byId.get(String(row._id.agencyId)) || null,
+      period: row._id.bucket,
+      currency: row._id.currency || "EGP",
+      chargeCount: row.chargeCount,
+      chargedCoins: row.chargedCoins,
+      salesMinor: row.salesMinor,
+      commissionMinor: row.commissionMinor,
+      ownerCreditCoins: row.ownerCreditCoins,
+      lastTransactionAt: row.lastTransactionAt
+    }));
+    return res.json({
+      ok: true, period, timezone: "UTC", from, to, generatedAt: new Date(),
+      totals: reports.reduce((acc, row) => {
+        acc.chargeCount += row.chargeCount;
+        acc.chargedCoins += row.chargedCoins;
+        acc.salesMinor += row.salesMinor;
+        acc.commissionMinor += row.commissionMinor;
+        acc.ownerCreditCoins += row.ownerCreditCoins;
+        return acc;
+      }, { chargeCount: 0, chargedCoins: 0, salesMinor: 0, commissionMinor: 0, ownerCreditCoins: 0 }),
+      reports
+    });
+  } catch (error) {
+    return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر إنشاء التقرير المالي" });
+  }
+});
+
+router.get("/:agencyId/reports", async (req, res) => {
+  try {
+    if (!validObjectId(req.params.agencyId)) return res.status(400).json({ ok: false, message: "معرّف الوكالة غير صحيح" });
+    const agency = await Agency.findById(req.params.agencyId).lean();
+    if (!agency) return res.status(404).json({ ok: false, message: "الوكالة غير موجودة" });
+    await agencyAccess(req.auth.sub, agency, ["manager"]);
+    const { period, from, to } = reportWindow(req.query);
+    const rows = await aggregateAgencyReport({ agencyId: agency._id, createdAt: { $gte: from, $lt: to } }, period);
+    const reports = rows.map(row => ({
+      period: row._id.bucket, currency: row._id.currency || agency.currency,
+      chargeCount: row.chargeCount, chargedCoins: row.chargedCoins,
+      salesMinor: row.salesMinor, commissionMinor: row.commissionMinor,
+      ownerCreditCoins: row.ownerCreditCoins, lastTransactionAt: row.lastTransactionAt
+    }));
+    return res.json({
+      ok: true, agency: { id: String(agency._id), agencyCode: agency.agencyCode, name: agency.name },
+      period, timezone: "UTC", from, to, generatedAt: new Date(), reports
+    });
+  } catch (error) {
+    return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر إنشاء تقرير الوكالة" });
+  }
+});
+
 router.get("/owner", async (req, res, next) => {
   try {
     await requireOwner(req.auth.sub);
