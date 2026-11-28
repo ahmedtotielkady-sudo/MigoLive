@@ -1,6 +1,8 @@
 const express = require("express");
 const User = require("../models/User");
 const requireAuth = require("../middleware/requireAuth");
+const AdminAuditLog = require("../models/AdminAuditLog");
+async function audit(req, action, target, reason, metadata={}) { await AdminAuditLog.create({actorUserId:req.auth.sub,action,targetType:"user",targetId:String(target.uid),reason:String(reason||"").slice(0,500),metadata}); }
 
 const router = express.Router();
 router.use(requireAuth);
@@ -95,6 +97,7 @@ router.post("/:uid/ban", async (req, res, next) => {
     target.activeSessionId = null;
     target.activeSessionExpiresAt = null;
     await target.save();
+    await audit(req,"user.ban",target,reason);
 
     const io = req.app.get("io");
     if (io) {
@@ -121,6 +124,7 @@ router.post("/:uid/unban", async (req, res, next) => {
     target.activeSessionId = null;
     target.activeSessionExpiresAt = null;
     await target.save();
+    await audit(req,"user.unban",target,"رفع الحظر");
     const io = req.app.get("io");
     if (io) io.emit("owner:member-updated", { uid: target.uid, action: "unbanned", status: "active" });
     return res.json({ ok: true, user: memberView(target) });
@@ -160,6 +164,7 @@ router.patch("/:uid", async (req, res, next) => {
     }
     Object.assign(target, updates);
     await target.save();
+    await audit(req,"user.update",target,"تعديل بيانات أو صلاحية",updates);
     const io = req.app.get("io");
     if (io) io.to("user:" + String(target._id)).emit("owner:member-updated", { uid: target.uid, action: "profile-updated", user: memberView(target) });
     return res.json({ ok: true, user: memberView(target) });
@@ -181,6 +186,7 @@ router.post("/:uid/logout", async (req, res, next) => {
     target.activeSessionId = null;
     target.activeSessionExpiresAt = null;
     await target.save();
+    await audit(req,"user.logout",target,"إنهاء جلسة المستخدم");
     const io = req.app.get("io");
     if (io) {
       const room = "user:" + String(target._id);
