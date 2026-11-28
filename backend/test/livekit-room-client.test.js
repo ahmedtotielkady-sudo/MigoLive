@@ -24,8 +24,17 @@ test("room membership and seat actions are confirmed by the server before local 
 
 test("LiveKit audio is attached for remote tracks and local publishing requires server permission", () => {
   const bridge = fs.readFileSync(path.join(root, "voice-room.js"), "utf8");
-  assert.ok(bridge.includes("RoomEvent.TrackSubscribed"));
+  assert.ok(bridge.includes("events.TrackSubscribed"));
   assert.ok(bridge.includes("track.attach()"));
   assert.ok(bridge.includes("response.enabled !== true"));
   assert.ok(bridge.includes("setMicrophoneEnabled(true)"));
+});
+
+test("Capacitor localhost origins are allowed by the API and realtime CORS gates", () => {
+  const server = fs.readFileSync(path.join(root, "backend/server.js"), "utf8");
+  const realtime = fs.readFileSync(path.join(root, "backend/realtime.js"), "utf8");
+  for (const origin of ["https://localhost", "http://localhost", "capacitor://localhost"]) {
+    assert.ok(server.includes(origin));
+    assert.ok(realtime.includes(origin));
+  }
 });
