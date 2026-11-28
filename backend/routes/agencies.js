@@ -134,14 +134,19 @@ router.get("/owner/reports/agencies", async (req, res) => {
     }));
     return res.json({
       ok: true, period, timezone: "UTC", from, to, generatedAt: new Date(),
-      totals: reports.reduce((acc, row) => {
-        acc.chargeCount += row.chargeCount;
-        acc.chargedCoins += row.chargedCoins;
-        acc.salesMinor += row.salesMinor;
-        acc.commissionMinor += row.commissionMinor;
-        acc.ownerCreditCoins += row.ownerCreditCoins;
+      totalsByCurrency: Object.values(reports.reduce((acc, row) => {
+        const currency = row.currency;
+        if (!acc[currency]) acc[currency] = {
+          currency, chargeCount: 0, chargedCoins: 0, salesMinor: 0,
+          commissionMinor: 0, ownerCreditCoins: 0
+        };
+        acc[currency].chargeCount += row.chargeCount;
+        acc[currency].chargedCoins += row.chargedCoins;
+        acc[currency].salesMinor += row.salesMinor;
+        acc[currency].commissionMinor += row.commissionMinor;
+        acc[currency].ownerCreditCoins += row.ownerCreditCoins;
         return acc;
-      }, { chargeCount: 0, chargedCoins: 0, salesMinor: 0, commissionMinor: 0, ownerCreditCoins: 0 }),
+      }, {})),
       reports
     });
   } catch (error) {
