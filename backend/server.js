@@ -107,10 +107,11 @@ async function start() {
   const Agency = require("./models/Agency");
   const AgencyMembership = require("./models/AgencyMembership");
   const AgencyLedger = require("./models/AgencyLedger");
+  const HostAgencyTransfer = require("./models/HostAgencyTransfer");
   const AdminAuditLog = require("./models/AdminAuditLog");
   const GameRound = require("./models/GameRound");
   const GameState = require("./models/GameState");
-  await Promise.all([MicLease.init(), GameRound.init(), GameState.init(), Agency.init(), AgencyMembership.init(), AgencyLedger.init(), AdminAuditLog.init()]);
+  await Promise.all([MicLease.init(), GameRound.init(), GameState.init(), Agency.init(), AgencyMembership.init(), AgencyLedger.init(), HostAgencyTransfer.init(), AdminAuditLog.init()]);
   const io = attachRealtime(httpServer, allowedOrigins);
   app.set("io", io);
   httpServer.listen(port, "0.0.0.0", () => console.log(`MigoLive API + realtime listening on port ${port}`));
