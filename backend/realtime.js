@@ -264,14 +264,6 @@ async function seatSnapshot(room) {
         const peers = online.filter(peer => Number(peer.uid) !== Number(ctx.user.uid));
         /* Keep Socket.IO room membership for same-process signaling; MongoDB presence
            is the cross-replica source of truth for the visible online roster. */
-        const peerSocketIds = [...(io.sockets.adapter.rooms.get("room:" + key) || [])]
-          .filter(id => id !== socket.id);
-        const peers = peerSocketIds.map(id => {
-          const peer = io.sockets.sockets.get(id);
-          return peer && peer.data && Number.isSafeInteger(Number(peer.data.uid))
-            ? { socketId: id, uid: Number(peer.data.uid), displayName: String(peer.data.displayName || "") }
-            : null;
-        }).filter(Boolean);
         ack({ ok: true, roomCode, socketId: socket.id, uid: ctx.user.uid, peers, online, seats: await seatSnapshot(ctx.room) });
         socket.to("room:" + key).emit("room:peer-joined", {
           socketId: socket.id, uid: ctx.user.uid, displayName: ctx.user.displayName
