@@ -1,6 +1,8 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
+const crypto = require("crypto");
+function requestFingerprint(value) { return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 const User = require("../models/User");
 const Wallet = require("../models/Wallet");
 const WalletTransaction = require("../models/WalletTransaction");
@@ -83,6 +85,7 @@ router.post("/transfer", async (req, res, next) => {
   const type = req.body.type === "gift" ? "gift" : "transfer";
   const description = String(req.body.description || (type === "gift" ? "إرسال هدية" : "تحويل عملات")).slice(0, 160);
   const key = String(req.get("idempotency-key") || "");
+  const requestHash = requestFingerprint({ action: "wallet_transfer", actorId: String(req.auth.sub), targetUid, amount, type, description });
   if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1000000000) {
     return res.status(400).json({ ok: false, message: "قيمة العملات غير صحيحة" });
   }
@@ -101,7 +104,7 @@ router.post("/transfer", async (req, res, next) => {
       if (existing) {
         if (String(existing.from) !== req.auth.sub ||
             String(existing.to) !== String((await User.findOne({ uid: targetUid }).session(session).select("_id"))?._id || "") ||
-            existing.amount !== amount || existing.type !== type) {
+            existing.amount !== amount || existing.type !== type || existing.description !== description || (existing.requestHash && existing.requestHash !== requestHash)) {
           throw Object.assign(new Error("مفتاح العملية مستخدم لطلب مختلف"), { status: 409 });
         }
         const sender = await User.findById(req.auth.sub).session(session).select("coins uid");
@@ -122,16 +125,31 @@ router.post("/transfer", async (req, res, next) => {
       await Wallet.updateOne({ userId: sender._id }, { $set: { balance: sender.coins } }, { upsert: true, session });
       await Wallet.updateOne({ userId: recipient._id }, { $set: { balance: recipientAfter.coins } }, { upsert: true, session });
       const [tx] = await WalletTransaction.create([{
-        from: sender._id, to: recipient._id, amount, type, description, idempotencyKey: key
+        from: sender._id, to: recipient._id, amount, type, description, idempotencyKey: key, requestHash
       }], { session });
       result = { coins: sender.coins, transactionId: String(tx._id), repeated: false };
     });
     return res.json({ ok: true, ...result });
   } catch (error) {
-    return res.status(error.status || 500).json({
-      ok: false,
-      message: error.status ? error.message : "تعذر تنفيذ التحويل"
-    });
+    if (error && error.code === 11000) {
+      try {
+        const [existing, sender, recipient] = await Promise.all([
+          WalletTransaction.findOne({ idempotencyKey: key }).lean(),
+          User.findById(req.auth.sub).select("coins").lean(),
+          User.findOne({ uid: targetUid }).select("_id").lean()
+        ]);
+        if (existing && sender && recipient && String(existing.from) === String(req.auth.sub) &&
+            String(existing.to) === String(recipient._id) && existing.amount === amount &&
+            existing.type === type && existing.description === description &&
+            (!existing.requestHash || existing.requestHash === requestHash)) {
+          return res.json({ ok: true, coins: sender.coins, transactionId: String(existing._id), repeated: true });
+        }
+        return res.status(409).json({ ok: false, message: "مفتاح العملية مستخدم لطلب مختلف" });
+      } catch (_) {
+        return res.status(503).json({ ok: false, message: "تعذر تأكيد نتيجة التحويل؛ أعد المحاولة بنفس المعرّف" });
+      }
+    }
+    return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر تنفيذ التحويل" });
   } finally { await session.endSession(); }
 });
 
