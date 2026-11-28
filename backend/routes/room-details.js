@@ -30,7 +30,8 @@ router.get("/:roomCode", async (req, res, next) => {
           uid: room.owner.uid, displayName: room.owner.displayName, avatar: room.owner.avatar
         } : null,
         members: room.members.map(member => ({
-          uid: member.uid, displayName: member.displayName, avatar: member.avatar, role: member.role
+          uid: member.uid, displayName: member.displayName, avatar: member.avatar, role: String(member._id) === String(room.owner?._id) ? "owner" : member.role,
+          isOwner: String(member._id) === String(room.owner?._id)
         })),
         membersCount: room.members.length,
         capacity: room.capacity,
@@ -50,7 +51,7 @@ router.get("/:roomCode/presence", async (req, res, next) => {
       return res.status(400).json({ ok: false, message: "رقم الغرفة غير صحيح" });
     }
     const room = await Room.findOne({ roomCode, status: "open" })
-      .select("members").lean();
+      .select("members owner").lean();
     if (!room || !room.members.some(id => String(id) === req.auth.sub)) {
       return res.status(403).json({ ok: false, message: "انضم إلى الغرفة أولاً" });
     }
@@ -63,10 +64,11 @@ router.get("/:roomCode/presence", async (req, res, next) => {
     for (const peer of active) {
       unique.set(String(peer.userId), {
         uid: peer.uid,
-        displayName: peer.displayName || ""
+        displayName: peer.displayName || "",
+        isOwner: String(peer.userId) === String(room.owner)
       });
     }
-    return res.json({ ok: true, roomCode, online: [...unique.values()] });
+    return res.json({ ok: true, roomCode, ownerUid: Number((await require("../models/User").findById(room.owner).select("uid").lean())?.uid || 0), online: [...unique.values()] });
   } catch (error) { return next(error); }
 });
 
