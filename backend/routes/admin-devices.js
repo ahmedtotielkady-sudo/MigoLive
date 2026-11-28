@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 const Device = require("../models/Device");
 const requireAuth = require("../middleware/requireAuth");
+const AdminAuditLog = require("../models/AdminAuditLog");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -58,6 +59,7 @@ router.post("/:id/block", async (req, res, next) => {
       $set: { blocked: true, blockedAt: new Date(), blockedBy: req.auth.sub, blockReason: reason }
     }, { new: true });
     if (!device) return res.status(404).json({ ok: false, message: "الجهاز غير موجود" });
+    await AdminAuditLog.create({actorUserId:req.auth.sub,action:"device.block",targetType:"device",targetId:String(device._id),reason,metadata:{platform:device.platform,model:device.model}});
     const io = req.app.get("io");
     if (io) for (const id of device.userIds || []) {
       const room = "user:" + String(id);
@@ -74,6 +76,7 @@ router.post("/:id/unblock", async (req, res, next) => {
       $set: { blocked: false, blockedAt: null, blockedBy: null, blockReason: "" }
     }, { new: true });
     if (!device) return res.status(404).json({ ok: false, message: "الجهاز غير موجود" });
+    await AdminAuditLog.create({actorUserId:req.auth.sub,action:"device.unblock",targetType:"device",targetId:String(device._id),reason:"رفع حظر الجهاز"});
     return res.json({ ok: true, device: view(device) });
   } catch (error) { return next(error); }
 });
