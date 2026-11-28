@@ -51,17 +51,19 @@
     });
   }
 
-  function localKeyForUid(uid, displayName) {
+  function localKeyForUid(uid, displayName, isRoomOwner) {
     const n = Number(uid);
     let key = Object.keys(DB.users || {}).find(k => Number(DB.users[k] && DB.users[k].uid) === n);
-    if (key) return key;
-    key = "remote-" + String(n);
+    if (!key) key = "remote-" + String(n);
     if (!DB.users[key]) {
       DB.users[key] = {
         name: String(displayName || ("مستخدم " + n)),
         uid: n, role: "user", coins: 0, avatar: "", friends: [], blocked: []
       };
     }
+    if (displayName && key.startsWith("remote-")) DB.users[key].name = String(displayName);
+    // Room-scoped role: never grant global app-owner/admin privileges from room data.
+    DB.users[key].roomRole = isRoomOwner === true ? "owner" : (DB.users[key].roomRole === "owner" ? "member" : "member");
     return key;
   }
 
@@ -135,7 +137,7 @@
       if (!data || !Array.isArray(data.online) || voiceSession !== session || !room || Number(room.id) !== session.roomCode) return;
       const next = [];
       for (const peer of data.online) {
-        const key = localKeyForUid(peer.uid, peer.displayName);
+        const key = localKeyForUid(peer.uid, peer.displayName, peer.isOwner);
         if (!next.includes(key)) next.push(key);
       }
       const selfKey = localKeyForUid(session.uid);
@@ -190,7 +192,7 @@
       // after its acknowledgement, so registering listeners afterwards loses fast joins.
       socket.on("room:peer-joined", data => {
         if (!room || !data || !data.uid) return;
-        const key = localKeyForUid(data.uid, data.displayName);
+        const key = localKeyForUid(data.uid, data.displayName, data.isOwner);
         room.online = room.online || [];
         if (!room.online.includes(key)) room.online.push(key);
         renderRoom(document.querySelector("#room-float-panel"));
@@ -204,7 +206,7 @@
         const key = localKeyForUid(peer.uid, peer.displayName);
         if (!room.online.includes(key)) room.online.push(key);
       }
-      const selfKey = localKeyForUid(joined.uid);
+      const selfKey = localKeyForUid(joined.uid, "", joined.isOwner);
       if (!room.online.includes(selfKey)) room.online.push(selfKey);
       renderRoom(document.querySelector("#room-float-panel"));
       startPresenceSync(voiceSession);
@@ -270,7 +272,7 @@
             const key = localKeyForUid(peer.uid, peer.displayName);
             if (!room.online.includes(key)) room.online.push(key);
           }
-          const selfKey = localKeyForUid(response.uid);
+          const selfKey = localKeyForUid(response.uid, "", response.isOwner);
           if (!room.online.includes(selfKey)) room.online.push(selfKey);
           renderRoom(document.querySelector("#room-float-panel"));
         });
@@ -405,7 +407,7 @@
         const id = Number(remote.id);
         if (!Number.isSafeInteger(id)) continue;
         remoteIds.add(id);
-        const ownerKey = localKeyForUid(remote.ownerUid, "مضيف الغرفة");
+        const ownerKey = localKeyForUid(remote.ownerUid, "مالك الغرفة", true);
         let local = DB.rooms.find(x => Number(x.id) === id);
         if (!local) {
           local = normRoom({
