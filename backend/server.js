@@ -34,7 +34,14 @@ app.get("/api/health", (_req, res) => {
   res.status(connected ? 200 : 503).json({
     ok: connected,
     service: "MigoLive API",
-    database: connected ? "connected" : "disconnected"
+    database: connected ? "connected" : "disconnected",
+    voice: {
+      configured: Boolean(
+        String(process.env.LIVEKIT_URL || "").trim() &&
+        String(process.env.LIVEKIT_API_KEY || "").trim() &&
+        String(process.env.LIVEKIT_API_SECRET || "").trim()
+      )
+    }
   });
 });
 
