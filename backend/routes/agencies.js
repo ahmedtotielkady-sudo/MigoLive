@@ -300,6 +300,26 @@ router.post("/owner/:agencyId/manager", async (req, res) => {
 });
 
 
+
+router.get("/owner/hosts/:uid/transfers", async (req, res) => {
+  try {
+    await requireOwner(req.auth.sub);
+    const uid = Number(req.params.uid);
+    if (!Number.isSafeInteger(uid) || uid < 1) return res.status(400).json({ ok: false, message: "رقم المضيف غير صحيح" });
+    const host = await User.findOne({ uid }).select("_id uid").lean();
+    if (!host) return res.status(404).json({ ok: false, message: "المضيف غير موجود" });
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+    const transfers = await HostAgencyTransfer.find({ hostUserId: host._id })
+      .populate("fromAgencyId", "agencyCode name")
+      .populate("toAgencyId", "agencyCode name")
+      .populate("actorUserId", "uid displayName")
+      .sort({ createdAt: -1 }).limit(limit).lean();
+    return res.json({ ok: true, transfers });
+  } catch (error) {
+    return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر تحميل سجل نقل المضيف" });
+  }
+});
+
 router.post("/owner/hosts/:uid/transfer", async (req, res) => {
   const uid = Number(req.params.uid);
   const targetAgencyId = String(req.body.targetAgencyId || "");
