@@ -46,8 +46,10 @@ jobs:
       - name: Apply local notification center
         run: python3 scripts/apply-notification-center.py
 
-      - name: Validate API bridge JavaScript
-        run: node --check api-bridge.js
+      - name: Validate API and voice bridge JavaScript
+        run: |
+          node --check api-bridge.js
+          node --check voice-room.js
 
       - name: Prepare web assets
         run: |
@@ -55,13 +57,16 @@ jobs:
           cp index.html www/index.html
           cp migolive-back-navigation.js www/migolive-back-navigation.js
           cp api-bridge.js www/api-bridge.js
+          cp voice-room.js www/voice-room.js
           python3 - <<'PY'
           from pathlib import Path
           p = Path('www/index.html')
           html = p.read_text(encoding='utf-8')
           tags = [
               '<script src="migolive-back-navigation.js"></script>',
-              '<script src="api-bridge.js"></script>'
+              '<script src="api-bridge.js"></script>',
+              '<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.25.0/dist/livekit-client.umd.min.js"></script>',
+              '<script src="voice-room.js"></script>'
           ]
           for tag in tags:
               if tag not in html:
