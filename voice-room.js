@@ -409,7 +409,7 @@
             }
           }
           let password = target.pass && typeof target.pass === "string" ? target.pass : "";
-          if (target.pass === true) {
+          if (target.pass === true && !target.serverMember) {
             password = window.prompt("أدخل كلمة مرور الغرفة") || "";
             if (!password) return;
           }
