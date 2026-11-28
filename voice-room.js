@@ -127,6 +127,7 @@
     if (voiceSession && voiceSession.roomCode === roomCode && voiceSession.socket.connected) return;
     if (connectingRoom === roomCode) return;
     connectingRoom = roomCode;
+    let pendingSocket = null;
     try {
       if (voiceSession) await disconnectVoiceRoom(true);
       setVoiceStatus("جارٍ الاتصال بالصوت...", false);
@@ -142,6 +143,7 @@
         reconnectionAttempts: 8,
         timeout: 12000
       });
+      pendingSocket = socket;
       await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("تعذر الاتصال بخادم الغرف")), 15000);
         socket.once("connect", () => { clearTimeout(timer); resolve(); });
@@ -171,7 +173,10 @@
           ? [...new Set(room.talkingUsers.concat(key))]
           : room.talkingUsers.filter(x => x !== key);
         if (key === me) talk = data.enabled === true;
-        if (room.owner === key) room.hostTalk = data.enabled === true;
+        if (room.owner === key) {
+          room.hostTalk = data.enabled === true;
+          room.hostUser = data.enabled ? key : null;
+        }
         renderRoom(document.querySelector("#room-float-panel"));
       });
       socket.on("host:mute-state", data => {
@@ -181,7 +186,12 @@
         room.muted = data.muted
           ? [...new Set(room.muted.concat(key))]
           : room.muted.filter(x => x !== key);
-        if (key === me && data.muted) setLocalMicrophone(false);
+        if (key === me && data.muted) setLocalMicrophone(false).catch(() => {});
+        renderRoom(document.querySelector("#room-float-panel"));
+      });
+      socket.on("room:host-changed", data => {
+        if (!room || !data) return;
+        room.owner = localKeyForUid(data.ownerUid);
         renderRoom(document.querySelector("#room-float-panel"));
       });
       socket.on("room:kicked", data => {
@@ -227,6 +237,8 @@
       if (voiceSession && voiceSession.roomCode === roomCode && !voiceSession.liveRoom) {
         try { voiceSession.socket.disconnect(); } catch (_) {}
         voiceSession = null;
+      } else if (pendingSocket && (!voiceSession || voiceSession.roomCode !== roomCode)) {
+        try { pendingSocket.disconnect(); } catch (_) {}
       }
     } finally {
       connectingRoom = null;
@@ -250,7 +262,10 @@
     }
     talk = enabled === true;
     if (room) {
-      if (room.owner === me) room.hostTalk = talk;
+      if (room.owner === me) {
+        room.hostTalk = talk;
+        room.hostUser = talk ? me : null;
+      }
       room.talkingUsers = room.talkingUsers || [];
       room.talkingUsers = talk
         ? [...new Set(room.talkingUsers.concat(me))]
@@ -277,7 +292,10 @@
         session.socket.disconnect();
       }
       if (!skipApiLeave) {
-        try { await apiRequest("/rooms/" + session.roomCode + "/leave", { method: "POST", body: JSON.stringify({}) }); } catch (_) {}
+        try {
+          const result = await apiRequest("/rooms/" + session.roomCode + "/leave", { method: "POST", body: JSON.stringify({}) });
+          if (room && result.ownerUid) room.owner = localKeyForUid(result.ownerUid);
+        } catch (_) {}
       }
     } finally {
       const audio = document.getElementById("migo-live-audio");
@@ -389,10 +407,15 @@
               return;
             }
           }
+          let password = target.pass && typeof target.pass === "string" ? target.pass : "";
+          if (target.pass === true) {
+            password = window.prompt("أدخل كلمة مرور الغرفة") || "";
+            if (!password) return;
+          }
           try {
             await apiRequest("/rooms/" + id + "/join", {
               method: "POST",
-              body: JSON.stringify({ password: target.pass && typeof target.pass === "string" ? target.pass : "" })
+              body: JSON.stringify({ password })
             });
             nav("room-" + id);
           } catch (error) { toast(error.message || "تعذر الانضمام إلى الغرفة"); }
@@ -462,9 +485,16 @@
         } catch (error) { toast(error.message || "تعذر تحديث المقعد"); }
       };
     });
+    container.querySelectorAll("[data-s]").forEach(button => {
+      const index = Number(button.dataset.s);
+      const key = room && room.seats[index];
+      button.classList.toggle("talk", !!(key && room.talkingUsers && room.talkingUsers.includes(key)));
+    });
+    const hostButton = container.querySelector("#hostMic");
+    if (hostButton) hostButton.classList.toggle("talking", !!(room && room.hostTalk));
     container.querySelectorAll("[data-a]").forEach(button => {
       const action = button.dataset.a;
-      if (action !== "mute" && action !== "kick" && action !== "ban") return;
+      if (action !== "mute" && action !== "kick" && action !== "ban" && action !== "kicklock") return;
       button.onclick = async () => {
         const targetKey = room && room.seats[Number(sel)];
         const target = targetKey && DB.users[targetKey];
@@ -476,6 +506,7 @@
             });
           } else {
             await emitAck(voiceSession.socket, "host:kick", { uid: target.uid });
+            if (action === "kicklock") room.lock.push(Number(sel));
           }
           sel = null;
           renderRoom(container);
