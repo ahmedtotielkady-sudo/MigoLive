@@ -85,3 +85,47 @@ test("agency charge duplicate-key recovery resolves the target before comparing 
   assert.doesNotMatch(route, /if \(existing && user &&/);
   assert.match(route, /existing\.amountCoins === pkg\.coins/);
 });
+
+test("host agency transfer history is immutable and indexed", () => {
+  const Transfer = require("../models/HostAgencyTransfer");
+  assert.ok(Transfer.schema.path("hostUserId").options.immutable);
+  assert.ok(Transfer.schema.path("fromAgencyId").options.immutable);
+  assert.ok(Transfer.schema.path("toAgencyId").options.immutable);
+  assert.ok(Transfer.schema.indexes().some(([keys]) => keys.hostUserId === 1 && keys.createdAt === -1));
+});
+
+test("host transfer is owner-only, validates target agency type and commits membership plus history atomically", () => {
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /router\.post\("\/owner\/hosts\/:uid\/transfer"/);
+  assert.match(route, /targetAgency\.type !== "host"/);
+  assert.match(route, /memberType: "host", status: "active"/);
+  assert.ok(route.includes("HostAgencyTransfer.create(["));
+  assert.match(route, /agency\.host\.transferred/);
+  assert.match(route, /session\.withTransaction/);
+});
+
+test("host transfer history endpoint is owner-only and paginated", () => {
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /router\.get\("\/owner\/hosts\/:uid\/transfers"/);
+  assert.match(route, /await requireOwner\(req\.auth\.sub\)/);
+  assert.ok(route.includes("HostAgencyTransfer.create(["));
+});
+
+test("host transfer history has a unique idempotency key and immutable audit facts", () => {
+  const HostTransfer = require("../models/HostAgencyTransfer");
+  assert.ok(HostTransfer.schema.path("idempotencyKey").options.unique);
+  for (const field of ["hostUserId", "fromAgencyId", "toAgencyId", "actorUserId", "reason", "idempotencyKey", "requestHash", "createdAt"]) {
+    assert.ok(HostTransfer.schema.path(field), "missing transfer field " + field);
+  }
+  assert.equal(HostTransfer.schema.path("createdAt").options.immutable, true);
+});
+
+test("owner host transfer changes membership and writes history in one transaction", () => {
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /router\.post\("\/owner\/hosts\/:uid\/transfer"/);
+  assert.match(route, /const actor = await requireOwner\(req\.auth\.sub, session\)/);
+  assert.ok(route.includes('current.status = "removed"'));
+  assert.ok(route.includes("HostAgencyTransfer.create(["));
+  assert.match(route, /agency\.host\.transferred/);
+  assert.match(route, /session\.withTransaction/);
+});

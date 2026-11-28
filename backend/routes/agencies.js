@@ -8,6 +8,7 @@ const Agency = require("../models/Agency");
 const AgencyMembership = require("../models/AgencyMembership");
 const AgencyLedger = require("../models/AgencyLedger");
 const AdminAuditLog = require("../models/AdminAuditLog");
+const HostAgencyTransfer = require("../models/HostAgencyTransfer");
 const Wallet = require("../models/Wallet");
 const WalletTransaction = require("../models/WalletTransaction");
 
@@ -295,6 +296,113 @@ router.post("/owner/:agencyId/manager", async (req, res) => {
     return res.json({ ok: true, ...result });
   } catch (error) {
     return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر تغيير مدير الوكالة" });
+  } finally { await session.endSession(); }
+});
+
+
+
+router.get("/owner/hosts/:uid/transfers", async (req, res) => {
+  try {
+    await requireOwner(req.auth.sub);
+    const uid = Number(req.params.uid);
+    if (!Number.isSafeInteger(uid) || uid < 1) return res.status(400).json({ ok: false, message: "رقم المضيف غير صحيح" });
+    const host = await User.findOne({ uid }).select("_id uid").lean();
+    if (!host) return res.status(404).json({ ok: false, message: "المضيف غير موجود" });
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+    const transfers = await HostAgencyTransfer.find({ hostUserId: host._id })
+      .populate("fromAgencyId", "agencyCode name")
+      .populate("toAgencyId", "agencyCode name")
+      .populate("actorUserId", "uid displayName")
+      .sort({ createdAt: -1 }).limit(limit).lean();
+    return res.json({ ok: true, transfers });
+  } catch (error) {
+    return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر تحميل سجل نقل المضيف" });
+  }
+});
+
+router.post("/owner/hosts/:uid/transfer", async (req, res) => {
+  const uid = Number(req.params.uid);
+  const targetAgencyId = String(req.body.targetAgencyId || "");
+  const reason = String(req.body.reason || "").trim().slice(0, 240);
+  let key;
+  try { key = idempotencyKey(req); }
+  catch (error) { return res.status(error.status).json({ ok: false, message: error.message }); }
+  const commissionRateBps = Number(req.body.commissionRateBps || 0);
+  if (!Number.isInteger(commissionRateBps) || commissionRateBps < 0 || commissionRateBps > 10000) return res.status(400).json({ ok: false, message: "نسبة العمولة غير صحيحة" });
+  const requestHash = requestFingerprint({ action: "host_transfer", uid, targetAgencyId, reason, commissionRateBps, actorId: String(req.auth.sub) });
+  if (!Number.isSafeInteger(uid) || uid < 1) return res.status(400).json({ ok: false, message: "رقم المضيف غير صحيح" });
+  if (!validObjectId(targetAgencyId)) return res.status(400).json({ ok: false, message: "الوكالة المستهدفة غير صحيحة" });
+  if (!reason) return res.status(400).json({ ok: false, message: "سبب نقل المضيف مطلوب" });
+  const session = await mongoose.startSession();
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      const actor = await requireOwner(req.auth.sub, session);
+      const prior = await HostAgencyTransfer.findOne({ idempotencyKey: key }).session(session);
+      if (prior) {
+        if (String(prior.actorUserId) !== String(actor._id) || String(prior.toAgencyId) !== targetAgencyId || prior.requestHash !== requestHash) throw httpError(409, "معرّف النقل مستخدم لطلب مختلف");
+        result = { repeated: true, transferId: String(prior._id), fromAgencyId: prior.fromAgencyId ? String(prior.fromAgencyId) : null, toAgencyId: String(prior.toAgencyId) };
+        return;
+      }
+      const host = await User.findOne({ uid, status: "active" }).session(session).select("_id uid");
+      if (!host) throw httpError(404, "المضيف غير موجود أو موقوف");
+      const targetAgency = await Agency.findById(targetAgencyId).session(session);
+      if (!targetAgency || targetAgency.type !== "host") throw httpError(404, "وكالة المضيفين المستهدفة غير موجودة");
+      if (targetAgency.status !== "active") throw httpError(409, "الوكالة المستهدفة غير نشطة");
+      const current = await AgencyMembership.findOne({
+        userId: host._id, memberType: "host", status: "active"
+      }).session(session);
+      if (current && String(current.agencyId) === String(targetAgency._id)) {
+        result = { repeated: true, transferId: null, fromAgencyId: String(targetAgency._id), toAgencyId: String(targetAgency._id) };
+        return;
+      }
+      const fromAgencyId = current ? current.agencyId : null;
+      if (current) {
+        current.status = "removed";
+        current.removedAt = new Date();
+        current.removalReason = "نقل إلى وكالة أخرى: " + reason;
+        await current.save({ session });
+      }
+      let nextMembership = await AgencyMembership.findOne({
+        agencyId: targetAgency._id, userId: host._id, memberType: "host"
+      }).session(session);
+      if (nextMembership) {
+        nextMembership.status = "active";
+        nextMembership.invitedBy = actor._id;
+        nextMembership.joinedAt = new Date();
+        nextMembership.removedAt = null;
+        nextMembership.removalReason = "";
+        nextMembership.commissionRateBps = commissionRateBps;
+        await nextMembership.save({ session });
+      } else {
+        [nextMembership] = await AgencyMembership.create([{
+          agencyId: targetAgency._id, userId: host._id, memberType: "host",
+          status: "active", invitedBy: actor._id,
+          commissionRateBps
+        }], { session });
+      }
+      const [transfer] = await HostAgencyTransfer.create([{
+        hostUserId: host._id, fromAgencyId, toAgencyId: targetAgency._id,
+        actorUserId: actor._id, reason, status: "completed", idempotencyKey: key, requestHash
+      }], { session });
+      await audit(session, actor, "agency.host.transferred", "user", host._id, reason, {
+        uid, fromAgencyId: fromAgencyId ? String(fromAgencyId) : null,
+        toAgencyId: String(targetAgency._id), transferId: String(transfer._id)
+      });
+      result = {
+        repeated: false, transferId: String(transfer._id),
+        fromAgencyId: fromAgencyId ? String(fromAgencyId) : null,
+        toAgencyId: String(targetAgency._id), membershipId: String(nextMembership._id)
+      };
+    });
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    if (error && error.code === 11000) {
+      const prior = await HostAgencyTransfer.findOne({ idempotencyKey: key }).lean().catch(() => null);
+      if (prior && prior.requestHash === requestHash && String(prior.actorUserId) === String(req.auth.sub)) return res.json({ ok: true, repeated: true, transferId: String(prior._id), fromAgencyId: prior.fromAgencyId ? String(prior.fromAgencyId) : null, toAgencyId: String(prior.toAgencyId) });
+      return res.status(409).json({ ok: false, message: "تم تحديث ارتباط المضيف بالتزامن؛ أعد تحميل البيانات" });
+    }
+    return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر نقل المضيف" });
   } finally { await session.endSession(); }
 });
 
