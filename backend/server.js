@@ -107,6 +107,7 @@ async function start() {
   const Agency = require("./models/Agency");
   const AgencyMembership = require("./models/AgencyMembership");
   const AgencyLedger = require("./models/AgencyLedger");
+  const AgencyHostTransfer = require("./models/AgencyHostTransfer");
   const HostAgencyTransfer = require("./models/HostAgencyTransfer");
   const AdminAuditLog = require("./models/AdminAuditLog");
   const GameRound = require("./models/GameRound");
