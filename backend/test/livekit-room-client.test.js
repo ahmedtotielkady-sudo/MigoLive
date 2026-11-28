@@ -14,6 +14,9 @@ test("Android room UI loads the LiveKit and Socket.IO audio bridge", () => {
   assert.ok(workflow.includes("android.permission.MODIFY_AUDIO_SETTINGS"));
   assert.ok(bridge.includes("window.io(origin"));
   assert.ok(bridge.includes('"/rooms/livekit/" + roomCode + "/token"'));
+  assert.ok(!bridge.includes('apiRequest("/rooms/" + roomCode + "/join"'));
+  assert.ok(bridge.includes("local.serverMember = remote.isMember === true"));
+  assert.ok(bridge.includes('target.pass === true && !target.serverMember'));
 });
 
 test("room membership and seat actions are confirmed by the server before local UI changes", () => {

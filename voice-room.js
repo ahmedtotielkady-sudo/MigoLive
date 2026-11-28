@@ -131,10 +131,8 @@
     try {
       if (voiceSession) await disconnectVoiceRoom(true);
       setVoiceStatus("جارٍ الاتصال بالصوت...", false);
-      await apiRequest("/rooms/" + roomCode + "/join", {
-        method: "POST",
-        body: JSON.stringify({ password: targetRoom.pass && typeof targetRoom.pass === "string" ? targetRoom.pass : "" })
-      });
+      // Membership is established by the room-list click handler or room creation.
+      // Do not join again here: private rooms would be prompted for a password twice.
       await loadSocketClient();
       const socket = window.io(origin, {
         auth: { token: currentToken() },
@@ -317,6 +315,7 @@
       if (!Number.isSafeInteger(newId)) throw new Error("تعذر إنشاء الغرفة أونلاين");
       localRoom.id = newId;
       localRoom.serverManaged = true;
+      localRoom.serverMember = true;
       localRoom.members = [me];
       localRoom.seats = Array(SEATMAX).fill(null);
       localRoom.online = [me];
@@ -353,6 +352,7 @@
         local.owner = ownerKey;
         local.serverManaged = true;
         local.membersCount = remote.membersCount;
+        local.serverMember = remote.isMember === true;
         local.pass = remote.isPrivate ? true : false;
         if (local.seats.length !== SEATMAX) local.seats = Array(SEATMAX).fill(null);
       }
@@ -381,7 +381,7 @@
           const id = Number(result.room && result.room.id);
           const createdRoom = normRoom({
             id, name, owner: me, seats: Array(SEATMAX).fill(null),
-            members: [me], online: [me], chat: [], serverManaged: true
+            members: [me], online: [me], chat: [], serverManaged: true, serverMember: true
           });
           DB.rooms = DB.rooms.filter(x => Number(x.id) !== id);
           DB.rooms.unshift(createdRoom);
@@ -409,15 +409,18 @@
             }
           }
           let password = target.pass && typeof target.pass === "string" ? target.pass : "";
-          if (target.pass === true) {
+          if (target.pass === true && !target.serverMember) {
             password = window.prompt("أدخل كلمة مرور الغرفة") || "";
             if (!password) return;
           }
           try {
-            await apiRequest("/rooms/" + id + "/join", {
-              method: "POST",
-              body: JSON.stringify({ password })
-            });
+            if (!target.serverMember) {
+              await apiRequest("/rooms/" + id + "/join", {
+                method: "POST",
+                body: JSON.stringify({ password })
+              });
+              target.serverMember = true;
+            }
             nav("room-" + id);
           } catch (error) { toast(error.message || "تعذر الانضمام إلى الغرفة"); }
         };
