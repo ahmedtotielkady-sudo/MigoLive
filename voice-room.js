@@ -63,7 +63,7 @@
     }
     if (displayName && key.startsWith("remote-")) DB.users[key].name = String(displayName);
     // Room-scoped role: never grant global app-owner/admin privileges from room data.
-    DB.users[key].roomRole = isRoomOwner === true ? "owner" : (DB.users[key].roomRole === "owner" ? "member" : "member");
+    DB.users[key].roomRole = isRoomOwner === true ? "owner" : "member";
     return key;
   }
 
@@ -203,7 +203,7 @@
       const initialOnline = Array.isArray(joined.online) ? joined.online : (joined.peers || []);
       room.online = [];
       for (const peer of initialOnline) {
-        const key = localKeyForUid(peer.uid, peer.displayName);
+        const key = localKeyForUid(peer.uid, peer.displayName, peer.isOwner);
         if (!room.online.includes(key)) room.online.push(key);
       }
       const selfKey = localKeyForUid(joined.uid, "", joined.isOwner);
@@ -243,7 +243,7 @@
       });
       socket.on("room:host-changed", data => {
         if (!room || !data) return;
-        room.owner = localKeyForUid(data.ownerUid);
+        room.owner = localKeyForUid(data.ownerUid, "مالك الغرفة", true);
         renderRoom(document.querySelector("#room-float-panel"));
       });
       socket.on("room:kicked", data => {
