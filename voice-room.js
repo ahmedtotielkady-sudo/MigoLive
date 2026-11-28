@@ -252,6 +252,7 @@
       try { await session.liveRoom.localParticipant.setMicrophoneEnabled(false); } catch (_) {}
     }
     const response = await emitAck(session.socket, "mic:state", { enabled: enabled === true, transport: "livekit" });
+    if (enabled && response.enabled !== true) throw new Error("المايك مكتوم أو لا تملك مقعد متحدث صالحًا");
     if (enabled) {
       try {
         await session.liveRoom.localParticipant.setMicrophoneEnabled(true);
