@@ -29,6 +29,8 @@ function memberView(user) {
     username: user.username,
     displayName: user.displayName,
     avatar: user.avatar || "",
+    phoneMasked: user.phone ? String(user.phone).replace(/(\\+?\\d{2,4})\\d+(\\d{2,3})$/, "$1••••••$2") : "",
+    emailMasked: user.email ? String(user.email).replace(/^(.).+(@.*)$/, "$1••••$2") : "",
     role: user.role,
     status: user.status,
     coins: Number(user.coins) || 0,
@@ -59,7 +61,7 @@ router.get("/", async (req, res, next) => {
     const [total, users] = await Promise.all([
       User.countDocuments(filter),
       User.find(filter)
-        .select("uid username displayName avatar role status coins createdAt lastLoginAt")
+        .select("uid username displayName avatar phone email role status coins createdAt lastLoginAt")
         .sort({ createdAt: -1, _id: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
