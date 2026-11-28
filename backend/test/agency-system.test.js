@@ -124,8 +124,8 @@ test("owner host transfer changes membership and writes history in one transacti
   const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
   assert.match(route, /router\.post\("\/owner\/hosts\/:uid\/transfer"/);
   assert.match(route, /const actor = await requireOwner\(req\.auth\.sub, session\)/);
-  assert.match(route, /currentMembership\.status = "removed"/);
-  assert.match(route, /AgencyHostTransfer\.create\(/);
+  assert.match(route, /current\\.status = "removed"/);
+  assert.match(route, /HostAgencyTransfer\\.create\\(/);
   assert.match(route, /agency\.host\.transferred/);
   assert.match(route, /session\.withTransaction/);
 });
