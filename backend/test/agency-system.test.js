@@ -147,3 +147,19 @@ test("agency managers can only access their own agency report and report windows
   assert.match(route, /366 \* 24 \* 60 \* 60 \* 1000/);
   assert.match(route, /يجب إرسال تاريخ البداية والنهاية معًا/);
 });
+
+test("active host membership uniqueness uses a compound index compatible with legacy userId index", () => {
+  const schema = require("../models/AgencyMembership").schema;
+  const indexes = schema.indexes();
+  const uniqueHost = indexes.find(([keys, options]) =>
+    keys.userId === 1 && keys.memberType === 1 &&
+    options.unique === true &&
+    options.partialFilterExpression &&
+    options.partialFilterExpression.memberType === "host" &&
+    options.partialFilterExpression.status === "active"
+  );
+  assert.ok(uniqueHost, "missing active host membership uniqueness index");
+  assert.equal(uniqueHost[1].name, "unique_active_host_membership_per_user");
+  assert.ok(indexes.some(([keys]) => keys.userId === 1 && Object.keys(keys).length === 1),
+    "legacy userId lookup index should remain available");
+});

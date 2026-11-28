@@ -16,8 +16,12 @@ const agencyMembershipSchema = new mongoose.Schema({
 
 agencyMembershipSchema.index({ agencyId: 1, userId: 1, memberType: 1 }, { unique: true });
 agencyMembershipSchema.index(
-  { userId: 1 },
-  { unique: true, partialFilterExpression: { memberType: "host", status: "active" } }
+  { userId: 1, memberType: 1 },
+  {
+    unique: true,
+    name: "unique_active_host_membership_per_user",
+    partialFilterExpression: { memberType: "host", status: "active" }
+  }
 );
 agencyMembershipSchema.index({ agencyId: 1, status: 1, memberType: 1 });
 module.exports = mongoose.models.AgencyMembership || mongoose.model("AgencyMembership", agencyMembershipSchema);
