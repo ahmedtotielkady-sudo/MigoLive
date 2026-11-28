@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const Counter = require("../models/Counter");
 const Room = require("../models/Room");
+const RoomPresence = require("../models/RoomPresence");
 const User = require("../models/User");
 const requireAuth = require("../middleware/requireAuth");
 
@@ -121,6 +122,7 @@ router.post("/:roomCode/leave", async (req, res, next) => {
       newOwnerUid = nextOwner?.uid ?? null;
     }
     await room.save();
+    await RoomPresence.deleteMany({ roomCode: Number(room.roomCode), userId: req.auth.sub });
 
     const io = req.app.get("io");
     if (io) {

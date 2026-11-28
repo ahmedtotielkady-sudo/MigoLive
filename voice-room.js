@@ -120,6 +120,45 @@
     });
   }
 
+  function stopPresenceSync(session) {
+    if (!session) return;
+    if (session.presenceTimer) clearInterval(session.presenceTimer);
+    if (session.heartbeatTimer) clearInterval(session.heartbeatTimer);
+    session.presenceTimer = null;
+    session.heartbeatTimer = null;
+  }
+
+  async function syncRoomPresence(session) {
+    if (!session || session.closing || voiceSession !== session || !room || Number(room.id) !== session.roomCode) return;
+    try {
+      const data = await apiRequest("/rooms/" + session.roomCode + "/presence");
+      if (!data || !Array.isArray(data.online) || voiceSession !== session || !room || Number(room.id) !== session.roomCode) return;
+      const next = [];
+      for (const peer of data.online) {
+        const key = localKeyForUid(peer.uid, peer.displayName);
+        if (!next.includes(key)) next.push(key);
+      }
+      const selfKey = localKeyForUid(session.uid);
+      if (!next.includes(selfKey)) next.push(selfKey);
+      const changed = next.length !== (room.online || []).length || next.some((key, index) => key !== room.online[index]);
+      room.online = next;
+      if (changed) renderRoom(document.querySelector("#room-float-panel"));
+    } catch (_) {
+      // Keep the last confirmed roster while the API is temporarily unavailable.
+    }
+  }
+
+  function startPresenceSync(session) {
+    stopPresenceSync(session);
+    session.heartbeatTimer = setInterval(() => {
+      if (session.socket && session.socket.connected && !session.closing) {
+        session.socket.emit("room:heartbeat", {}, () => {});
+      }
+    }, 15_000);
+    session.presenceTimer = setInterval(() => syncRoomPresence(session), 2_500);
+    syncRoomPresence(session);
+  }
+
   async function connectVoiceRoom(targetRoom) {
     if (!targetRoom || !currentToken()) return;
     const roomCode = Number(targetRoom.id);
@@ -157,16 +196,18 @@
         renderRoom(document.querySelector("#room-float-panel"));
       });
       const joined = await emitAck(socket, "room:join", { roomCode });
-      voiceSession = { roomCode, socket, liveRoom: null, closing: false };
+      voiceSession = { roomCode, socket, liveRoom: null, closing: false, uid: joined.uid };
       syncSeats(joined.seats || []);
-      room.online = room.online || [];
-      for (const peer of (joined.peers || [])) {
+      const initialOnline = Array.isArray(joined.online) ? joined.online : (joined.peers || []);
+      room.online = [];
+      for (const peer of initialOnline) {
         const key = localKeyForUid(peer.uid, peer.displayName);
         if (!room.online.includes(key)) room.online.push(key);
       }
       const selfKey = localKeyForUid(joined.uid);
       if (!room.online.includes(selfKey)) room.online.push(selfKey);
       renderRoom(document.querySelector("#room-float-panel"));
+      startPresenceSync(voiceSession);
       socket.on("seats:state", data => syncSeats(data && data.seats));
       socket.on("room:peer-left", data => {
         if (!room || !data || !data.uid) return;
@@ -224,7 +265,8 @@
           if (!response || !response.ok) return;
           syncSeats(response.seats || []);
           room.online = [];
-          for (const peer of (response.peers || [])) {
+          const currentOnline = Array.isArray(response.online) ? response.online : (response.peers || []);
+          for (const peer of currentOnline) {
             const key = localKeyForUid(peer.uid, peer.displayName);
             if (!room.online.includes(key)) room.online.push(key);
           }
@@ -250,13 +292,18 @@
       if (voiceSession && voiceSession.roomCode === roomCode) voiceSession.liveRoom = lk;
       setVoiceStatus("الصوت المباشر متصل", true);
     } catch (error) {
-      setVoiceStatus("الصوت غير متاح", false);
-      toast(error.message || "تعذر الاتصال بالصوت الحقيقي");
       if (voiceSession && voiceSession.roomCode === roomCode && !voiceSession.liveRoom) {
-        try { voiceSession.socket.disconnect(); } catch (_) {}
-        voiceSession = null;
-      } else if (pendingSocket && (!voiceSession || voiceSession.roomCode !== roomCode)) {
-        try { pendingSocket.disconnect(); } catch (_) {}
+        // Room presence is independent from the LiveKit audio transport.
+        // Keep Socket.IO alive so members still see one another if audio setup fails.
+        voiceSession.audioError = String(error && error.message || "LIVEKIT_UNAVAILABLE");
+        setVoiceStatus("الأعضاء متصلون — الصوت غير متاح مؤقتًا", false);
+        toast("تم الاتصال بالغرفة، لكن الصوت غير متاح مؤقتًا");
+      } else {
+        setVoiceStatus("الصوت غير متاح", false);
+        toast(error.message || "تعذر الاتصال بالغرفة");
+        if (pendingSocket && (!voiceSession || voiceSession.roomCode !== roomCode)) {
+          try { pendingSocket.disconnect(); } catch (_) {}
+        }
       }
     } finally {
       connectingRoom = null;
@@ -298,6 +345,7 @@
     const session = voiceSession;
     if (!session || session.closing) return;
     session.closing = true;
+    stopPresenceSync(session);
     voiceSession = null;
     try {
       if (session.liveRoom) {

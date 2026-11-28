@@ -1,5 +1,6 @@
 const express = require("express");
 const Room = require("../models/Room");
+const RoomPresence = require("../models/RoomPresence");
 const requireAuth = require("../middleware/requireAuth");
 
 const router = express.Router();
@@ -38,6 +39,34 @@ router.get("/:roomCode", async (req, res, next) => {
         createdAt: room.createdAt
       }
     });
+  } catch (error) { return next(error); }
+});
+
+
+router.get("/:roomCode/presence", async (req, res, next) => {
+  try {
+    const roomCode = Number(req.params.roomCode);
+    if (!Number.isSafeInteger(roomCode)) {
+      return res.status(400).json({ ok: false, message: "رقم الغرفة غير صحيح" });
+    }
+    const room = await Room.findOne({ roomCode, status: "open" })
+      .select("members").lean();
+    if (!room || !room.members.some(id => String(id) === req.auth.sub)) {
+      return res.status(403).json({ ok: false, message: "انضم إلى الغرفة أولاً" });
+    }
+    const active = await RoomPresence.find({
+      roomCode,
+      expiresAt: { $gt: new Date() },
+      userId: { $in: room.members }
+    }).select("userId uid displayName").sort({ createdAt: 1 }).lean();
+    const unique = new Map();
+    for (const peer of active) {
+      unique.set(String(peer.userId), {
+        uid: peer.uid,
+        displayName: peer.displayName || ""
+      });
+    }
+    return res.json({ ok: true, roomCode, online: [...unique.values()] });
   } catch (error) { return next(error); }
 });
 

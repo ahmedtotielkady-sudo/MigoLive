@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const Room = require("./models/Room");
 const User = require("./models/User");
 const MicLease = require("./models/MicLease");
+const RoomPresence = require("./models/RoomPresence");
 const { RoomServiceClient, TrackSource } = require("livekit-server-sdk");
 
 function attachRealtime(httpServer, allowedOrigins) {
@@ -185,6 +186,18 @@ async function seatSnapshot(room) {
 
   io.on("connection", socket => {
     socket.join("user:" + String(socket.auth.sub));
+    socket.on("room:heartbeat", async (_payload = {}, ack = () => {}) => {
+      try {
+        const roomCode = socket.data.roomCode;
+        if (!roomCode) return ack({ ok: false, error: "NOT_IN_ROOM" });
+        const result = await RoomPresence.updateOne(
+          { roomCode: Number(roomCode), userId: socket.auth.sub, socketId: socket.id },
+          { $set: { expiresAt: new Date(Date.now() + 60_000) } }
+        );
+        return ack({ ok: result.matchedCount > 0 });
+      } catch (_error) { return ack({ ok: false, error: "SERVER_ERROR" }); }
+    });
+
     socket.on("room:join", async (payload = {}, ack = () => {}) => {
       try {
         const roomCode = Number(payload.roomCode);
@@ -196,6 +209,7 @@ async function seatSnapshot(room) {
         if (previous && previous !== key) {
           await releaseMic(previous, socket.auth.sub, socket.id);
           socket.leave("room:" + previous);
+          await RoomPresence.deleteOne({ roomCode: Number(previous), userId: socket.auth.sub, socketId: socket.id });
           try {
             // Another device/tab for this account may still be in the old room.
             // Do not revoke its LiveKit participant or remove its shared speaker seat.
@@ -224,15 +238,33 @@ async function seatSnapshot(room) {
         socket.data.uid = ctx.user.uid;
         socket.data.displayName = ctx.user.displayName;
         socket.join("room:" + key);
-        const peerSocketIds = [...(io.sockets.adapter.rooms.get("room:" + key) || [])]
-          .filter(id => id !== socket.id);
-        const peers = peerSocketIds.map(id => {
-          const peer = io.sockets.sockets.get(id);
-          return peer && peer.data && Number.isSafeInteger(Number(peer.data.uid))
-            ? { socketId: id, uid: Number(peer.data.uid), displayName: String(peer.data.displayName || "") }
-            : null;
-        }).filter(Boolean);
-        ack({ ok: true, roomCode, socketId: socket.id, uid: ctx.user.uid, peers, seats: await seatSnapshot(ctx.room) });
+        const presenceExpiry = new Date(Date.now() + 60_000);
+        await RoomPresence.findOneAndUpdate(
+          { roomCode: Number(roomCode), userId: ctx.user._id, socketId: socket.id },
+          { $set: {
+            uid: ctx.user.uid,
+            displayName: ctx.user.displayName || "",
+            expiresAt: presenceExpiry
+          } },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        const activePresence = await RoomPresence.find({
+          roomCode: Number(roomCode),
+          expiresAt: { $gt: new Date() },
+          userId: { $in: ctx.room.members }
+        }).select("userId uid displayName").sort({ createdAt: 1 }).lean();
+        const onlineByUser = new Map();
+        for (const peer of activePresence) {
+          onlineByUser.set(String(peer.userId), {
+            uid: peer.uid,
+            displayName: String(peer.displayName || "")
+          });
+        }
+        const online = [...onlineByUser.values()];
+        const peers = online.filter(peer => Number(peer.uid) !== Number(ctx.user.uid));
+        /* Keep Socket.IO room membership for same-process signaling; MongoDB presence
+           is the cross-replica source of truth for the visible online roster. */
+        ack({ ok: true, roomCode, socketId: socket.id, uid: ctx.user.uid, peers, online, seats: await seatSnapshot(ctx.room) });
         socket.to("room:" + key).emit("room:peer-joined", {
           socketId: socket.id, uid: ctx.user.uid, displayName: ctx.user.displayName
         });
@@ -437,6 +469,7 @@ async function seatSnapshot(room) {
           socketRooms.delete(id);
           peer.data.roomCode = null;
         }
+        await RoomPresence.deleteMany({ roomCode: Number(roomCode), userId: target._id });
         emitRoom(roomCode, "room:peer-left", { uid: targetUid, reason: "kicked" });
         ack({ ok: true });
       } catch (_error) { ack({ ok: false, error: "SERVER_ERROR" }); }
@@ -446,6 +479,7 @@ async function seatSnapshot(room) {
       const roomCode = socketRooms.get(socket.id);
       if (roomCode) {
         await releaseMic(roomCode, socket.auth.sub, socket.id);
+        await RoomPresence.deleteOne({ roomCode: Number(roomCode), userId: socket.auth.sub, socketId: socket.id });
         try {
           // A socket disconnect is not the same as the account leaving the room:
           // keep the shared LiveKit participant and seat while another socket remains.
