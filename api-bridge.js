@@ -687,11 +687,6 @@
     'wheel-animals:spin': '/games/wheel-animals/spin',
     'fruit-luck:spin': '/games/fruit-luck/spin',
     'big-warrior:fight': '/games/big-warrior/fight',
-    'cleopatra-gold:spin': '/games/cleopatra-gold/spin',
-    'rocket-crash:start': '/games/rocket-crash/start',
-    'rocket-crash:state': '/games/rocket-crash/state',
-    'rocket-crash:cashout': '/games/rocket-crash/cashout',
-    'rocket-crash:cancel': '/games/rocket-crash/cancel',
     'veggie:state': '/games/veggie/state',
     'veggie:bet': '/games/veggie/bet'
   };
@@ -761,10 +756,6 @@
     }
     if (gameId === 'big-warrior' && !['lion', 'tiger', 'draw'].includes(o.winner)) {
       throw new Error('الفائز في المحارب الكبير غير محدد من الخادم');
-    }
-    if (gameId === 'cleopatra-gold' &&
-        (!Array.isArray(o.grid) || o.grid.length !== 5 || o.grid.some(col => !Array.isArray(col) || col.length !== 4))) {
-      throw new Error('شبكة نتيجة ذهب كليوباترا غير مكتملة');
     }
     return result;
   }
