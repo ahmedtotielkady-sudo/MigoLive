@@ -7,10 +7,12 @@ const MicLease = require("./models/MicLease");
 const { RoomServiceClient, TrackSource } = require("livekit-server-sdk");
 
 function attachRealtime(httpServer, allowedOrigins) {
+  const capacitorOrigins = new Set(["https://localhost", "http://localhost", "capacitor://localhost"]);
+  const originAllowed = (origin) => !origin || allowedOrigins.includes(origin) || capacitorOrigins.has(origin);
   const io = new Server(httpServer, {
     cors: {
       origin(origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        if (originAllowed(origin)) return callback(null, true);
         return callback(new Error("Origin is not allowed by CORS"));
       },
       methods: ["GET", "POST"]

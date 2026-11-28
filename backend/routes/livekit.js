@@ -23,9 +23,9 @@ router.post("/:roomCode/token", async (req, res, next) => {
 
     const [room, user] = await Promise.all([
       Room.findOne({ roomCode, status: "open" }).select("roomCode owner members speakerSeats").lean(),
-      User.findById(req.auth.sub).select("_id uid role").lean()
+      User.findById(req.auth.sub).select("_id uid role status").lean()
     ]);
-    if (!room || !user || !room.members.some(id => String(id) === String(user._id))) {
+    if (!room || !user || user.status !== "active" || !room.members.some(id => String(id) === String(user._id))) {
       return res.status(403).json({ ok: false, message: "يجب أن تكون عضوًا في الغرفة أولاً" });
     }
 
@@ -35,7 +35,7 @@ router.post("/:roomCode/token", async (req, res, next) => {
 
     const accessToken = new AccessToken(apiKey, apiSecret, {
       identity,
-      ttl: "1h"
+      ttl: "15m"
     });
     accessToken.addGrant({
       roomJoin: true,
