@@ -3,6 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 const root = path.resolve(__dirname, "../..");
 
 test("room presence is persisted in MongoDB with a TTL and unique socket identity", () => {
@@ -40,4 +41,16 @@ test("Android room client polls the shared roster and renews its presence lease"
   assert.match(bridge, /setInterval\(\(\) => syncRoomPresence\(session\), 2_500\)/);
   assert.match(bridge, /stopPresenceSync\(session\)/);
   assert.match(bridge, /Array\.isArray\(joined\.online\)/);
+});
+
+test("room presence server and client scripts parse without syntax errors", () => {
+  for (const file of [
+    "backend/realtime.js",
+    "backend/routes/rooms.js",
+    "backend/routes/room-details.js",
+    "backend/server.js",
+    "voice-room.js"
+  ]) {
+    execFileSync(process.execPath, ["--check", path.join(root, file)]);
+  }
 });
