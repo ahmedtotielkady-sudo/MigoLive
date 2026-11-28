@@ -56,3 +56,15 @@ test("server mounts agency APIs and initializes unique indexes before listening"
   assert.match(server, /AgencyMembership\.init\(\)/);
   assert.match(server, /AgencyLedger\.init\(\)/);
 });
+
+test("agency mutations return an existing active membership instead of duplicating it", () => {
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /if \(existing && existing\.status === "active"\)[\\s\\S]*?repeated = true/);
+  assert.match(route, /if \(member\.status === "removed"\) return/);
+});
+test("agency ledger stores a request fingerprint to reject idempotency-key payload mismatches", () => {
+  assert.ok(AgencyLedger.schema.path("requestHash"));
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /requestFingerprint\(\{ action: "user_charge"/);
+  assert.match(route, /existing\.requestHash !== requestFingerprint/);
+});
