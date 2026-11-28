@@ -110,3 +110,22 @@ test("host transfer history endpoint is owner-only and paginated", () => {
   assert.match(route, /await requireOwner\(req\.auth\.sub\)/);
   assert.match(route, /HostAgencyTransfer\.find\(\{ hostUserId: host\._id \}\)/);
 });
+
+test("host transfer history has a unique idempotency key and immutable audit facts", () => {
+  const HostTransfer = require("../models/AgencyHostTransfer");
+  assert.ok(HostTransfer.schema.path("idempotencyKey").options.unique);
+  for (const field of ["userId", "fromAgencyId", "toAgencyId", "actorUserId", "reason", "requestHash", "createdAt"]) {
+    assert.ok(HostTransfer.schema.path(field), "missing transfer field " + field);
+  }
+  assert.equal(HostTransfer.schema.path("createdAt").options.immutable, true);
+});
+
+test("owner host transfer changes membership and writes history in one transaction", () => {
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /router\.post\("\/owner\/hosts\/:uid\/transfer"/);
+  assert.match(route, /const actor = await requireOwner\(req\.auth\.sub, session\)/);
+  assert.match(route, /currentMembership\.status = "removed"/);
+  assert.match(route, /AgencyHostTransfer\.create\(/);
+  assert.match(route, /agency\.host\.transferred/);
+  assert.match(route, /session\.withTransaction/);
+});
