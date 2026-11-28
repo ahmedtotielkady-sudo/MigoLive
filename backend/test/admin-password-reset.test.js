@@ -26,3 +26,7 @@ test("password reset revokes active session and prevents owner target changes", 
   assert.match(route, /activeSessionExpiresAt = null/);
   assert.match(route, /disconnectSockets\(true\)/);
 });
+
+test("password reset does not load the existing password hash", () => {
+  assert.doesNotMatch(route, /select\(["']\+passwordHash["']\)/);
+});
