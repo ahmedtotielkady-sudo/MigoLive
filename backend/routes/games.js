@@ -12,11 +12,28 @@ const slot777 = require("../game-engines/slot-777");
 const router = express.Router();
 router.use(requireAuth);
 
+async function recoverDuplicateRound(key, userId, gameId, requestHash) {
+  const [prior, user] = await Promise.all([
+    GameRound.findOne({ idempotencyKey: key }).lean(),
+    User.findById(userId).select("coins").lean()
+  ]);
+  if (!prior || !user || String(prior.userId) !== String(userId) ||
+      prior.gameId !== gameId || !prior.requestHash || prior.requestHash !== requestHash) return null;
+  return {
+    roundId: prior.roundId, coins: user.coins, bet: prior.bet,
+    payout: prior.payout, outcome: prior.outcome,
+    freeSpin: !!(prior.outcome && prior.outcome.freeSpin),
+    freeSpinsRemaining: Number(prior.outcome && prior.outcome.freeSpinsRemaining) || 0, repeated: true
+  };
+}
+
+
 // Only this route is live initially. Other game IDs remain unavailable until
 // their original payout rules have been ported and independently tested.
 router.post("/slot-777/spin", async (req, res) => {
   const bet = Number(req.body && req.body.bet);
   const key = String(req.get("idempotency-key") || "");
+  const requestHash = crypto.createHash("sha256").update(JSON.stringify({ gameId: "slot-777", userId: String(req.auth.sub), bet })).digest("hex");
   if (!/^[A-Za-z0-9_-]{16,80}$/.test(key)) {
     return res.status(400).json({ ok: false, message: "معرّف الجولة مطلوب" });
   }
@@ -80,7 +97,7 @@ router.post("/slot-777/spin", async (req, res) => {
 
       const roundId = crypto.randomUUID();
       const [round] = await GameRound.create([{
-        userId: user._id, gameId: "slot-777", roundId, idempotencyKey: key,
+        userId: user._id, gameId: "slot-777", roundId, idempotencyKey: key, requestHash,
         bet: actualBet, payout: outcome.win,
         status: outcome.win > 0 ? "settled" : "lost",
         outcome: { grid: outcome.grid, bonus: outcome.bonus, freeSpinsAwarded: outcome.freeSpins, freeSpinsRemaining: state.freeSpins, hits: outcome.hits, requestedBet: bet, freeSpin },
@@ -91,6 +108,15 @@ router.post("/slot-777/spin", async (req, res) => {
     });
     return res.json({ ok: true, gameId: "slot-777", ...result });
   } catch (error) {
+    if (error && error.code === 11000) {
+      try {
+        const replay = await recoverDuplicateRound(key, req.auth.sub, "slot-777", requestHash);
+        if (replay) return res.json({ ok: true, gameId: slot-777, ...replay });
+        return res.status(409).json({ ok: false, message: "معرّف الجولة مستخدم لطلب مختلف" });
+      } catch (_) {
+        return res.status(503).json({ ok: false, message: "تعذر تأكيد نتيجة الجولة؛ أعد المحاولة بنفس المعرّف" });
+      }
+    }
     return res.status(error.status || 500).json({
       ok: false, message: error.status ? error.message : "تعذر تنفيذ الجولة",
       ...(Number.isSafeInteger(error.currentCoins) ? { coins: error.currentCoins } : {})
@@ -106,6 +132,7 @@ const wheelAnimals = require("../game-engines/wheel-animals");
 router.post("/wheel-animals/spin", async (req, res) => {
   const bets = req.body && req.body.bets;
   const key = String(req.get("idempotency-key") || "");
+  const requestHash = crypto.createHash("sha256").update(JSON.stringify({ gameId: "wheel-animals", userId: String(req.auth.sub), bets })).digest("hex");
   if (!/^[A-Za-z0-9_-]{16,80}$/.test(key)) {
     return res.status(400).json({ ok: false, message: "معرّف الجولة مطلوب" });
   }
@@ -153,7 +180,7 @@ router.post("/wheel-animals/spin", async (req, res) => {
       const roundId = crypto.randomUUID();
       const outcome = { ...game, requestedBets: bets };
       const [round] = await GameRound.create([{
-        userId: user._id, gameId: "wheel-animals", roundId, idempotencyKey: key,
+        userId: user._id, gameId: "wheel-animals", roundId, idempotencyKey: key, requestHash,
         bet: game.totalBet, payout: game.payout,
         status: game.payout > 0 ? "settled" : "lost", outcome, settledAt: new Date()
       }], { session });
@@ -162,6 +189,15 @@ router.post("/wheel-animals/spin", async (req, res) => {
     });
     return res.json({ ok: true, gameId: "wheel-animals", ...result });
   } catch (error) {
+    if (error && error.code === 11000) {
+      try {
+        const replay = await recoverDuplicateRound(key, req.auth.sub, "wheel-animals", requestHash);
+        if (replay) return res.json({ ok: true, gameId: wheel-animals, ...replay });
+        return res.status(409).json({ ok: false, message: "معرّف الجولة مستخدم لطلب مختلف" });
+      } catch (_) {
+        return res.status(503).json({ ok: false, message: "تعذر تأكيد نتيجة الجولة؛ أعد المحاولة بنفس المعرّف" });
+      }
+    }
     return res.status(error.status || 500).json({
       ok: false, message: error.status ? error.message : "تعذر تنفيذ الجولة",
       ...(Number.isSafeInteger(error.currentCoins) ? { coins: error.currentCoins } : {})
@@ -175,6 +211,7 @@ const fruitLuck = require("../game-engines/fruit-luck");
 router.post("/fruit-luck/spin", async (req, res) => {
   const bets = req.body && req.body.bets;
   const key = String(req.get("idempotency-key") || "");
+  const requestHash = crypto.createHash("sha256").update(JSON.stringify({ gameId: "fruit-luck", userId: String(req.auth.sub), bets })).digest("hex");
   if (!/^[A-Za-z0-9_-]{16,80}$/.test(key)) {
     return res.status(400).json({ ok: false, message: "معرّف الجولة مطلوب" });
   }
@@ -221,7 +258,7 @@ router.post("/fruit-luck/spin", async (req, res) => {
       const roundId = crypto.randomUUID();
       const outcome = { ...game };
       const [round] = await GameRound.create([{
-        userId: user._id, gameId: "fruit-luck", roundId, idempotencyKey: key,
+        userId: user._id, gameId: "fruit-luck", roundId, idempotencyKey: key, requestHash,
         bet: game.totalBet, payout: game.payout,
         status: game.payout > 0 ? "settled" : "lost", outcome, settledAt: new Date()
       }], { session });
@@ -230,6 +267,15 @@ router.post("/fruit-luck/spin", async (req, res) => {
     });
     return res.json({ ok: true, gameId: "fruit-luck", ...result });
   } catch (error) {
+    if (error && error.code === 11000) {
+      try {
+        const replay = await recoverDuplicateRound(key, req.auth.sub, "fruit-luck", requestHash);
+        if (replay) return res.json({ ok: true, gameId: fruit-luck, ...replay });
+        return res.status(409).json({ ok: false, message: "معرّف الجولة مستخدم لطلب مختلف" });
+      } catch (_) {
+        return res.status(503).json({ ok: false, message: "تعذر تأكيد نتيجة الجولة؛ أعد المحاولة بنفس المعرّف" });
+      }
+    }
     return res.status(error.status || 500).json({
       ok: false, message: error.status ? error.message : "تعذر تنفيذ الجولة"
     });
@@ -244,6 +290,7 @@ router.post("/big-warrior/fight", async (req, res) => {
   const bet = Number(req.body && req.body.bet);
   const pick = String(req.body && req.body.pick || "");
   const key = String(req.get("idempotency-key") || "");
+  const requestHash = crypto.createHash("sha256").update(JSON.stringify({ gameId: "big-warrior", userId: String(req.auth.sub), bet, pick })).digest("hex");
   if (!/^[A-Za-z0-9_-]{16,80}$/.test(key)) {
     return res.status(400).json({ ok: false, message: "معرّف الجولة مطلوب" });
   }
@@ -289,7 +336,7 @@ router.post("/big-warrior/fight", async (req, res) => {
       await Wallet.updateOne({ userId: user._id }, { $set: { balance: user.coins } }, { upsert: true, session });
       const roundId = crypto.randomUUID();
       const [round] = await GameRound.create([{
-        userId: user._id, gameId: "big-warrior", roundId, idempotencyKey: key,
+        userId: user._id, gameId: "big-warrior", roundId, idempotencyKey: key, requestHash,
         bet, payout: outcome.payout,
         status: outcome.payout > 0 ? "settled" : "lost",
         outcome, settledAt: new Date()
@@ -299,6 +346,15 @@ router.post("/big-warrior/fight", async (req, res) => {
     });
     return res.json({ ok: true, gameId: "big-warrior", ...result });
   } catch (error) {
+    if (error && error.code === 11000) {
+      try {
+        const replay = await recoverDuplicateRound(key, req.auth.sub, "big-warrior", requestHash);
+        if (replay) return res.json({ ok: true, gameId: big-warrior, ...replay });
+        return res.status(409).json({ ok: false, message: "معرّف الجولة مستخدم لطلب مختلف" });
+      } catch (_) {
+        return res.status(503).json({ ok: false, message: "تعذر تأكيد نتيجة الجولة؛ أعد المحاولة بنفس المعرّف" });
+      }
+    }
     return res.status(error.status || 500).json({
       ok: false, message: error.status ? error.message : "تعذر تنفيذ الجولة"
     });
