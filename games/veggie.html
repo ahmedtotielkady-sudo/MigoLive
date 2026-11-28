@@ -186,8 +186,9 @@ function clock(){
 }
 function winnersOf(o){
   if(!o)return[];
-  if(o.type==="single")return[Number(o.index)];
-  return FOODS.map(function(f,i){return f.g===o.group?i:-1}).filter(function(i){return i>=0});
+  // serverOutcome() normalizes the server payload to i/g for the UI.
+  if(o.type==="single")return Number.isInteger(Number(o.i))?[Number(o.i)]:[];
+  return FOODS.map(function(f,i){return f.g===o.g?i:-1}).filter(function(i){return i>=0});
 }
 function serverOutcome(){
   var o=serverState&&serverState.outcome;if(!o)return null;
@@ -215,7 +216,7 @@ function sync(){
   var c=clock(),o=c.o,SB=BET_TIME+SPIN_TIME,out=serverOutcome(),key;
   if(o<BET_TIME){phase="bet";key="b"+Math.ceil(BET_TIME-o);if(key!==lastKey){lastKey=key;clearMarks();$("cd").textContent=Math.ceil(BET_TIME-o);$("lb").textContent="اختيار طعام جديد"}}
   else if(o<SB){phase="spin";if(!out)return;var p=(o-BET_TIME)/SPIN_TIME,e=0.7*p+0.3*(1-Math.pow(1-p,2)),total=40+out.target;var cur=p>=1?out.target:Math.floor(e*total+1e-9)%8,sec=Math.max(0,Math.ceil(SB-o));key="s"+cur+"_"+sec;if(key!==lastKey){lastKey=key;cards.forEach(function(d){d.classList.remove("hl","win");d.classList.add("dim")});cards[cur].classList.add("hl");cards[cur].classList.remove("dim");$("plateM").classList.remove("on");$("plateV").classList.remove("on");$("cd").textContent=sec;$("lb").textContent="سيقف بعد"}}
-  else{phase="result";if(!out)return;key="r"+serverState.roundId;if(key!==lastKey){lastKey=key;clearMarks();cards.forEach(function(d){d.classList.add("dim")});winnersOf(out).forEach(function(i){cards[i].classList.remove("dim");cards[i].classList.add("win")});if(out.type==="group")$(out.g==="v"?"plateV":"plateM").classList.add("on");$("cd").textContent=lastWin>0?"🎉":"";$("lb").textContent="النتيجة";hist.push(out.type==="group"?out.g:String(out.i));render()}}
+  else{phase="result";if(!out)return;key="r"+serverState.roundId;if(key!==lastKey){lastKey=key;clearMarks();cards.forEach(function(d){d.classList.add("dim")});winnersOf(out).forEach(function(i){cards[i].classList.remove("dim");cards[i].classList.add("win")});if(out.type==="group")$(out.g==="v"?"plateV":"plateM").classList.add("on");$("cd").textContent=lastWin>0?"🎉":"";$("lb").textContent="النتيجة";render()}}
 }
 
 function loop(){sync();requestAnimationFrame(loop)}
