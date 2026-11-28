@@ -41,6 +41,8 @@ test("Android room client polls the shared roster and renews its presence lease"
   assert.match(bridge, /setInterval\(\(\) => syncRoomPresence\(session\), 2_500\)/);
   assert.match(bridge, /stopPresenceSync\(session\)/);
   assert.match(bridge, /Array\.isArray\(joined\.online\)/);
+  assert.match(bridge, /Keep Socket\.IO alive so members still see one another/);
+  assert.doesNotMatch(bridge, /stopPresenceSync\(voiceSession\);\s*try \{ voiceSession\.socket\.disconnect\(\); \} catch/);
 });
 
 test("room presence server and client scripts parse without syntax errors", () => {
