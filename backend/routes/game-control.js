@@ -11,11 +11,8 @@ const GAMES = [
   { id: "slot-777", name: "سلوت 777" },
   { id: "ocean-storm", name: "عاصفة المحيط" },
   { id: "wheel-animals", name: "عجلة الحيوانات" },
-  { id: "cleopatra-gold", name: "ذهب كليوباترا" },
   { id: "fruit-luck", name: "حظ الفواكه" },
-  { id: "rocket-crash", name: "الصاروخ" },
   { id: "big-warrior", name: "المحارب الكبير" },
-  { id: "veggie", name: "خضار" }
 ];
 async function ownerOnly(req, res, next) {
   try {

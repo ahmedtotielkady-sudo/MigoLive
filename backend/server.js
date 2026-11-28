@@ -64,14 +64,8 @@ app.use("/api/games", (req, res, next) => {
   next();
 });
 
-// Mount the high-frequency Veggie state/bet API before the generic games limiter.
-// Otherwise /api/games also matches /api/games/veggie and its 30/min limit
-// blocks the one-second polling with HTTP 429 before the 600/min Veggie limiter runs.
-app.use("/api/games/veggie", rateLimit({ windowMs: 60_000, limit: 600, standardHeaders: true, legacyHeaders: false }), require("./routes/veggie"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/games"));
 app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ocean-storm"));
-app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/cleopatra-gold"));
-app.use("/api/games", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/rocket-crash"));
 
 app.use("/api/rooms/ice-config", rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }), require("./routes/ice-config"));
 app.use("/api/rooms/livekit", rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false }), require("./routes/livekit"));
@@ -111,11 +105,9 @@ async function start() {
   const MicLease = require("./models/MicLease");
   const GameRound = require("./models/GameRound");
   const GameState = require("./models/GameState");
-  const VeggieRound = require("./models/VeggieRound");
-  await Promise.all([MicLease.init(), GameRound.init(), GameState.init(), VeggieRound.init()]);
+  await Promise.all([MicLease.init(), GameRound.init(), GameState.init()]);
   const io = attachRealtime(httpServer, allowedOrigins);
   app.set("io", io);
-  require("./services/veggie-settlement").startVeggieSettlementWorker(io);
   httpServer.listen(port, "0.0.0.0", () => console.log(`MigoLive API + realtime listening on port ${port}`));
 }
 start().catch((error) => {

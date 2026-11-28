@@ -687,16 +687,14 @@
     'wheel-animals:spin': '/games/wheel-animals/spin',
     'fruit-luck:spin': '/games/fruit-luck/spin',
     'big-warrior:fight': '/games/big-warrior/fight',
-    'cleopatra-gold:spin': '/games/cleopatra-gold/spin',
-    'rocket-crash:start': '/games/rocket-crash/start',
-    'rocket-crash:state': '/games/rocket-crash/state',
-    'rocket-crash:cashout': '/games/rocket-crash/cashout',
-    'rocket-crash:cancel': '/games/rocket-crash/cancel',
-    'veggie:state': '/games/veggie/state',
-    'veggie:bet': '/games/veggie/bet'
+    'big-warrior:fight': '/games/big-warrior/fight'
   };
   function gameFrameFor(source) {
-    const frames = [$id('gf'), document.querySelector('#migo-game-overlay iframe')].filter(Boolean);
+    // Game launchers use more than one container across rooms and the full-screen
+    // overlay. Match the actual iframe window rather than assuming one fixed ID.
+    const frames = Array.from(document.querySelectorAll('iframe'));
+    const legacy = $id('gf');
+    if (legacy && !frames.includes(legacy)) frames.push(legacy);
     return frames.find(frame => frame.contentWindow === source) || null;
   }
   function validateGameServerResult(gameId, action, result) {
@@ -705,19 +703,6 @@
       throw new Error('رد الخادم غير مكتمل: لم يتم تأكيد رصيد الجولة');
     }
     if (action === 'state' || action === 'wallet') {
-      if (gameId === 'veggie' && action === 'state' &&
-          (!result.roundId || !Number.isFinite(Number(result.startsAt)) ||
-           !['bet', 'spin', 'result'].includes(result.phase) ||
-           (result.outcome && !['single', 'group'].includes(result.outcome.type)))) {
-        throw new Error('بيانات جولة الخضار غير مكتملة');
-      }
-      return result;
-    }
-    if (gameId === 'veggie' && action === 'bet') {
-      if (!Array.isArray(result.outcome && result.outcome.amounts) ||
-          result.outcome.amounts.length !== 8 || !Number.isFinite(Number(result.bet))) {
-        throw new Error('تأكيد رهان الخضار غير مكتمل');
-      }
       return result;
     }
     if (typeof result.roundId !== 'string' || !result.roundId) {
@@ -757,10 +742,6 @@
     }
     if (gameId === 'big-warrior' && !['lion', 'tiger', 'draw'].includes(o.winner)) {
       throw new Error('الفائز في المحارب الكبير غير محدد من الخادم');
-    }
-    if (gameId === 'cleopatra-gold' &&
-        (!Array.isArray(o.grid) || o.grid.length !== 5 || o.grid.some(col => !Array.isArray(col) || col.length !== 4))) {
-      throw new Error('شبكة نتيجة ذهب كليوباترا غير مكتملة');
     }
     return result;
   }

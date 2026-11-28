@@ -7,9 +7,7 @@ const slot = require("../game-engines/slot-777");
 const wheel = require("../game-engines/wheel-animals");
 const fruit = require("../game-engines/fruit-luck");
 const ocean = require("../game-engines/ocean-storm");
-const cleopatra = require("../game-engines/cleopatra-gold");
 const warrior = require("../game-engines/big-warrior");
-const rocket = require("../game-engines/rocket-crash");
 
 test("Slot 777 validates stake and returns the server grid dimensions", () => {
   assert.throws(() => slot.play({ bet: 41, random: () => 0 }), /الرهان/);
@@ -58,14 +56,6 @@ test("Ocean Storm returns a 6 by 5 server grid and valid payout", () => {
   assert.ok(result.outcome && typeof result.outcome === "object");
 });
 
-test("Cleopatra Gold returns a 5 by 4 grid and a nonnegative payout", () => {
-  const result = cleopatra.play({ bet: 100, random: () => 0 });
-  assert.equal(result.grid.length, 5);
-  assert.ok(result.grid.every(column => column.length === 4));
-  assert.ok(Number.isSafeInteger(result.win) && result.win >= 0);
-  assert.ok(Number.isSafeInteger(result.freeSpins) && result.freeSpins >= 0);
-});
-
 test("Big Warrior winner and payout are determined by the engine", () => {
   const result = warrior.play({ bet: 100, pick: "lion", randomInt: () => 0 });
   assert.equal(result.winner, "lion");
@@ -74,9 +64,3 @@ test("Big Warrior winner and payout are determined by the engine", () => {
   assert.throws(() => warrior.play({ bet: 99, pick: "lion" }), /الرهان/);
 });
 
-test("Rocket Crash validates supported stakes and multiplier timing", () => {
-  assert.doesNotThrow(() => rocket.validateBet(100));
-  assert.throws(() => rocket.validateBet(99), /الرهان/);
-  assert.equal(rocket.multiplierAt(1000, 1000), 1);
-  assert.ok(rocket.multiplierAt(1000, 2000) > 1);
-});

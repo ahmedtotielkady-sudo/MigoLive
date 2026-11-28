@@ -18,84 +18,6 @@ if profile_anchor in html and "window.__migoGetGameProfile" not in html:
 elif "window.__migoGetGameProfile" not in html:
     raise SystemExit("Could not expose profile bridge: user function not found")
 
-# Register Rocket Space without disturbing existing game entries.
-rocket_entry = "rocket:{n:'صاروخ الفضاء',i:'🚀',d:'لعبة الصاروخ · عملات المحفظة'}"
-cleopatra_entry = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'},veggie:{n:'خضار',i:'🥗',d:'عجلة الخضار · عملات المحفظة'}"
-if rocket_entry not in html:
-    if cleopatra_entry in html:
-        html = html.replace(cleopatra_entry, cleopatra_entry + "," + rocket_entry, 1)
-    else:
-        # Newer catalog layouts may be assembled elsewhere; do not abort APK
-        # preparation solely because this legacy registry signature changed.
-        print("Legacy Cleopatra registry signature not found; keeping current game catalog")
-
-# Fail the build rather than silently shipping without the Rocket Space asset.
-rocket_asset = Path("games/rocket-crash.html")
-if not rocket_asset.is_file() or rocket_asset.stat().st_size < 1000:
-    raise SystemExit("Rocket Space game asset is missing or incomplete")
-
-# Route Cleopatra, Big Warrior, and Rocket to their local HTML assets.
-if "k==='rocket'" not in html:
-    loader_condition = "if(k==='cleopatra'||k==='warrior'){"
-    loader_path = "const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':'games/big-warrior.html';"
-    if loader_condition in html and loader_path in html:
-        html = html.replace(loader_condition, "if(k==='cleopatra'||k==='warrior'||k==='rocket'){", 1)
-        html = html.replace(loader_path, "const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':(k==='warrior'?'games/big-warrior.html':'games/rocket-crash.html');", 1)
-    else:
-        open_anchor = "let gameSource;if(k==='cleopatra'){const response=await fetch('games/cleopatra-gold.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
-        open_replacement = "let gameSource;if(k==='cleopatra'||k==='warrior'||k==='rocket'){const file=k==='cleopatra'?'cleopatra-gold.html':(k==='warrior'?'big-warrior.html':'rocket-crash.html');const response=await fetch('games/'+file);if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
-        if open_anchor in html:
-            html = html.replace(open_anchor, open_replacement, 1)
-        else:
-            # The app may use a newer Games-tab loader. Keep the in-room
-            # fullscreen launcher; an optional tab hook must not block APK builds.
-            print("Games-tab loader variant not found; keeping room launcher")
-
-# Route the Veggie catalog entry to its standalone server-connected HTML asset.
-if "k==='veggie'" not in html:
-    rocket_condition = "if(k==='cleopatra'||k==='warrior'||k==='rocket'){"
-    rocket_path = "const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':(k==='warrior'?'games/big-warrior.html':'games/rocket-crash.html');"
-    legacy_condition = "if(k==='cleopatra'||k==='warrior'){"
-    legacy_path = "const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':'games/big-warrior.html';"
-    veggie_condition = "if(k==='cleopatra'||k==='warrior'||k==='rocket'||k==='veggie'){"
-    veggie_path = "const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':(k==='warrior'?'games/big-warrior.html':(k==='rocket'?'games/rocket-crash.html':'games/veggie.html'));"
-    if rocket_condition in html and rocket_path in html:
-        html = html.replace(rocket_condition, veggie_condition, 1)
-        html = html.replace(rocket_path, veggie_path, 1)
-    elif legacy_condition in html and legacy_path in html:
-        html = html.replace(legacy_condition, veggie_condition, 1)
-        html = html.replace(legacy_path, veggie_path, 1)
-    else:
-        old_open = "let gameSource;if(k==='cleopatra'){const response=await fetch('games/cleopatra-gold.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
-        new_open = "let gameSource;if(k==='cleopatra'||k==='warrior'||k==='rocket'||k==='veggie'){const file=k==='cleopatra'?'cleopatra-gold.html':(k==='warrior'?'big-warrior.html':(k==='rocket'?'rocket-crash.html':'veggie.html'));const response=await fetch('games/'+file);if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
-        if old_open in html:
-            html = html.replace(old_open, new_open, 1)
-        else:
-            print("Games-tab Veggie loader variant not found; room picker still includes Veggie")
-
-veggie_asset = Path("games/veggie.html")
-if not veggie_asset.is_file() or veggie_asset.stat().st_size < 1000:
-    raise SystemExit("Veggie game asset is missing or incomplete")
-
-# Make food and chip controls respond on the first touch instead of waiting for
-# the synthetic click event. Keep the action guarded by the game's busy state.
-veggie_html = veggie_asset.read_text(encoding="utf-8")
-veggie_touch_style = """<style id="migo-veggie-fast-touch-v1">
-.food,.chip{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-</style>
-"""
-if "migo-veggie-fast-touch-v1" not in veggie_html:
-    if "</head>" not in veggie_html:
-        raise SystemExit("Missing </head> in veggie.html")
-    veggie_html = veggie_html.replace("</head>", veggie_touch_style + "\n</head>", 1)
-old_food_click = 'd.addEventListener("click",function(){placeBet(i)});'
-new_food_click = 'd.addEventListener("pointerdown",function(e){if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();placeBet(i)},{passive:false});'
-if old_food_click in veggie_html:
-    veggie_html = veggie_html.replace(old_food_click, new_food_click, 1)
-elif new_food_click not in veggie_html:
-    raise SystemExit("Veggie food touch handler signature not found")
-veggie_asset.write_text(veggie_html, encoding="utf-8")
-
 style_id = "migo-game-room-launcher-style-v1"
 script_id = "migo-game-room-launcher-script-v1"
 
@@ -143,11 +65,8 @@ js = r"""
   {name:"عجلة الحيوانات",url:"wheel-animals.html"},
   {name:"عاصفة المحيط",url:"slot-ocean-storm.html"},
   {name:"سلوت 777",url:"slot-777.html"},
-  {name:"ذهب كليوباترا",url:"games/cleopatra-gold.html"},
   {name:"المحارب الكبير",url:"games/big-warrior.html"},
-  {name:"صاروخ الفضاء",url:"games/rocket-crash.html"},
   {name:"فواكه الحظ",url:"games/fruit-luck.html"},
-  {name:"خضار",url:"games/veggie.html"},
  ];
  const uniqueGames = [...new Map(games.map(g=>[g.url,g])).values()];
  const cleanText=()=>{
@@ -165,7 +84,7 @@ js = r"""
    picker=document.createElement("div");picker.id="migo-game-picker";picker.hidden=true;
    picker.innerHTML='<div class="migo-picker-card"><div class="migo-picker-title">الألعاب</div><div class="migo-picker-grid"></div><button class="migo-picker-close" type="button">إغلاق</button></div>';
    const grid=picker.querySelector(".migo-picker-grid");
-   const visuals={"عجلة الحيوانات":["🐯","اختر حيوانك"],"عاصفة المحيط":["🌊","سلوت 5×6"],"سلوت 777":["🎰","سلوت 3×5"],"ذهب كليوباترا":["👑","سلوت 5×4 · رصيد المحفظة"],"المحارب الكبير":["🦁","الأسد ضد النمر · رصيد المحفظة"],"صاروخ الفضاء":["🚀","لعبة الصاروخ · رصيد المحفظة"],"فواكه الحظ":["🍉","عجلة الفواكه · رصيد المحفظة"],"خضار":["🥗","عجلة الخضار · رصيد المحفظة"]};
+   const visuals={"عجلة الحيوانات":["🐯","اختر حيوانك"],"عاصفة المحيط":["🌊","سلوت 5×6"],"سلوت 777":["🎰","سلوت 3×5"],"المحارب الكبير":["🦁","الأسد ضد النمر · رصيد المحفظة"],"فواكه الحظ":["🍉","عجلة الفواكه · رصيد المحفظة"]};
    uniqueGames.forEach(g=>{const v=visuals[g.name]||["🎮",""];const b=document.createElement("button");b.type="button";b.className="migo-game-card";b.innerHTML='<span class="migo-game-icon">'+v[0]+'</span><span class="migo-game-name"></span><span class="migo-game-desc"></span>';b.querySelector(".migo-game-name").textContent=g.name;b.querySelector(".migo-game-desc").textContent=v[1];b.addEventListener("click",()=>openGame(g));grid.appendChild(b)});
    picker.querySelector(".migo-picker-close").onclick=()=>picker.hidden=true;
    document.body.appendChild(picker);
@@ -238,9 +157,7 @@ js = r"""
     (g.name==="عجلة الحيوانات"&&/wheel-animals/.test(raw))||
     (g.name==="عاصفة المحيط"&&/slot-ocean-storm/.test(raw))||
     (g.name==="سلوت 777"&&/slot-777/.test(raw))||
-    (g.name==="ذهب كليوباترا"&&/cleopatra-gold/.test(raw))||
     (g.name==="المحارب الكبير"&&/big-warrior/.test(raw))||
-    (g.name==="صاروخ الفضاء"&&/rocket-crash/.test(raw))||
     (g.name==="فواكه الحظ"&&/fruit-luck/.test(raw))||
     (g.name==="خضار"&&/veggie/.test(raw)))||null;
  }
