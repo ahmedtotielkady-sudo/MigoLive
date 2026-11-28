@@ -10,6 +10,7 @@ on:
       - feature/permanent-dark-server-wallet
       - fix/registration-username-min-3-max-24
       - fix/pizza-yam-multi-bet-settlement
+      - fix/veggie-freeze-wallet-response
       - feature/global-phone-registration-ui-2026-11-20
       - feature/signup-dark-wallet-integration-2026-11-20
       - feature/owner-version-device-controls-2026-11-26
