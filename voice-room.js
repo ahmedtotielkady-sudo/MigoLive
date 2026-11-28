@@ -206,7 +206,7 @@
       socket.on("disconnect", () => {
         if (voiceSession && voiceSession.roomCode === roomCode) {
           setVoiceStatus("انقطع اتصال الغرفة — جارٍ إعادة الاتصال", false);
-          setLocalMicrophone(false);
+          setLocalMicrophone(false).catch(() => {});
         }
       });
       socket.on("connect", () => {
