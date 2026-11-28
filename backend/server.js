@@ -14,6 +14,8 @@ const httpServer = http.createServer(app);
 const port = Number(process.env.PORT || 3000);
 const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .split(",").map((value) => value.trim()).filter(Boolean);
+const capacitorOrigins = new Set(["https://localhost", "http://localhost", "capacitor://localhost"]);
+const originAllowed = (origin) => !origin || allowedOrigins.includes(origin) || capacitorOrigins.has(origin);
 
 app.disable("x-powered-by");
 // Railway terminates the public connection at one trusted proxy hop.
@@ -21,7 +23,7 @@ app.set("trust proxy", 1);
 app.use(helmet());
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    if (originAllowed(origin)) return callback(null, true);
     return callback(new Error("Origin is not allowed by CORS"));
   }
 }));
