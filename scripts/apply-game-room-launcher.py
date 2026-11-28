@@ -20,11 +20,14 @@ elif "window.__migoGetGameProfile" not in html:
 
 # Register Rocket Space without disturbing existing game entries.
 rocket_entry = "rocket:{n:'صاروخ الفضاء',i:'🚀',d:'لعبة الصاروخ · عملات المحفظة'}"
-cleopatra_entry = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'}"
+cleopatra_entry = "cleopatra:{n:'ذهب كليوباترا',i:'👑',d:'سلوت 5×4 · عملات المحفظة'},veggie:{n:'خضار',i:'🥗',d:'عجلة الخضار · عملات المحفظة'}"
 if rocket_entry not in html:
-    if cleopatra_entry not in html:
-        raise SystemExit("Could not find Cleopatra entry to register Rocket Space")
-    html = html.replace(cleopatra_entry, cleopatra_entry + "," + rocket_entry, 1)
+    if cleopatra_entry in html:
+        html = html.replace(cleopatra_entry, cleopatra_entry + "," + rocket_entry, 1)
+    else:
+        # Newer catalog layouts may be assembled elsewhere; do not abort APK
+        # preparation solely because this legacy registry signature changed.
+        print("Legacy Cleopatra registry signature not found; keeping current game catalog")
 
 # Fail the build rather than silently shipping without the Rocket Space asset.
 rocket_asset = Path("games/rocket-crash.html")
@@ -47,6 +50,51 @@ if "k==='rocket'" not in html:
             # The app may use a newer Games-tab loader. Keep the in-room
             # fullscreen launcher; an optional tab hook must not block APK builds.
             print("Games-tab loader variant not found; keeping room launcher")
+
+# Route the Veggie catalog entry to its standalone server-connected HTML asset.
+if "k==='veggie'" not in html:
+    rocket_condition = "if(k==='cleopatra'||k==='warrior'||k==='rocket'){"
+    rocket_path = "const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':(k==='warrior'?'games/big-warrior.html':'games/rocket-crash.html');"
+    legacy_condition = "if(k==='cleopatra'||k==='warrior'){"
+    legacy_path = "const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':'games/big-warrior.html';"
+    veggie_condition = "if(k==='cleopatra'||k==='warrior'||k==='rocket'||k==='veggie'){"
+    veggie_path = "const gamePath=k==='cleopatra'?'games/cleopatra-gold.html':(k==='warrior'?'games/big-warrior.html':(k==='rocket'?'games/rocket-crash.html':'games/veggie.html'));"
+    if rocket_condition in html and rocket_path in html:
+        html = html.replace(rocket_condition, veggie_condition, 1)
+        html = html.replace(rocket_path, veggie_path, 1)
+    elif legacy_condition in html and legacy_path in html:
+        html = html.replace(legacy_condition, veggie_condition, 1)
+        html = html.replace(legacy_path, veggie_path, 1)
+    else:
+        old_open = "let gameSource;if(k==='cleopatra'){const response=await fetch('games/cleopatra-gold.html');if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
+        new_open = "let gameSource;if(k==='cleopatra'||k==='warrior'||k==='rocket'||k==='veggie'){const file=k==='cleopatra'?'cleopatra-gold.html':(k==='warrior'?'big-warrior.html':(k==='rocket'?'rocket-crash.html':'veggie.html'));const response=await fetch('games/'+file);if(!response.ok)throw new Error('تعذر تحميل اللعبة محلياً');gameSource=await response.text()}else{gameSource=dec(GB[k])}"
+        if old_open in html:
+            html = html.replace(old_open, new_open, 1)
+        else:
+            print("Games-tab Veggie loader variant not found; room picker still includes Veggie")
+
+veggie_asset = Path("games/veggie.html")
+if not veggie_asset.is_file() or veggie_asset.stat().st_size < 1000:
+    raise SystemExit("Veggie game asset is missing or incomplete")
+
+# Make food and chip controls respond on the first touch instead of waiting for
+# the synthetic click event. Keep the action guarded by the game's busy state.
+veggie_html = veggie_asset.read_text(encoding="utf-8")
+veggie_touch_style = """<style id="migo-veggie-fast-touch-v1">
+.food,.chip{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+</style>
+"""
+if "migo-veggie-fast-touch-v1" not in veggie_html:
+    if "</head>" not in veggie_html:
+        raise SystemExit("Missing </head> in veggie.html")
+    veggie_html = veggie_html.replace("</head>", veggie_touch_style + "\n</head>", 1)
+old_food_click = 'd.addEventListener("click",function(){placeBet(i)});'
+new_food_click = 'd.addEventListener("pointerdown",function(e){if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();placeBet(i)},{passive:false});'
+if old_food_click in veggie_html:
+    veggie_html = veggie_html.replace(old_food_click, new_food_click, 1)
+elif new_food_click not in veggie_html:
+    raise SystemExit("Veggie food touch handler signature not found")
+veggie_asset.write_text(veggie_html, encoding="utf-8")
 
 style_id = "migo-game-room-launcher-style-v1"
 script_id = "migo-game-room-launcher-script-v1"
@@ -99,7 +147,9 @@ js = r"""
   {name:"المحارب الكبير",url:"games/big-warrior.html"},
   {name:"صاروخ الفضاء",url:"games/rocket-crash.html"},
   {name:"فواكه الحظ",url:"games/fruit-luck.html"},
+  {name:"خضار",url:"games/veggie.html"},
  ];
+ const uniqueGames = [...new Map(games.map(g=>[g.url,g])).values()];
  const cleanText=()=>{
   const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
   const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
@@ -115,8 +165,8 @@ js = r"""
    picker=document.createElement("div");picker.id="migo-game-picker";picker.hidden=true;
    picker.innerHTML='<div class="migo-picker-card"><div class="migo-picker-title">الألعاب</div><div class="migo-picker-grid"></div><button class="migo-picker-close" type="button">إغلاق</button></div>';
    const grid=picker.querySelector(".migo-picker-grid");
-   const visuals={"عجلة الحيوانات":["🐯","اختر حيوانك"],"عاصفة المحيط":["🌊","سلوت 5×6"],"سلوت 777":["🎰","سلوت 3×5"],"ذهب كليوباترا":["👑","سلوت 5×4 · رصيد المحفظة"],"المحارب الكبير":["🦁","الأسد ضد النمر · رصيد المحفظة"],"صاروخ الفضاء":["🚀","لعبة الصاروخ · رصيد المحفظة"],"فواكه الحظ":["🍉","عجلة الفواكه · رصيد المحفظة"]};
-   games.forEach(g=>{const v=visuals[g.name]||["🎮",""];const b=document.createElement("button");b.type="button";b.className="migo-game-card";b.innerHTML='<span class="migo-game-icon">'+v[0]+'</span><span class="migo-game-name"></span><span class="migo-game-desc"></span>';b.querySelector(".migo-game-name").textContent=g.name;b.querySelector(".migo-game-desc").textContent=v[1];b.addEventListener("click",()=>openGame(g));grid.appendChild(b)});
+   const visuals={"عجلة الحيوانات":["🐯","اختر حيوانك"],"عاصفة المحيط":["🌊","سلوت 5×6"],"سلوت 777":["🎰","سلوت 3×5"],"ذهب كليوباترا":["👑","سلوت 5×4 · رصيد المحفظة"],"المحارب الكبير":["🦁","الأسد ضد النمر · رصيد المحفظة"],"صاروخ الفضاء":["🚀","لعبة الصاروخ · رصيد المحفظة"],"فواكه الحظ":["🍉","عجلة الفواكه · رصيد المحفظة"],"خضار":["🥗","عجلة الخضار · رصيد المحفظة"]};
+   uniqueGames.forEach(g=>{const v=visuals[g.name]||["🎮",""];const b=document.createElement("button");b.type="button";b.className="migo-game-card";b.innerHTML='<span class="migo-game-icon">'+v[0]+'</span><span class="migo-game-name"></span><span class="migo-game-desc"></span>';b.querySelector(".migo-game-name").textContent=g.name;b.querySelector(".migo-game-desc").textContent=v[1];b.addEventListener("click",()=>openGame(g));grid.appendChild(b)});
    picker.querySelector(".migo-picker-close").onclick=()=>picker.hidden=true;
    document.body.appendChild(picker);
   }
@@ -164,14 +214,10 @@ js = r"""
     const profile=typeof window.__migoGetGameProfile==="function"?window.__migoGetGameProfile():{name:"",avatar:"",coins:0};
     e.source.postMessage({t:"bal",v:Number(profile.coins)||0},"*");
     e.source.postMessage({t:"me",name:profile.name||"",avatar:profile.avatar||""},"*");
-   }else if(d.t==="set"&&Number.isFinite(d.v)&&d.v>=0){
-    const u=typeof U==="function"?U():null;
-    if(!u)return;
-    u.coins=Math.floor(d.v);
-    if(typeof save==="function")save();
-    const coinNode=document.querySelector("#mycoins");
-    if(coinNode)coinNode.textContent=u.coins;
-    window.dispatchEvent(new CustomEvent("migo:wallet-updated",{detail:{coins:u.coins}}));
+   }else if(d.t==="set"){
+    // Never accept client-side balance writes from a game iframe.
+    // Game wagers and payouts must be committed by the authenticated backend.
+    console.warn("Ignored client-side game wallet write; server settlement is required");
    }else if(d.t==="wallet"){
     window.dispatchEvent(new CustomEvent("migo:open-wallet"));
    }
@@ -191,7 +237,12 @@ js = r"""
   return games.find(g=>raw.includes(g.url)||label.includes(g.name.toLowerCase())||
     (g.name==="عجلة الحيوانات"&&/wheel-animals/.test(raw))||
     (g.name==="عاصفة المحيط"&&/slot-ocean-storm/.test(raw))||
-    (g.name==="سلوت 777"&&/slot-777/.test(raw)));
+    (g.name==="سلوت 777"&&/slot-777/.test(raw))||
+    (g.name==="ذهب كليوباترا"&&/cleopatra-gold/.test(raw))||
+    (g.name==="المحارب الكبير"&&/big-warrior/.test(raw))||
+    (g.name==="صاروخ الفضاء"&&/rocket-crash/.test(raw))||
+    (g.name==="فواكه الحظ"&&/fruit-luck/.test(raw))||
+    (g.name==="خضار"&&/veggie/.test(raw)))||null;
  }
  function bindGamesEverywhere(){
   if(document.documentElement.dataset.migoGamesEverywhere==="1")return;
@@ -245,6 +296,21 @@ if style_id not in html:
 if script_id not in html:
     if "</body>" not in html: raise SystemExit("Missing </body>")
     html = html.replace("</body>", js + "\n</body>", 1)
+
+# Keep Veggie and Fruit Luck visible when older policy APIs omit either entry.
+# An explicit disabled policy remains authoritative.
+html = html.replace("const draw=available=>{", "const draw=(available,known)=>{", 1)
+html = html.replace(
+    "const list=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k]));",
+    "const list=Object.entries(GM).filter(([k])=>!available||available.has(idMap[k])||(['veggie','fruit-luck'].includes(k)&&known&&!known.has(idMap[k])));",
+    1
+)
+html = html.replace(
+    "window.migoApi('/game-control/status').then(p=>draw(new Set((p.games||[]).filter(x=>x.enabled!==false).map(x=>x.id)))).catch(()=>{});",
+    "window.migoApi('/game-control/status').then(p=>{const games=Array.isArray(p.games)?p.games:[];draw(new Set(games.filter(x=>x.enabled!==false).map(x=>x.id)),new Set(games.map(x=>x.id)));}).catch(()=>{});",
+    1
+)
+
 p.write_text(html, encoding="utf-8")
 
 # Slightly compact the warrior game's controls and fighter cards without changing artwork.

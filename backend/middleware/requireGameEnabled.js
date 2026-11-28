@@ -9,7 +9,8 @@ const ROUTE_GAME = [
   [/^\/(?:cleopatra-gold)\//, "cleopatra-gold"],
   [/^\/(?:fruit-luck)\//, "fruit-luck"],
   [/^\/(?:rocket-crash)\//, "rocket-crash"],
-  [/^\/(?:big-warrior)\//, "big-warrior"]
+  [/^\/(?:big-warrior)\//, "big-warrior"],
+  [/^\/(?:veggie)\//, "veggie"]
 ];
 
 module.exports = async function requireGameEnabled(req, res, next) {
@@ -20,7 +21,6 @@ module.exports = async function requireGameEnabled(req, res, next) {
     if (!user || user.status !== "active") {
       return res.status(403).json({ ok: false, message: "الحساب غير نشط" });
     }
-    // The owner can still enter a paused game for maintenance/testing.
     if (user.role === "owner") return next();
     const policy = await AppGamePolicy.findById("global").lean();
     const game = policy && policy.games && policy.games[match[1]];

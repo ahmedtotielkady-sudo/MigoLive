@@ -1,4 +1,5 @@
 name: Build MigoLive local Android APK
+# Rebuild Android preview for the current Veggie game integration.
 
 on:
   push:
@@ -8,6 +9,7 @@ on:
       - feature/agency-owner-approval
       - feature/permanent-dark-server-wallet
       - fix/registration-username-min-3-max-24
+      - fix/pizza-yam-multi-bet-settlement
       - feature/global-phone-registration-ui-2026-11-20
       - feature/signup-dark-wallet-integration-2026-11-20
       - feature/owner-version-device-controls-2026-11-26
@@ -28,6 +30,36 @@ jobs:
         with:
           node-version: 22
 
+      - name: Test server-authoritative Veggie game
+        run: |
+          node --check backend/game-engines/veggie.js
+          node --check backend/models/VeggieRound.js
+          node --check backend/routes/veggie.js
+          node --check backend/services/veggie-settlement.js
+          node --check backend/server.js
+          node --test backend/tests/veggie.test.js
+          node --test backend/test/veggie.test.js
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class InlineScripts(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.active=False; self.current=[]; self.scripts=[]
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower()=="script":
+                      attrs=dict(attrs); self.active="src" not in attrs; self.current=[]
+              def handle_data(self, data):
+                  if self.active: self.current.append(data)
+              def handle_endtag(self, tag):
+                  if tag.lower()=="script" and self.active:
+                      self.scripts.append("".join(self.current)); self.active=False
+          parser=InlineScripts()
+          parser.feed(Path("games/veggie.html").read_text(encoding="utf-8"))
+          scripts=[s for s in parser.scripts if s.strip()]
+          if not scripts: raise SystemExit("Veggie inline script missing")
+          Path("/tmp/migo-veggie-inline.js").write_text("\n".join(scripts),encoding="utf-8")
+          PY
+          node --check /tmp/migo-veggie-inline.js
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -225,7 +257,7 @@ jobs:
                   if self.active:self.current.append(data)
               def handle_endtag(self,tag):
                   if tag.lower()=='script' and self.active:self.parts.append(''.join(self.current));self.active=False
-          files=['www/index.html','www/slot-777.html','www/slot-ocean-storm.html','www/wheel-animals.html','www/games/fruit-luck.html','www/games/cleopatra-gold.html','www/games/big-warrior.html','www/games/rocket-crash.html']
+          files=['www/index.html','www/slot-777.html','www/slot-ocean-storm.html','www/wheel-animals.html','www/games/fruit-luck.html','www/games/cleopatra-gold.html','www/games/big-warrior.html','www/games/rocket-crash.html','www/games/veggie.html']
           for file in files:
               parser=Scripts();parser.feed(Path(file).read_text(encoding='utf-8'))
               for i,source in enumerate(parser.parts):
