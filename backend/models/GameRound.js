@@ -8,6 +8,7 @@ const gameRoundSchema = new mongoose.Schema({
   ] },
   roundId: { type: String, required: true },
   idempotencyKey: { type: String, required: true, unique: true },
+  requestHash: { type: String, default: "", maxlength: 64 },
   bet: { type: Number, required: true, min: 0 },
   payout: { type: Number, required: true, min: 0, default: 0 },
   status: { type: String, enum: ["accepted", "settled", "lost", "cancelled"], default: "accepted", index: true },
