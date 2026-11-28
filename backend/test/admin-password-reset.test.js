@@ -14,7 +14,7 @@ test("password reset route is behind owner-only member administration middleware
 
 test("password reset hashes new password and never returns password material", () => {
   assert.match(route, /bcrypt\.hash\(password, 12\)/);
-  assert.match(route, /password\.length < 8 \|\| password\.length > 72/);
+  assert.match(route, /password\.length < 8 \|\| Buffer\.byteLength\(password, "utf8"\) > 72/);
   assert.match(route, /user\.password_reset/);
   assert.doesNotMatch(route, /json\(\{[^}]*passwordHash/s);
   assert.doesNotMatch(route, /metadata:\s*\{[^}]*password/i);
