@@ -161,6 +161,7 @@ router.post("/admin/credit", async (req, res) => {
   const targetUid = Number(req.body.targetUid);
   const description = String(req.body.description || "شحن من الإدارة").slice(0, 160);
   const key = String(req.get("idempotency-key") || "");
+  const requestHash = requestFingerprint({ action: "admin_credit", actorId: String(req.auth.sub), targetUid, amount, description });
   if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1000000000) {
     return res.status(400).json({ ok: false, message: "قيمة العملات غير صحيحة" });
   }
@@ -186,7 +187,7 @@ router.post("/admin/credit", async (req, res) => {
       if (existing) {
         if (String(existing.from || "") !== String(admin._id) ||
             String(existing.to || "") !== String(target._id) ||
-            existing.amount !== amount || existing.type !== "admin_adjustment") {
+            existing.amount !== amount || existing.type !== "admin_adjustment" || existing.description !== description || (existing.requestHash && existing.requestHash !== requestHash)) {
           throw Object.assign(new Error("معرّف العملية مستخدم لشحنة مختلفة"), { status: 409 });
         }
         result = { coins: target.coins, transactionId: String(existing._id), repeated: true };
@@ -210,16 +211,30 @@ router.post("/admin/credit", async (req, res) => {
         amount,
         type: "admin_adjustment",
         description,
-        idempotencyKey: key
+        idempotencyKey: key,
+        requestHash
       }], { session });
       result = { uid: updated.uid, coins: updated.coins, transactionId: String(tx._id), repeated: false };
     });
     return res.json({ ok: true, ...result });
   } catch (error) {
-    return res.status(error.status || 500).json({
-      ok: false,
-      message: error.status ? error.message : "تعذر تنفيذ شحن الإدارة"
-    });
+    if (error && error.code === 11000) {
+      try {
+        const [existing, admin, target] = await Promise.all([
+          WalletTransaction.findOne({ idempotencyKey: key }).lean(),
+          User.findById(req.auth.sub).select("_id role status").lean(),
+          User.findOne({ uid: targetUid }).select("_id uid coins").lean()
+        ]);
+        if (existing && admin && target && admin.status === "active" && ["owner", "admin"].includes(admin.role) &&
+            String(existing.from) === String(admin._id) && String(existing.to) === String(target._id) &&
+            existing.amount === amount && existing.type === "admin_adjustment" && existing.description === description &&
+            (!existing.requestHash || existing.requestHash === requestHash)) {
+          return res.json({ ok: true, uid: target.uid, coins: target.coins, transactionId: String(existing._id), repeated: true });
+        }
+        return res.status(409).json({ ok: false, message: "معرّف العملية مستخدم لشحنة مختلفة" });
+      } catch (_) { return res.status(503).json({ ok: false, message: "تعذر تأكيد نتيجة الشحن؛ أعد المحاولة بنفس المعرّف" }); }
+    }
+    return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر تنفيذ شحن الإدارة" });
   } finally {
     await session.endSession();
   }
@@ -233,6 +248,7 @@ router.post("/admin/debit", async (req, res) => {
   const targetUid = Number(req.body.targetUid);
   const description = String(req.body.description || "").trim().slice(0, 160);
   const key = String(req.get("idempotency-key") || "");
+  const requestHash = requestFingerprint({ action: "admin_debit", actorId: String(req.auth.sub), targetUid, amount, description });
   if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1000000000) {
     return res.status(400).json({ ok: false, message: "قيمة الخصم غير صحيحة" });
   }
@@ -263,7 +279,7 @@ router.post("/admin/debit", async (req, res) => {
         if (String(existing.from || "") !== String(target._id) ||
             String(existing.to || "") !== String(admin._id) ||
             existing.amount !== amount || existing.type !== "admin_adjustment" ||
-            existing.description !== description) {
+            existing.description !== description || (existing.requestHash && existing.requestHash !== requestHash)) {
           throw Object.assign(new Error("معرّف العملية مستخدم لخصم مختلف"), { status: 409 });
         }
         const current = await User.findById(target._id).session(session).select("uid coins");
@@ -288,16 +304,30 @@ router.post("/admin/debit", async (req, res) => {
         amount,
         type: "admin_adjustment",
         description,
-        idempotencyKey: key
+        idempotencyKey: key,
+        requestHash
       }], { session });
       result = { uid: updated.uid, coins: updated.coins, transactionId: String(tx._id), repeated: false };
     });
     return res.json({ ok: true, ...result });
   } catch (error) {
-    return res.status(error.status || 500).json({
-      ok: false,
-      message: error.status ? error.message : "تعذر تنفيذ الخصم"
-    });
+    if (error && error.code === 11000) {
+      try {
+        const [existing, admin, target] = await Promise.all([
+          WalletTransaction.findOne({ idempotencyKey: key }).lean(),
+          User.findById(req.auth.sub).select("_id role status").lean(),
+          User.findOne({ uid: targetUid }).select("_id uid coins").lean()
+        ]);
+        if (existing && admin && target && admin.status === "active" && ["owner", "admin"].includes(admin.role) &&
+            String(existing.from) === String(target._id) && String(existing.to) === String(admin._id) &&
+            existing.amount === amount && existing.type === "admin_adjustment" && existing.description === description &&
+            (!existing.requestHash || existing.requestHash === requestHash)) {
+          return res.json({ ok: true, uid: target.uid, coins: target.coins, transactionId: String(existing._id), repeated: true });
+        }
+        return res.status(409).json({ ok: false, message: "معرّف العملية مستخدم لخصم مختلف" });
+      } catch (_) { return res.status(503).json({ ok: false, message: "تعذر تأكيد نتيجة الخصم؛ أعد المحاولة بنفس المعرّف" }); }
+    }
+    return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر تنفيذ الخصم" });
   } finally {
     await session.endSession();
   }
