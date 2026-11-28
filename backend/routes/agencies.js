@@ -338,11 +338,9 @@ router.post("/owner/hosts/:uid/transfer", async (req, res) => {
     let result;
     await session.withTransaction(async () => {
       const actor = await requireOwner(req.auth.sub, session);
-      const actor = await requireOwner(req.auth.sub, session);
       const prior = await HostAgencyTransfer.findOne({ idempotencyKey: key }).session(session);
       if (prior) {
-        if (String(prior.actorUserId) !== String(actor._id) || String(prior.hostUserId) === "" ||
-            String(prior.toAgencyId) !== targetAgencyId || prior.requestHash !== requestHash) throw httpError(409, "معرّف النقل مستخدم لطلب مختلف");
+        if (String(prior.actorUserId) !== String(actor._id) || String(prior.toAgencyId) !== targetAgencyId || prior.requestHash !== requestHash) throw httpError(409, "معرّف النقل مستخدم لطلب مختلف");
         result = { repeated: true, transferId: String(prior._id), fromAgencyId: prior.fromAgencyId ? String(prior.fromAgencyId) : null, toAgencyId: String(prior.toAgencyId) };
         return;
       }
