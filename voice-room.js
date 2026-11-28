@@ -292,14 +292,18 @@
       if (voiceSession && voiceSession.roomCode === roomCode) voiceSession.liveRoom = lk;
       setVoiceStatus("الصوت المباشر متصل", true);
     } catch (error) {
-      setVoiceStatus("الصوت غير متاح", false);
-      toast(error.message || "تعذر الاتصال بالصوت الحقيقي");
       if (voiceSession && voiceSession.roomCode === roomCode && !voiceSession.liveRoom) {
-        stopPresenceSync(voiceSession);
-        try { voiceSession.socket.disconnect(); } catch (_) {}
-        voiceSession = null;
-      } else if (pendingSocket && (!voiceSession || voiceSession.roomCode !== roomCode)) {
-        try { pendingSocket.disconnect(); } catch (_) {}
+        // Room presence is independent from the LiveKit audio transport.
+        // Keep Socket.IO alive so members still see one another if audio setup fails.
+        voiceSession.audioError = String(error && error.message || "LIVEKIT_UNAVAILABLE");
+        setVoiceStatus("الأعضاء متصلون — الصوت غير متاح مؤقتًا", false);
+        toast("تم الاتصال بالغرفة، لكن الصوت غير متاح مؤقتًا");
+      } else {
+        setVoiceStatus("الصوت غير متاح", false);
+        toast(error.message || "تعذر الاتصال بالغرفة");
+        if (pendingSocket && (!voiceSession || voiceSession.roomCode !== roomCode)) {
+          try { pendingSocket.disconnect(); } catch (_) {}
+        }
       }
     } finally {
       connectingRoom = null;
