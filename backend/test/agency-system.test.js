@@ -136,6 +136,7 @@ test("agency financial reports aggregate daily/monthly sales and commissions fro
   assert.match(route, /commissionMinor: \{ \$sum: "\$commissionMinor" \}/);
   assert.match(route, /chargedCoins: \{ \$sum:/);
   assert.match(route, /timezone: "UTC"/);
+  assert.match(route, /totalsByCurrency/);
   assert.match(route, /router\.get\("\/owner\/reports\/agencies"/);
 });
 
