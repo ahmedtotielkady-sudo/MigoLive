@@ -218,7 +218,19 @@ router.post("/owner/:agencyId/credit", async (req, res) => {
       result = { agency: safeAgency(agency), transactionId: String(entry._id), repeated: false };
     });
     return res.json({ ok: true, ...result });
-  } catch (error) { return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر إضافة رصيد الوكالة" }); }
+  } catch (error) {
+    if (error && error.code === 11000) {
+      const existing = await AgencyLedger.findOne({ idempotencyKey: key }).lean().catch(() => null);
+      if (existing && String(existing.agencyId) === req.params.agencyId && existing.type === "owner_credit" &&
+          existing.amountCoins === amountCoins && String(existing.actorUserId) === String(req.auth.sub) &&
+          (!existing.requestHash || existing.requestHash === requestFingerprint({ action: "owner_credit", agencyId: req.params.agencyId, actorId: String(req.auth.sub), amountCoins, reason }))) {
+        const agency = await Agency.findById(existing.agencyId).lean();
+        return res.json({ ok: true, agency: safeAgency(agency), transactionId: String(existing._id), repeated: true });
+      }
+      return res.status(409).json({ ok: false, message: "معرّف العملية مستخدم لطلب مختلف" });
+    }
+    return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر إضافة رصيد الوكالة" });
+  }
   finally { await session.endSession(); }
 });
 
@@ -401,8 +413,10 @@ router.post("/:agencyId/charge", async (req, res) => {
   } catch (error) {
     if (error && error.code === 11000) {
       const existing = await AgencyLedger.findOne({ idempotencyKey: key }).lean().catch(() => null);
-      if (existing && String(existing.agencyId) === req.params.agencyId && existing.type === "user_charge") {
-        const user = await User.findOne({ uid }).select("coins").lean();
+      if (existing && user && String(existing.agencyId) === req.params.agencyId && existing.type === "user_charge" &&
+          String(existing.targetUserId) === String(user._id) && String(existing.actorUserId) === String(req.auth.sub) && existing.amountCoins > 0 &&
+          (!existing.requestHash || existing.requestHash === requestFingerprint({ action: "user_charge", agencyId: req.params.agencyId, actorId: String(req.auth.sub), targetId: String(user._id), packageId, coins: existing.amountCoins }))) {
+        const user = await User.findOne({ uid }).select("_id coins").lean();
         const agency = await Agency.findById(req.params.agencyId).select("balanceCoins").lean();
         return res.json({ ok: true, coins: user?.coins, agencyBalanceCoins: agency?.balanceCoins, transactionId: String(existing._id), repeated: true });
       }
