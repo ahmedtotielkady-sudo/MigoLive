@@ -85,3 +85,21 @@ test("agency charge duplicate-key recovery resolves the target before comparing 
   assert.doesNotMatch(route, /if \(existing && user &&/);
   assert.match(route, /existing\.amountCoins === pkg\.coins/);
 });
+
+test("host agency transfer history is immutable and indexed", () => {
+  const Transfer = require("../models/HostAgencyTransfer");
+  assert.ok(Transfer.schema.path("hostUserId").options.immutable);
+  assert.ok(Transfer.schema.path("fromAgencyId").options.immutable);
+  assert.ok(Transfer.schema.path("toAgencyId").options.immutable);
+  assert.ok(Transfer.schema.indexes().some(([keys]) => keys.hostUserId === 1 && keys.createdAt === -1));
+});
+
+test("host transfer is owner-only, validates target agency type and commits membership plus history atomically", () => {
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /router\.post\("\/owner\/hosts\/:uid\/transfer"/);
+  assert.match(route, /targetAgency\.type !== "host"/);
+  assert.match(route, /memberType: "host", status: "active"/);
+  assert.match(route, /HostAgencyTransfer\.create/);
+  assert.match(route, /agency\.host\.transferred/);
+  assert.match(route, /session\.withTransaction/);
+});
