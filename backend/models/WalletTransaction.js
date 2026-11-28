@@ -6,6 +6,7 @@ const walletTransactionSchema = new mongoose.Schema({
   type: { type: String, enum: ["transfer", "gift", "admin_adjustment", "admin_deduction", "game_bet", "game_reward", "agency_charge"], required: true },
   description: { type: String, maxlength: 160, default: "" },
   idempotencyKey: { type: String, unique: true, sparse: true },
+  requestHash: { type: String, default: "", maxlength: 64 },
   createdAt: { type: Date, default: Date.now, index: true }
 }, { versionKey: false });
 module.exports = mongoose.models.WalletTransaction || mongoose.model("WalletTransaction", walletTransactionSchema);
