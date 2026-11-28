@@ -69,3 +69,19 @@ test("agency ledger stores a request fingerprint to reject idempotency-key paylo
   assert.match(route, /requestFingerprint\(\{ action: "user_charge"/);
   assert.match(route, /existing\.requestHash !== requestFingerprint/);
 });
+
+test("agency manager transfer is owner-only, atomic, and auditable", () => {
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /router\.post\("\/owner\/:agencyId\/manager"/);
+  assert.match(route, /requireOwner\(req\.auth\.sub, session\)/);
+  assert.match(route, /agency\.managerUserId = nextManager\._id/);
+  assert.match(route, /agency\.manager\.transferred/);
+  assert.match(route, /session\.withTransaction/);
+});
+
+test("agency charge duplicate-key recovery resolves the target before comparing the request", () => {
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /const \[existing, target, agency\] = await Promise\.all/);
+  assert.doesNotMatch(route, /if \(existing && user &&/);
+  assert.match(route, /existing\.amountCoins === pkg\.coins/);
+});

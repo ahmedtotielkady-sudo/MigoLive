@@ -234,6 +234,70 @@ router.post("/owner/:agencyId/credit", async (req, res) => {
   finally { await session.endSession(); }
 });
 
+
+// Transfer agency management to another active account; only the verified owner may do this.
+router.post("/owner/:agencyId/manager", async (req, res) => {
+  const managerUid = Number(req.body.managerUid);
+  const reason = String(req.body.reason || "").trim().slice(0, 240);
+  if (!Number.isSafeInteger(managerUid) || managerUid < 1) {
+    return res.status(400).json({ ok: false, message: "رقم المدير الجديد غير صحيح" });
+  }
+  if (!reason) return res.status(400).json({ ok: false, message: "سبب تغيير المدير مطلوب" });
+  const session = await mongoose.startSession();
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      const actor = await requireOwner(req.auth.sub, session);
+      if (!validObjectId(req.params.agencyId)) throw httpError(400, "معرّف الوكالة غير صحيح");
+      const agency = await Agency.findById(req.params.agencyId).session(session);
+      if (!agency) throw httpError(404, "الوكالة غير موجودة");
+      const nextManager = await User.findOne({ uid: managerUid, status: "active" }).session(session).select("_id uid");
+      if (!nextManager) throw httpError(404, "المدير الجديد غير موجود أو موقوف");
+      const previousManagerId = String(agency.managerUserId);
+      if (previousManagerId === String(nextManager._id)) {
+        result = { agency: safeAgency(agency), repeated: true };
+        return;
+      }
+
+      const previousMembership = await AgencyMembership.findOne({
+        agencyId: agency._id, userId: agency.managerUserId, memberType: "manager", status: "active"
+      }).session(session);
+      if (previousMembership) {
+        previousMembership.status = "removed";
+        previousMembership.removedAt = new Date();
+        previousMembership.removalReason = reason;
+        await previousMembership.save({ session });
+      }
+
+      let nextMembership = await AgencyMembership.findOne({
+        agencyId: agency._id, userId: nextManager._id, memberType: "manager"
+      }).session(session);
+      if (nextMembership) {
+        nextMembership.status = "active";
+        nextMembership.invitedBy = actor._id;
+        nextMembership.joinedAt = new Date();
+        nextMembership.removedAt = null;
+        nextMembership.removalReason = "";
+        await nextMembership.save({ session });
+      } else {
+        [nextMembership] = await AgencyMembership.create([{
+          agencyId: agency._id, userId: nextManager._id, memberType: "manager",
+          status: "active", invitedBy: actor._id
+        }], { session });
+      }
+      agency.managerUserId = nextManager._id;
+      await agency.save({ session });
+      await audit(session, actor, "agency.manager.transferred", "agency", agency._id, reason, {
+        previousManagerId, nextManagerId: String(nextManager._id), nextManagerUid: managerUid
+      });
+      result = { agency: safeAgency(agency), repeated: false };
+    });
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر تغيير مدير الوكالة" });
+  } finally { await session.endSession(); }
+});
+
 router.get("/mine", async (req, res, next) => {
   try {
     await activeActor(req.auth.sub);
@@ -412,15 +476,28 @@ router.post("/:agencyId/charge", async (req, res) => {
     return res.json({ ok: true, ...result });
   } catch (error) {
     if (error && error.code === 11000) {
-      const existing = await AgencyLedger.findOne({ idempotencyKey: key }).lean().catch(() => null);
-      if (existing && user && String(existing.agencyId) === req.params.agencyId && existing.type === "user_charge" &&
-          String(existing.targetUserId) === String(user._id) && String(existing.actorUserId) === String(req.auth.sub) && existing.amountCoins > 0 &&
-          (!existing.requestHash || existing.requestHash === requestFingerprint({ action: "user_charge", agencyId: req.params.agencyId, actorId: String(req.auth.sub), targetId: String(user._id), packageId, coins: existing.amountCoins }))) {
-        const user = await User.findOne({ uid }).select("_id coins").lean();
-        const agency = await Agency.findById(req.params.agencyId).select("balanceCoins").lean();
-        return res.json({ ok: true, coins: user?.coins, agencyBalanceCoins: agency?.balanceCoins, transactionId: String(existing._id), repeated: true });
+      try {
+        const [existing, target, agency] = await Promise.all([
+          AgencyLedger.findOne({ idempotencyKey: key }).lean(),
+          User.findOne({ uid }).select("_id coins").lean(),
+          Agency.findById(req.params.agencyId).select("balanceCoins packages type").lean()
+        ]);
+        const pkg = agency && agency.packages.find(p => p.packageId === packageId && p.active);
+        if (existing && target && agency && agency.type === "recharge" && pkg &&
+            String(existing.agencyId) === String(agency._id) &&
+            String(existing.targetUserId) === String(target._id) &&
+            String(existing.actorUserId) === String(req.auth.sub) &&
+            existing.type === "user_charge" && existing.amountCoins === pkg.coins &&
+            (!existing.requestHash || existing.requestHash === requestFingerprint({
+              action: "user_charge", agencyId: String(agency._id), actorId: String(req.auth.sub),
+              targetId: String(target._id), packageId, coins: pkg.coins
+            }))) {
+          return res.json({ ok: true, coins: target.coins, agencyBalanceCoins: agency.balanceCoins, transactionId: String(existing._id), repeated: true });
+        }
+        return res.status(409).json({ ok: false, message: "معرّف العملية مستخدم لطلب مختلف" });
+      } catch (_recoveryError) {
+        return res.status(503).json({ ok: false, message: "تعذر تأكيد نتيجة الشحن؛ أعد المحاولة بنفس المعرّف" });
       }
-      return res.status(409).json({ ok: false, message: "معرّف العملية مستخدم بالفعل" });
     }
     return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر تنفيذ شحن الوكالة" });
   } finally { await session.endSession(); }
