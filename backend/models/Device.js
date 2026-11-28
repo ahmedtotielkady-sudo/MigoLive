@@ -7,7 +7,6 @@ const DeviceVersionSchema = new mongoose.Schema({
   manufacturer: { type: String, default: "", maxlength: 80 },
   osVersion: { type: String, default: "", maxlength: 40 },
   appVersion: { type: String, default: "", maxlength: 32 },
-  versionHistory: { type: [DeviceVersionSchema], default: [] },
   recordedAt: { type: Date, default: Date.now }
 }, { _id: false });
 
@@ -20,6 +19,7 @@ const DeviceSchema = new mongoose.Schema({
   manufacturer: { type: String, default: "", maxlength: 80 },
   osVersion: { type: String, default: "", maxlength: 40 },
   appVersion: { type: String, default: "", maxlength: 32 },
+  versionHistory: { type: [DeviceVersionSchema], default: [] },
   userAgent: { type: String, default: "", maxlength: 400 },
   firstSeenAt: { type: Date, default: Date.now },
   lastSeenAt: { type: Date, default: Date.now },
