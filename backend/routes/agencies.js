@@ -17,6 +17,7 @@ router.use(requireAuth);
 function httpError(status, message) {
   return Object.assign(new Error(message), { status });
 }
+function requestFingerprint(value) { return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 function idempotencyKey(req) {
   const key = String(req.get("idempotency-key") || "");
   if (!/^[A-Za-z0-9_-]{16,100}$/.test(key)) throw httpError(400, "معرّف العملية مطلوب");
@@ -196,7 +197,7 @@ router.post("/owner/:agencyId/credit", async (req, res) => {
       if (!validObjectId(req.params.agencyId)) throw httpError(400, "معرّف الوكالة غير صحيح");
       const existing = await AgencyLedger.findOne({ idempotencyKey: key }).session(session);
       if (existing) {
-        if (String(existing.agencyId) !== req.params.agencyId || existing.type !== "owner_credit" || existing.amountCoins !== amountCoins) throw httpError(409, "معرّف العملية مستخدم لطلب مختلف");
+        if (String(existing.agencyId) !== req.params.agencyId || existing.type !== "owner_credit" || existing.amountCoins !== amountCoins || String(existing.actorUserId) !== String(actor._id) || (existing.requestHash && existing.requestHash !== requestFingerprint({ action: "owner_credit", agencyId: req.params.agencyId, actorId: String(actor._id), amountCoins, reason }))) throw httpError(409, "معرّف العملية مستخدم لطلب مختلف");
         const current = await Agency.findById(existing.agencyId).session(session);
         result = { agency: safeAgency(current), transactionId: String(existing._id), repeated: true };
         return;
@@ -210,7 +211,8 @@ router.post("/owner/:agencyId/credit", async (req, res) => {
       const [entry] = await AgencyLedger.create([{
         agencyId: agency._id, actorUserId: actor._id, type: "owner_credit",
         direction: "credit", amountCoins, balanceBefore: before, balanceAfter: agency.balanceCoins,
-        currency: agency.currency, description: reason, idempotencyKey: key
+        currency: agency.currency, description: reason, idempotencyKey: key,
+        requestHash: requestFingerprint({ action: "owner_credit", agencyId: String(agency._id), actorId: String(actor._id), amountCoins, reason })
       }], { session });
       await audit(session, actor, "agency.balance.credit", "agency", agency._id, reason, { amountCoins, before, after: agency.balanceCoins, ledgerId: String(entry._id) });
       result = { agency: safeAgency(agency), transactionId: String(entry._id), repeated: false };
@@ -248,7 +250,7 @@ router.get("/:agencyId/members", async (req, res, next) => {
 router.post("/:agencyId/members", async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    let result;
+    let result; let repeated = false;
     await session.withTransaction(async () => {
       if (!validObjectId(req.params.agencyId)) throw httpError(400, "معرّف الوكالة غير صحيح");
       const agency = await Agency.findById(req.params.agencyId).session(session);
@@ -269,7 +271,11 @@ router.post("/:agencyId/members", async (req, res) => {
       const rate = Number(req.body.commissionRateBps || 0);
       if (!Number.isInteger(rate) || rate < 0 || rate > 10000) throw httpError(400, "نسبة العمولة غير صحيحة");
       const existing = await AgencyMembership.findOne({ agencyId: agency._id, userId: target._id, memberType }).session(session);
-      if (existing && existing.status === "active") throw httpError(409, "المستخدم عضو بالفعل في هذه الوكالة");
+      if (existing && existing.status === "active") {
+        if (existing.commissionRateBps !== rate) throw httpError(409, "المستخدم عضو بالفعل بنسبة عمولة مختلفة");
+        result = existing; repeated = true;
+        return;
+      }
       if (existing) {
         existing.status = "active"; existing.invitedBy = actor._id;
         existing.joinedAt = new Date(); existing.removedAt = null; existing.removalReason = "";
@@ -284,7 +290,7 @@ router.post("/:agencyId/members", async (req, res) => {
       }
       await audit(session, actor, "agency.member.added", "agency", agency._id, req.body.reason || "إضافة عضو", { uid, memberType });
     });
-    return res.status(201).json({ ok: true, membershipId: String(result._id), repeated: false });
+    return res.status(201).json({ ok: true, membershipId: String(result._id), repeated });
   } catch (error) {
     if (error && error.code === 11000) return res.status(409).json({ ok: false, message: "المستخدم مرتبط بالفعل بوكالة مضيفين نشطة" });
     return res.status(error.status || 500).json({ ok: false, message: error.status ? error.message : "تعذر إضافة العضو" });
@@ -308,8 +314,10 @@ router.post("/:agencyId/members/:uid/remove", async (req, res) => {
       const target = await User.findOne({ uid }).session(session).select("_id");
       if (!target) throw httpError(404, "المستخدم غير موجود");
       if (String(target._id) === String(agency.managerUserId)) throw httpError(403, "تغيير مدير الوكالة يتم من لوحة المالك");
-      const member = await AgencyMembership.findOne({ agencyId: agency._id, userId: target._id, status: "active" }).session(session);
-      if (!member) throw httpError(404, "العضوية النشطة غير موجودة");
+      const member = await AgencyMembership.findOne({ agencyId: agency._id, userId: target._id }).session(session);
+      if (!member) throw httpError(404, "العضوية غير موجودة");
+      if (member.status === "removed") return;
+      if (member.status !== "active") throw httpError(409, "حالة العضوية لا تسمح بالإزالة");
       member.status = "removed"; member.removedAt = new Date();
       member.removalReason = String(req.body.reason || "").trim().slice(0, 240);
       await member.save({ session });
@@ -349,7 +357,7 @@ router.post("/:agencyId/charge", async (req, res) => {
       const existing = await AgencyLedger.findOne({ idempotencyKey: key }).session(session);
       if (existing) {
         if (String(existing.agencyId) !== String(agency._id) || String(existing.targetUserId) !== String(target._id) ||
-            existing.type !== "user_charge" || existing.amountCoins !== pkg.coins) throw httpError(409, "معرّف العملية مستخدم لطلب شحن مختلف");
+            existing.type !== "user_charge" || existing.amountCoins !== pkg.coins || String(existing.actorUserId) !== String(actor._id) || (existing.requestHash && existing.requestHash !== requestFingerprint({ action: "user_charge", agencyId: String(agency._id), actorId: String(actor._id), targetId: String(target._id), packageId, coins: pkg.coins }))) throw httpError(409, "معرّف العملية مستخدم لطلب شحن مختلف");
         const current = await User.findById(target._id).session(session).select("coins");
         result = { coins: current.coins, agencyBalanceCoins: agency.balanceCoins, transactionId: String(existing._id), repeated: true };
         return;
@@ -379,7 +387,8 @@ router.post("/:agencyId/charge", async (req, res) => {
         balanceBefore: before, balanceAfter: updatedAgency.balanceCoins,
         amountMinor: pkg.priceMinor, currency: pkg.currency, commissionMinor,
         description: "شحن المستخدم ID " + uid + " عبر الباقة " + packageId,
-        idempotencyKey: key, referenceId: String(walletTx._id)
+        idempotencyKey: key, referenceId: String(walletTx._id),
+        requestHash: requestFingerprint({ action: "user_charge", agencyId: String(agency._id), actorId: String(actor._id), targetId: String(target._id), packageId, coins: pkg.coins })
       }], { session });
       result = { coins: updatedUser.coins, agencyBalanceCoins: updatedAgency.balanceCoins, transactionId: String(entry._id), walletTransactionId: String(walletTx._id), repeated: false };
     });
