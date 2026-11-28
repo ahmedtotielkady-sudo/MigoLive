@@ -696,7 +696,11 @@
     'veggie:bet': '/games/veggie/bet'
   };
   function gameFrameFor(source) {
-    const frames = [$id('gf'), document.querySelector('#migo-game-overlay iframe')].filter(Boolean);
+    // Game launchers use more than one container across rooms and the full-screen
+    // overlay. Match the actual iframe window rather than assuming one fixed ID.
+    const frames = Array.from(document.querySelectorAll('iframe'));
+    const legacy = $id('gf');
+    if (legacy && !frames.includes(legacy)) frames.push(legacy);
     return frames.find(frame => frame.contentWindow === source) || null;
   }
   function validateGameServerResult(gameId, action, result) {
