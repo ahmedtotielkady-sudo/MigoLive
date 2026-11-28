@@ -15,6 +15,7 @@ const agencyLedgerSchema = new mongoose.Schema({
   commissionMinor: { type: Number, default: 0, min: 0 },
   description: { type: String, required: true, maxlength: 240 },
   idempotencyKey: { type: String, required: true, unique: true },
+  requestHash: { type: String, default: "", maxlength: 64 },
   referenceId: { type: String, default: "", maxlength: 120 },
   createdAt: { type: Date, default: Date.now, immutable: true }
 }, { versionKey: false });
