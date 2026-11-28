@@ -30,3 +30,12 @@ test("password reset revokes active session and prevents owner target changes", 
 test("password reset does not load the existing password hash", () => {
   assert.doesNotMatch(route, /select\(["']\+passwordHash["']\)/);
 });
+
+test("owner member panel provides a masked password reset form wired to the API", () => {
+  const bridge = fs.readFileSync(path.join(__dirname, "..", "..", "..", "api-bridge.js"), "utf8");
+  assert.match(bridge, /type="password"/);
+  assert.match(bridge, /autocomplete="new-password"/);
+  assert.match(bridge, /openPasswordResetDialog\(u\)/);
+  assert.match(bridge, /\/admin\/users\/' \+ encodeURIComponent\(user\.uid\) \+ '\/reset-password/);
+  assert.match(bridge, /JSON\.stringify\(\{ newPassword: password \}\)/);
+});
