@@ -7,6 +7,7 @@ const User = require("../models/User");
 const Agency = require("../models/Agency");
 const AgencyMembership = require("../models/AgencyMembership");
 const AgencyLedger = require("../models/AgencyLedger");
+const AgencyHostTransfer = require("../models/AgencyHostTransfer");
 const AdminAuditLog = require("../models/AdminAuditLog");
 const HostAgencyTransfer = require("../models/HostAgencyTransfer");
 const Wallet = require("../models/Wallet");
