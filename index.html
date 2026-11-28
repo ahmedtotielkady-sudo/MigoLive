@@ -1446,7 +1446,7 @@ function rOwner(m){
   if(!isStaff(U())){tab='me';return render()}
   if(ot==='appupdate'&&(!U()||U().role!=='owner')){ot='dash';toast('التحكم في تحديث التطبيق متاح للمالك فقط')}
   const users=Object.entries(DB.users),agents=users.filter(([,x])=>x.role==='agent');
-  const tabsO=staffTabs([['dash','📊 الرئيسية'],['tp','طلبات الشحن'],['set','الإعدادات'],['coins','العملات'],['agents','الوكلاء'],['users','الأعضاء'],['hosts','سجل المضيفين'],['alog','سجل الوكلاء'],['ag','وكالات المضيفين'],['ship','وكالات الشحن'],['ledger','دفاتر الحسابات'],['vip','VIP'],['gifts','الهدايا'],['broadcast','رسائل النظام'],['events','الفعاليات'],['staff','الصلاحيات'],['appupdate','📲 تحديث التطبيق'],['versions','📦 إدارة الإصدارات'],['devices','📱 الأجهزة والحظر'],['countries','طلبات تغيير البلد'],['support','الدعم']].filter(([k])=>!['appupdate','versions','devices'].includes(k)||U().role==='owner'))
+  const tabsO=staffTabs([['dash','📊 الرئيسية'],['tp','طلبات الشحن'],['set','الإعدادات'],['coins','العملات'],['agents','الوكلاء'],['users','الأعضاء'],['hosts','سجل المضيفين'],['alog','سجل الوكلاء'],['ag','وكالات المضيفين'],['ship','وكالات الشحن'],['ledger','دفاتر الحسابات'],['vip','VIP'],['gifts','الهدايا'],['broadcast','رسائل النظام'],['events','الفعاليات'],['staff','الصلاحيات'],['appupdate','📲 تحديث التطبيق'],['versions','📦 إدارة الإصدارات'],['devices','📱 الأجهزة والحظر'],['audit','🧾 سجل الرقابة'],['countries','طلبات تغيير البلد'],['support','الدعم']].filter(([k])=>!['appupdate','versions','devices'].includes(k)||U().role==='owner'))
   let body='';
   if(ot==='dash')body=ownerDashboardHTML(tabsO);
   if(ot==='ship')body=shippingOwnerHTML();
@@ -1472,6 +1472,7 @@ function rOwner(m){
   if(ot==='games')body=ownerGamesHTML();
   if(ot==='versions')body=ownerVersionsHTML();
   if(ot==='devices')body=ownerDevicesHTML();
+  if(ot==='audit')body=ownerAuditHTML();
   if(ot==='hostapps')body=localHostAppsHTML();
   if(ot==='referrals')body=localReferralsHTML();
   if(ot==='vipplans')body=localVipPlansHTML();
@@ -1495,6 +1496,7 @@ function rOwner(m){
   if(ot==='versions')ownerVersionsBind(m);
   if(ot==='games')ownerGamesBind(m);
   if(ot==='devices')ownerDevicesBind(m);
+  if(ot==='audit')ownerAuditBind(m);
   m.querySelectorAll('[data-country-ok]').forEach(b=>b.onclick=()=>{if(!U()||U().role!=='owner')return toast('الموافقة للمالك فقط');const q=(DB.countryRequests||[]).find(x=>x.id==b.dataset.countryOk&&x.status==='pending'),u=q&&DB.users[q.user];if(!q||!u)return toast('الطلب غير موجود');if((+u.coins||0)<100000)return toast('رصيد المستخدم لم يعد كافياً');u.coins-=100000;u.country=q.country;u.countrySetOnce=true;q.status='approved';q.reviewed=Date.now();q.reviewedBy=me;logIt('المالك',`وافق على تغيير بلد ${u.name} إلى ${q.country} وخصم 100,000 عملة`);notifyUserResult(q.user,`تمت الموافقة على تغيير بلدك إلى ${q.country} وخصم 100,000 عملة`);save();toast('تمت الموافقة وتغيير البلد');render()});
   m.querySelectorAll('[data-country-no]').forEach(b=>b.onclick=()=>{if(!U()||U().role!=='owner')return toast('الرفض للمالك فقط');const q=(DB.countryRequests||[]).find(x=>x.id==b.dataset.countryNo&&x.status==='pending');if(!q)return;q.status='rejected';q.reviewed=Date.now();q.reviewedBy=me;logIt('المالك',`رفض طلب تغيير بلد الحساب ${q.user}`);notifyUserResult(q.user,`تم رفض طلب تغيير البلد إلى ${q.country}`);save();toast('تم رفض الطلب');render()});
   if(ot==='hostapps')localHostAppsBind(m);
@@ -1669,6 +1671,32 @@ async function ownerDevicesBind(m){
  await load();
 }
 
+
+
+function ownerAuditHTML(){
+ return `<section class="owner-control-hero"><span class="owner-control-icon">🧾</span><div class="owner-control-title"><span class="owner-eyebrow">OWNER AUDIT</span><h4>سجل الرقابة والإجراءات</h4><p>سجل مركزي للإجراءات الإدارية المسجلة على الخادم، مع اسم المالك المنفذ وسبب الإجراء ووقته.</p></div></section>
+ <section class="card owner-control-card"><div class="owner-card-heading"><div><b>سجل عمليات المالك</b><p class="mu">السجل محفوظ على الخادم وليس على هذا الهاتف</p></div><button class="btn o s" id="oa-refresh">↻ تحديث</button></div>
+ <div class="owner-device-filters"><input class="in" id="oa-uid" inputmode="numeric" placeholder="رقم المستخدم المستهدف"><select class="in" id="oa-type"><option value="">كل أنواع العمليات</option><option value="user">حسابات</option><option value="device">أجهزة</option><option value="app">التطبيق والتحديثات</option><option value="agency">الوكالات</option><option value="wallet">المحفظة</option></select></div>
+ <div id="oa-state" class="owner-inline-state">جارٍ تحميل السجل…</div><div id="oa-list" class="owner-device-list"></div></section>`;
+}
+async function ownerAuditBind(m){
+ if(!U()||U().role!=='owner')return toast('سجل الرقابة للمالك فقط');
+ const state=m.querySelector('#oa-state'),list=m.querySelector('#oa-list');
+ const load=async()=>{
+  state.textContent='جارٍ تحميل سجل الخادم…';list.innerHTML='';
+  try{
+   const uid=m.querySelector('#oa-uid').value.trim(),type=m.querySelector('#oa-type').value;
+   const qs=new URLSearchParams({page:'1',limit:'100'});if(uid)qs.set('uid',uid);if(type)qs.set('targetType',type);
+   const data=await window.migoApi('/admin/audit?'+qs.toString());
+   const items=Array.isArray(data.items)?data.items:[];
+   state.textContent='عدد السجلات المطابقة: '+Number(data.total||items.length);
+   list.innerHTML=items.map(x=>'<article class="owner-device-row"><div class="owner-device-top"><span class="owner-device-symbol">🧾</span><span class="owner-device-name"><b>'+esc(x.action||'إجراء إداري')+'</b><small>'+esc(x.actor?.displayName||x.actor?.username||'مالك التطبيق')+' · '+esc(x.targetType||'—')+' · '+esc(x.targetId||'—')+'</small></span></div><div class="owner-device-details"><span>وقت التنفيذ<b>'+(x.createdAt?new Date(x.createdAt).toLocaleString('ar-EG'):'—')+'</b></span><span>رقم المالك<b>'+(x.actor?.uid?esc(x.actor.uid):'—')+'</b></span></div>'+(x.reason?'<div class="owner-device-reason">السبب: '+esc(x.reason)+'</div>':'')+'</article>').join('')||'<div class="owner-empty-state"><span>🧾</span><b>لا توجد سجلات</b><p>ستظهر هنا الإجراءات التي تسجلها وحدات الإدارة المتصلة بسجل التدقيق.</p></div>';
+  }catch(e){state.textContent='تعذر تحميل السجل: '+(e.message||'خطأ اتصال');state.classList.add('is-error');}
+ };
+ m.querySelector('#oa-refresh').onclick=load;m.querySelector('#oa-type').onchange=load;
+ m.querySelector('#oa-uid').onkeydown=e=>{if(e.key==='Enter')load()};
+ await load();
+}
 
 /* ===== مركز الإدارة الموسع: شحن، رسائل، فعاليات، دفاتر ===== */
 

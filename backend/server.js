@@ -84,6 +84,7 @@ app.use("/api/rooms", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: 
 
 app.use("/api/admin/users", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/admin-users"));
 app.use("/api/admin/devices", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/admin-devices"));
+app.use("/api/admin/audit", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/admin-audit"));
 app.use("/api/agencies", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false }), require("./routes/agencies"));
 
 app.use("/api/users", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), require("./routes/users"));
