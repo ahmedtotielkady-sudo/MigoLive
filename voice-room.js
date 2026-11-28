@@ -44,7 +44,7 @@
             FORBIDDEN: "ليست لديك صلاحية تنفيذ هذا الإجراء",
             LIVEKIT_NOT_CONNECTED: "تعذر تفعيل اتصال الصوت"
           };
-          return reject(new Error(errors[response && response.error] || "رفض الخادم العملية"));
+          return reject(new Error(errors[response && response.error] || "تعذر تنفيذ العملية"));
         }
         resolve(response);
       });
@@ -314,7 +314,7 @@
         body: JSON.stringify({ name: localRoom.name, description: "", isPrivate: false, capacity: 24 })
       });
       const newId = Number(created.room && created.room.id);
-      if (!Number.isSafeInteger(newId)) throw new Error("تعذر إنشاء الغرفة على الخادم");
+      if (!Number.isSafeInteger(newId)) throw new Error("تعذر إنشاء الغرفة أونلاين");
       localRoom.id = newId;
       localRoom.serverManaged = true;
       localRoom.members = [me];
