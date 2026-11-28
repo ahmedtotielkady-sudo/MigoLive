@@ -112,9 +112,9 @@ test("host transfer history endpoint is owner-only and paginated", () => {
 });
 
 test("host transfer history has a unique idempotency key and immutable audit facts", () => {
-  const HostTransfer = require("../models/AgencyHostTransfer");
+  const HostTransfer = require("../models/HostAgencyTransfer");
   assert.ok(HostTransfer.schema.path("idempotencyKey").options.unique);
-  for (const field of ["userId", "fromAgencyId", "toAgencyId", "actorUserId", "reason", "requestHash", "createdAt"]) {
+  for (const field of ["hostUserId", "fromAgencyId", "toAgencyId", "actorUserId", "reason", "idempotencyKey", "requestHash", "createdAt"]) {
     assert.ok(HostTransfer.schema.path(field), "missing transfer field " + field);
   }
   assert.equal(HostTransfer.schema.path("createdAt").options.immutable, true);
