@@ -39,3 +39,9 @@ test("owner member panel provides a masked password reset form wired to the API"
   assert.match(bridge, /\/admin\/users\/' \+ encodeURIComponent\(user\.uid\) \+ '\/reset-password/);
   assert.match(bridge, /JSON\.stringify\(\{ newPassword: password \}\)/);
 });
+
+test("password reset is rate limited and enforces bcrypt UTF-8 byte ceiling", () => {
+  assert.match(route, /windowMs:\s*15 \* 60 \* 1000/);
+  assert.match(route, /limit:\s*5/);
+  assert.match(route, /Buffer\.byteLength\(password, "utf8"\) > 72/);
+});
