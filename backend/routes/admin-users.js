@@ -1,6 +1,7 @@
 const express = require("express");
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
+const rateLimit = require("express-rate-limit");
 const requireAuth = require("../middleware/requireAuth");
 const AdminAuditLog = require("../models/AdminAuditLog");
 async function audit(req, action, target, reason, metadata={}) { await AdminAuditLog.create({actorUserId:req.auth.sub,action,targetType:"user",targetId:String(target.uid),reason:String(reason||"").slice(0,500),metadata}); }
@@ -202,15 +203,23 @@ router.post("/:uid/logout", async (req, res, next) => {
 // POST /api/admin/users/:uid/reset-password
 // The owner can set a new password, but no endpoint ever returns the current
 // password or password hash. Revoke all existing sessions after the reset.
-router.post("/:uid/reset-password", async (req, res, next) => {
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, message: "محاولات كثيرة لإعادة تعيين كلمات المرور، حاول بعد 15 دقيقة" }
+});
+
+router.post("/:uid/reset-password", passwordResetLimiter, async (req, res, next) => {
   try {
     const uid = Number(req.params.uid);
     if (!Number.isSafeInteger(uid) || uid < 1) {
       return res.status(400).json({ ok: false, message: "رقم العضو غير صحيح" });
     }
     const password = String(req.body && req.body.newPassword || "");
-    if (password.length < 8 || password.length > 72) {
-      return res.status(400).json({ ok: false, message: "كلمة المرور الجديدة يجب أن تكون من 8 إلى 72 حرفًا" });
+    if (password.length < 8 || Buffer.byteLength(password, "utf8") > 72) {
+      return res.status(400).json({ ok: false, message: "كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل وألا تتجاوز 72 بايتًا" });
     }
 
     const target = await User.findOne({ uid });
