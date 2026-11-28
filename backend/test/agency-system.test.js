@@ -129,3 +129,21 @@ test("owner host transfer changes membership and writes history in one transacti
   assert.match(route, /agency\.host\.transferred/);
   assert.match(route, /session\.withTransaction/);
 });
+
+test("agency financial reports aggregate daily/monthly sales and commissions from the immutable ledger", () => {
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /function aggregateAgencyReport\(filter, period\)/);
+  assert.match(route, /commissionMinor: \{ \$sum: "\$commissionMinor" \}/);
+  assert.match(route, /chargedCoins: \{ \$sum:/);
+  assert.match(route, /timezone: "UTC"/);
+  assert.match(route, /totalsByCurrency/);
+  assert.match(route, /router\.get\("\/owner\/reports\/agencies"/);
+});
+
+test("agency managers can only access their own agency report and report windows are bounded", () => {
+  const route = fs.readFileSync(path.join(root, "routes", "agencies.js"), "utf8");
+  assert.match(route, /router\.get\("\/:agencyId\/reports"/);
+  assert.match(route, /agencyAccess\(req\.auth\.sub, agency, \["manager"\]\)/);
+  assert.match(route, /366 \* 24 \* 60 \* 60 \* 1000/);
+  assert.match(route, /يجب إرسال تاريخ البداية والنهاية معًا/);
+});
