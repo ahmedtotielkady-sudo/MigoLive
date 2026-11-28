@@ -18,29 +18,6 @@ if profile_anchor in html and "window.__migoGetGameProfile" not in html:
 elif "window.__migoGetGameProfile" not in html:
     raise SystemExit("Could not expose profile bridge: user function not found")
 
-veggie_asset = Path("games/veggie.html")
-if not veggie_asset.is_file() or veggie_asset.stat().st_size < 1000:
-    raise SystemExit("Veggie game asset is missing or incomplete")
-
-# Make food and chip controls respond on the first touch instead of waiting for
-# the synthetic click event. Keep the action guarded by the game's busy state.
-veggie_html = veggie_asset.read_text(encoding="utf-8")
-veggie_touch_style = """<style id="migo-veggie-fast-touch-v1">
-.food,.chip{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-</style>
-"""
-if "migo-veggie-fast-touch-v1" not in veggie_html:
-    if "</head>" not in veggie_html:
-        raise SystemExit("Missing </head> in veggie.html")
-    veggie_html = veggie_html.replace("</head>", veggie_touch_style + "\n</head>", 1)
-old_food_click = 'd.addEventListener("click",function(){placeBet(i)});'
-new_food_click = 'd.addEventListener("pointerdown",function(e){if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();placeBet(i)},{passive:false});'
-if old_food_click in veggie_html:
-    veggie_html = veggie_html.replace(old_food_click, new_food_click, 1)
-elif new_food_click not in veggie_html:
-    raise SystemExit("Veggie food touch handler signature not found")
-veggie_asset.write_text(veggie_html, encoding="utf-8")
-
 style_id = "migo-game-room-launcher-style-v1"
 script_id = "migo-game-room-launcher-script-v1"
 
@@ -90,7 +67,6 @@ js = r"""
   {name:"سلوت 777",url:"slot-777.html"},
   {name:"المحارب الكبير",url:"games/big-warrior.html"},
   {name:"فواكه الحظ",url:"games/fruit-luck.html"},
-  {name:"خضار",url:"games/veggie.html"},
  ];
  const uniqueGames = [...new Map(games.map(g=>[g.url,g])).values()];
  const cleanText=()=>{
