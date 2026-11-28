@@ -147,16 +147,27 @@
         socket.once("connect", () => { clearTimeout(timer); resolve(); });
         socket.once("connect_error", error => { clearTimeout(timer); reject(error); });
       });
-      const joined = await emitAck(socket, "room:join", { roomCode });
-      voiceSession = { roomCode, socket, liveRoom: null, closing: false };
-      syncSeats(joined.seats || []);
-      socket.on("seats:state", data => syncSeats(data && data.seats));
+      // Subscribe before room:join: the server may broadcast peer-joined immediately
+      // after its acknowledgement, so registering listeners afterwards loses fast joins.
       socket.on("room:peer-joined", data => {
         if (!room || !data || !data.uid) return;
         const key = localKeyForUid(data.uid, data.displayName);
+        room.online = room.online || [];
         if (!room.online.includes(key)) room.online.push(key);
         renderRoom(document.querySelector("#room-float-panel"));
       });
+      const joined = await emitAck(socket, "room:join", { roomCode });
+      voiceSession = { roomCode, socket, liveRoom: null, closing: false };
+      syncSeats(joined.seats || []);
+      room.online = room.online || [];
+      for (const peer of (joined.peers || [])) {
+        const key = localKeyForUid(peer.uid, peer.displayName);
+        if (!room.online.includes(key)) room.online.push(key);
+      }
+      const selfKey = localKeyForUid(joined.uid);
+      if (!room.online.includes(selfKey)) room.online.push(selfKey);
+      renderRoom(document.querySelector("#room-float-panel"));
+      socket.on("seats:state", data => syncSeats(data && data.seats));
       socket.on("room:peer-left", data => {
         if (!room || !data || !data.uid) return;
         const key = localKeyForUid(data.uid);
@@ -210,7 +221,16 @@
       socket.on("connect", () => {
         if (!voiceSession || voiceSession.roomCode !== roomCode) return;
         socket.emit("room:join", { roomCode }, response => {
-          if (response && response.ok) syncSeats(response.seats || []);
+          if (!response || !response.ok) return;
+          syncSeats(response.seats || []);
+          room.online = [];
+          for (const peer of (response.peers || [])) {
+            const key = localKeyForUid(peer.uid, peer.displayName);
+            if (!room.online.includes(key)) room.online.push(key);
+          }
+          const selfKey = localKeyForUid(response.uid);
+          if (!room.online.includes(selfKey)) room.online.push(selfKey);
+          renderRoom(document.querySelector("#room-float-panel"));
         });
       });
 

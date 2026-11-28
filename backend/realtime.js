@@ -224,8 +224,14 @@ async function seatSnapshot(room) {
         socket.data.uid = ctx.user.uid;
         socket.data.displayName = ctx.user.displayName;
         socket.join("room:" + key);
-        const peers = [...(io.sockets.adapter.rooms.get("room:" + key) || [])]
+        const peerSocketIds = [...(io.sockets.adapter.rooms.get("room:" + key) || [])]
           .filter(id => id !== socket.id);
+        const peers = peerSocketIds.map(id => {
+          const peer = io.sockets.sockets.get(id);
+          return peer && peer.data && Number.isSafeInteger(Number(peer.data.uid))
+            ? { socketId: id, uid: Number(peer.data.uid), displayName: String(peer.data.displayName || "") }
+            : null;
+        }).filter(Boolean);
         ack({ ok: true, roomCode, socketId: socket.id, uid: ctx.user.uid, peers, seats: await seatSnapshot(ctx.room) });
         socket.to("room:" + key).emit("room:peer-joined", {
           socketId: socket.id, uid: ctx.user.uid, displayName: ctx.user.displayName
