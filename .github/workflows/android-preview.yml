@@ -223,6 +223,27 @@ jobs:
       - name: Sync Android project
         run: npx cap sync android
 
+      - name: Add Android microphone and audio-routing permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          xml = p.read_text(encoding='utf-8')
+          permissions = [
+              'android.permission.RECORD_AUDIO',
+              'android.permission.MODIFY_AUDIO_SETTINGS'
+          ]
+          for permission in permissions:
+              marker = f'<uses-permission android:name="{permission}"'
+              if marker not in xml:
+                  xml = xml.replace('<application', f'<uses-permission android:name="{permission}" />\\n    <application', 1)
+          p.write_text(xml, encoding='utf-8')
+          for permission in permissions:
+              if f'android:name="{permission}"' not in xml:
+                  raise SystemExit(f'Missing Android permission: {permission}')
+          print('Android microphone and audio routing permissions are present')
+          PY
+
       - name: Apply MigoLive launcher icon
         run: |
           curl -fL 'https://raw.githubusercontent.com/ahmedtotielkady-sudo/MigoLive/main/assets/migolive-icon.jpg' -o /tmp/migo-icon.jpg
