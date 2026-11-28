@@ -213,7 +213,7 @@ router.post("/:uid/reset-password", async (req, res, next) => {
       return res.status(400).json({ ok: false, message: "كلمة المرور الجديدة يجب أن تكون من 8 إلى 72 حرفًا" });
     }
 
-    const target = await User.findOne({ uid }).select("+passwordHash");
+    const target = await User.findOne({ uid });
     if (!target) return res.status(404).json({ ok: false, message: "العضو غير موجود" });
     if (target.role === "owner") {
       return res.status(403).json({ ok: false, message: "لا يمكن تغيير كلمة مرور مالك التطبيق من إدارة الأعضاء" });
