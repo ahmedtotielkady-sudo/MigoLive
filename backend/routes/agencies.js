@@ -233,7 +233,7 @@ router.get("/:agencyId/members", async (req, res, next) => {
     if (!validObjectId(req.params.agencyId)) return res.status(400).json({ ok: false, message: "معرّف الوكالة غير صحيح" });
     const agency = await Agency.findById(req.params.agencyId).lean();
     if (!agency) return res.status(404).json({ ok: false, message: "الوكالة غير موجودة" });
-    await agencyAccess(req.auth.sub, agency);
+    await agencyAccess(req.auth.sub, agency, ["manager"]);
     const rows = await AgencyMembership.find({ agencyId: agency._id, status: { $ne: "removed" } })
       .populate("userId", "uid username displayName avatar status").sort({ createdAt: -1 }).limit(500).lean();
     return res.json({ ok: true, members: rows.filter(m => m.userId).map(m => ({
@@ -408,7 +408,7 @@ router.get("/:agencyId/ledger", async (req, res) => {
     if (!validObjectId(req.params.agencyId)) return res.status(400).json({ ok: false, message: "معرّف الوكالة غير صحيح" });
     const agency = await Agency.findById(req.params.agencyId).lean();
     if (!agency) return res.status(404).json({ ok: false, message: "الوكالة غير موجودة" });
-    await agencyAccess(req.auth.sub, agency);
+    await agencyAccess(req.auth.sub, agency, ["manager"]);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
     const entries = await AgencyLedger.find({ agencyId: agency._id }).sort({ createdAt: -1 }).limit(limit).lean();
     return res.json({ ok: true, entries });
